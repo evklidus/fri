@@ -1,0 +1,854 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]: FRI
+    - list [ref=e4]:
+      - listitem [ref=e5]:
+        - link "Rankings" [ref=e6] [cursor=pointer]:
+          - /url: "#leaderboard"
+      - listitem [ref=e7]:
+        - link "Fan Polls" [ref=e8] [cursor=pointer]:
+          - /url: "#polls"
+      - listitem [ref=e9]:
+        - link "Live News" [ref=e10] [cursor=pointer]:
+          - /url: "#news"
+      - listitem [ref=e11]:
+        - link "Formula" [ref=e12] [cursor=pointer]:
+          - /url: "#formula"
+      - listitem [ref=e13]:
+        - link "For You" [ref=e14] [cursor=pointer]:
+          - /url: "#personas"
+      - listitem [ref=e15]:
+        - link "Explore" [ref=e16] [cursor=pointer]:
+          - /url: "#leaderboard"
+    - generic [ref=e17]:
+      - button "🇬🇧 EN" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 🇬🇧
+        - text: EN
+      - button "🇷🇺 RU" [ref=e20] [cursor=pointer]:
+        - generic [ref=e21]: 🇷🇺
+        - text: RU
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]: The Global Standard for Player Reputation
+      - heading "FOOTBALL REPUTATION INDEX" [level=1] [ref=e25]:
+        - text: FOOTBALL
+        - text: REPUTATION
+        - text: INDEX
+      - paragraph [ref=e26]: FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, fan sentiment, media coverage, and character into one transparent number.
+      - generic [ref=e27]:
+        - button "View Rankings" [ref=e28] [cursor=pointer]
+        - button "How It Works" [ref=e29] [cursor=pointer]
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - img [ref=e34]
+        - generic [ref=e35]:
+          - heading "K. Mbappé" [level=3] [ref=e36]
+          - paragraph [ref=e37]: FWD · Real Madrid
+        - generic [ref=e38]: Legendary
+      - generic [ref=e39]:
+        - generic [ref=e40]: "91.6"
+        - generic [ref=e41]: Football Reputation Index
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]: Performance
+          - generic [ref=e47]: "93"
+        - generic [ref=e48]:
+          - generic [ref=e49]: Social
+          - generic [ref=e52]: "98"
+        - generic [ref=e53]:
+          - generic [ref=e54]: Fan Poll
+          - generic [ref=e57]: "91.4"
+        - generic [ref=e58]:
+          - generic [ref=e59]: Media
+          - generic [ref=e62]: "82"
+        - generic [ref=e63]:
+          - generic [ref=e64]: Character
+          - generic [ref=e67]: "89"
+  - generic [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]: Global Rankings
+      - heading "FRI Leaderboard" [level=2] [ref=e71]
+      - paragraph [ref=e72]: Updated in real-time as matches end, news breaks, and fans vote. Every position, every age, one fair score.
+    - textbox "Search player name..." [ref=e74]
+    - generic [ref=e75]:
+      - button "All" [ref=e76] [cursor=pointer]
+      - button "Goalkeeper" [ref=e77] [cursor=pointer]
+      - button "Defender" [ref=e78] [cursor=pointer]
+      - button "Midfielder" [ref=e79] [cursor=pointer]
+      - button "Forward" [ref=e80] [cursor=pointer]
+    - table [ref=e81]:
+      - rowgroup [ref=e82]:
+        - row "# Player FRI Score Performance Social Fan Poll Trend" [ref=e83]:
+          - columnheader "#" [ref=e84]
+          - columnheader "Player" [ref=e85]
+          - columnheader "FRI Score" [ref=e86]
+          - columnheader "Performance" [ref=e87]
+          - columnheader "Social" [ref=e88]
+          - columnheader "Fan Poll" [ref=e89]
+          - columnheader "Trend" [ref=e90]
+      - rowgroup [ref=e91]:
+        - row "1 K. Mbappé Real Madrid · FWD · 26y 91.6 93 98 91.4 ↑ 0.6" [ref=e92] [cursor=pointer]:
+          - cell "1" [ref=e93]:
+            - generic [ref=e94]: "1"
+          - cell "K. Mbappé Real Madrid · FWD · 26y" [ref=e95]:
+            - generic [ref=e96]:
+              - img [ref=e98]
+              - generic [ref=e99]:
+                - generic [ref=e100]: K. Mbappé
+                - generic [ref=e101]: Real Madrid · FWD · 26y
+          - cell "91.6" [ref=e102]
+          - cell "93" [ref=e103]:
+            - generic [ref=e107]: "93"
+          - cell "98" [ref=e108]:
+            - generic [ref=e112]: "98"
+          - cell "91.4" [ref=e113]:
+            - generic [ref=e117]: "91.4"
+          - cell "↑ 0.6" [ref=e118]
+        - row "2 E. Haaland Man City · FWD · 24y 90 95 88 91 ↓ 2.1" [ref=e119] [cursor=pointer]:
+          - cell "2" [ref=e120]:
+            - generic [ref=e121]: "2"
+          - cell "E. Haaland Man City · FWD · 24y" [ref=e122]:
+            - generic [ref=e123]:
+              - img [ref=e125]
+              - generic [ref=e126]:
+                - generic [ref=e127]: E. Haaland
+                - generic [ref=e128]: Man City · FWD · 24y
+          - cell "90" [ref=e129]
+          - cell "95" [ref=e130]:
+            - generic [ref=e134]: "95"
+          - cell "88" [ref=e135]:
+            - generic [ref=e139]: "88"
+          - cell "91" [ref=e140]:
+            - generic [ref=e144]: "91"
+          - cell "↓ 2.1" [ref=e145]
+        - row "3 J. Bellingham Real Madrid · MID · 21y 89 91 85 95 ↑ 2.1" [ref=e146] [cursor=pointer]:
+          - cell "3" [ref=e147]:
+            - generic [ref=e148]: "3"
+          - cell "J. Bellingham Real Madrid · MID · 21y" [ref=e149]:
+            - generic [ref=e150]:
+              - img [ref=e152]
+              - generic [ref=e153]:
+                - generic [ref=e154]: J. Bellingham
+                - generic [ref=e155]: Real Madrid · MID · 21y
+          - cell "89" [ref=e156]
+          - cell "91" [ref=e157]:
+            - generic [ref=e161]: "91"
+          - cell "85" [ref=e162]:
+            - generic [ref=e166]: "85"
+          - cell "95" [ref=e167]:
+            - generic [ref=e171]: "95"
+          - cell "↑ 2.1" [ref=e172]
+        - row "4 M. Salah Liverpool · FWD · 32y 88 89 90 91 ↑ 0.4" [ref=e173] [cursor=pointer]:
+          - cell "4" [ref=e174]:
+            - generic [ref=e175]: "4"
+          - cell "M. Salah Liverpool · FWD · 32y" [ref=e176]:
+            - generic [ref=e177]:
+              - img [ref=e179]
+              - generic [ref=e180]:
+                - generic [ref=e181]: M. Salah
+                - generic [ref=e182]: Liverpool · FWD · 32y
+          - cell "88" [ref=e183]
+          - cell "89" [ref=e184]:
+            - generic [ref=e188]: "89"
+          - cell "90" [ref=e189]:
+            - generic [ref=e193]: "90"
+          - cell "91" [ref=e194]:
+            - generic [ref=e198]: "91"
+          - cell "↑ 0.4" [ref=e199]
+        - row "5 H. Kane Bayern Munich · FWD · 31y 87 93 82 87 ↑ 1.2" [ref=e200] [cursor=pointer]:
+          - cell "5" [ref=e201]:
+            - generic [ref=e202]: "5"
+          - cell "H. Kane Bayern Munich · FWD · 31y" [ref=e203]:
+            - generic [ref=e204]:
+              - img [ref=e206]
+              - generic [ref=e207]:
+                - generic [ref=e208]: H. Kane
+                - generic [ref=e209]: Bayern Munich · FWD · 31y
+          - cell "87" [ref=e210]
+          - cell "93" [ref=e211]:
+            - generic [ref=e215]: "93"
+          - cell "82" [ref=e216]:
+            - generic [ref=e220]: "82"
+          - cell "87" [ref=e221]:
+            - generic [ref=e225]: "87"
+          - cell "↑ 1.2" [ref=e226]
+        - row "6 Raphinha FC Barcelona · FWD · 28y 86 91 83 87 ↑ 2.3" [ref=e227] [cursor=pointer]:
+          - cell "6" [ref=e228]:
+            - generic [ref=e229]: "6"
+          - cell "Raphinha FC Barcelona · FWD · 28y" [ref=e230]:
+            - generic [ref=e231]:
+              - img [ref=e233]
+              - generic [ref=e234]:
+                - generic [ref=e235]: Raphinha
+                - generic [ref=e236]: FC Barcelona · FWD · 28y
+          - cell "86" [ref=e237]
+          - cell "91" [ref=e238]:
+            - generic [ref=e242]: "91"
+          - cell "83" [ref=e243]:
+            - generic [ref=e247]: "83"
+          - cell "87" [ref=e248]:
+            - generic [ref=e252]: "87"
+          - cell "↑ 2.3" [ref=e253]
+        - row "7 T. Courtois Real Madrid · GK · 32y 86 90 78 85 ↑ 1.4" [ref=e254] [cursor=pointer]:
+          - cell "7" [ref=e255]:
+            - generic [ref=e256]: "7"
+          - cell "T. Courtois Real Madrid · GK · 32y" [ref=e257]:
+            - generic [ref=e258]:
+              - img [ref=e260]
+              - generic [ref=e261]:
+                - generic [ref=e262]: T. Courtois
+                - generic [ref=e263]: Real Madrid · GK · 32y
+          - cell "86" [ref=e264]
+          - cell "90" [ref=e265]:
+            - generic [ref=e269]: "90"
+          - cell "78" [ref=e270]:
+            - generic [ref=e274]: "78"
+          - cell "85" [ref=e275]:
+            - generic [ref=e279]: "85"
+          - cell "↑ 1.4" [ref=e280]
+        - row "8 D. Rice Arsenal · MID · 26y 85 89 78 85 ↑ 1.8" [ref=e281] [cursor=pointer]:
+          - cell "8" [ref=e282]:
+            - generic [ref=e283]: "8"
+          - cell "D. Rice Arsenal · MID · 26y" [ref=e284]:
+            - generic [ref=e285]:
+              - img [ref=e287]
+              - generic [ref=e288]:
+                - generic [ref=e289]: D. Rice
+                - generic [ref=e290]: Arsenal · MID · 26y
+          - cell "85" [ref=e291]
+          - cell "89" [ref=e292]:
+            - generic [ref=e296]: "89"
+          - cell "78" [ref=e297]:
+            - generic [ref=e301]: "78"
+          - cell "85" [ref=e302]:
+            - generic [ref=e306]: "85"
+          - cell "↑ 1.8" [ref=e307]
+        - row "9 N'Golo Kanté Fenerbahçe · MID · 34y 85 88 76 89 ↑ 1.1" [ref=e308] [cursor=pointer]:
+          - cell "9" [ref=e309]:
+            - generic [ref=e310]: "9"
+          - cell "N'Golo Kanté Fenerbahçe · MID · 34y" [ref=e311]:
+            - generic [ref=e312]:
+              - img [ref=e314]
+              - generic [ref=e315]:
+                - generic [ref=e316]: N'Golo Kanté
+                - generic [ref=e317]: Fenerbahçe · MID · 34y
+          - cell "85" [ref=e318]
+          - cell "88" [ref=e319]:
+            - generic [ref=e323]: "88"
+          - cell "76" [ref=e324]:
+            - generic [ref=e328]: "76"
+          - cell "89" [ref=e329]:
+            - generic [ref=e333]: "89"
+          - cell "↑ 1.1" [ref=e334]
+        - row "10 V. van Dijk Liverpool · DEF · 33y 85 87 72 88 ↓ 0.2" [ref=e335] [cursor=pointer]:
+          - cell "10" [ref=e336]:
+            - generic [ref=e337]: "10"
+          - cell "V. van Dijk Liverpool · DEF · 33y" [ref=e338]:
+            - generic [ref=e339]:
+              - img [ref=e341]
+              - generic [ref=e342]:
+                - generic [ref=e343]: V. van Dijk
+                - generic [ref=e344]: Liverpool · DEF · 33y
+          - cell "85" [ref=e345]
+          - cell "87" [ref=e346]:
+            - generic [ref=e350]: "87"
+          - cell "72" [ref=e351]:
+            - generic [ref=e355]: "72"
+          - cell "88" [ref=e356]:
+            - generic [ref=e360]: "88"
+          - cell "↓ 0.2" [ref=e361]
+        - row "11 Pedri FC Barcelona · MID · 22y 84 88 80 90 ↑ 2.4" [ref=e362] [cursor=pointer]:
+          - cell "11" [ref=e363]:
+            - generic [ref=e364]: "11"
+          - cell "Pedri FC Barcelona · MID · 22y" [ref=e365]:
+            - generic [ref=e366]:
+              - img [ref=e368]
+              - generic [ref=e369]:
+                - generic [ref=e370]: Pedri
+                - generic [ref=e371]: FC Barcelona · MID · 22y
+          - cell "84" [ref=e372]
+          - cell "88" [ref=e373]:
+            - generic [ref=e377]: "88"
+          - cell "80" [ref=e378]:
+            - generic [ref=e382]: "80"
+          - cell "90" [ref=e383]:
+            - generic [ref=e387]: "90"
+          - cell "↑ 2.4" [ref=e388]
+        - row "12 L. Yamal FC Barcelona · FWD · 17y 83 90 88 91 ↑ 4.2" [ref=e389] [cursor=pointer]:
+          - cell "12" [ref=e390]:
+            - generic [ref=e391]: "12"
+          - cell "L. Yamal FC Barcelona · FWD · 17y" [ref=e392]:
+            - generic [ref=e393]:
+              - img [ref=e395]
+              - generic [ref=e396]:
+                - generic [ref=e397]: L. Yamal
+                - generic [ref=e398]: FC Barcelona · FWD · 17y
+          - cell "83" [ref=e399]
+          - cell "90" [ref=e400]:
+            - generic [ref=e404]: "90"
+          - cell "88" [ref=e405]:
+            - generic [ref=e409]: "88"
+          - cell "91" [ref=e410]:
+            - generic [ref=e414]: "91"
+          - cell "↑ 4.2" [ref=e415]
+        - row "13 Vitinha PSG · MID · 24y 83 87 72 84 ↑ 2.2" [ref=e416] [cursor=pointer]:
+          - cell "13" [ref=e417]:
+            - generic [ref=e418]: "13"
+          - cell "Vitinha PSG · MID · 24y" [ref=e419]:
+            - generic [ref=e420]:
+              - img [ref=e422]
+              - generic [ref=e423]:
+                - generic [ref=e424]: Vitinha
+                - generic [ref=e425]: PSG · MID · 24y
+          - cell "83" [ref=e426]
+          - cell "87" [ref=e427]:
+            - generic [ref=e431]: "87"
+          - cell "72" [ref=e432]:
+            - generic [ref=e436]: "72"
+          - cell "84" [ref=e437]:
+            - generic [ref=e441]: "84"
+          - cell "↑ 2.2" [ref=e442]
+        - row "14 F. Valverde Real Madrid · MID · 26y 82 89 74 82 ↑ 1.6" [ref=e443] [cursor=pointer]:
+          - cell "14" [ref=e444]:
+            - generic [ref=e445]: "14"
+          - cell "F. Valverde Real Madrid · MID · 26y" [ref=e446]:
+            - generic [ref=e447]:
+              - img [ref=e449]
+              - generic [ref=e450]:
+                - generic [ref=e451]: F. Valverde
+                - generic [ref=e452]: Real Madrid · MID · 26y
+          - cell "82" [ref=e453]
+          - cell "89" [ref=e454]:
+            - generic [ref=e458]: "89"
+          - cell "74" [ref=e459]:
+            - generic [ref=e463]: "74"
+          - cell "82" [ref=e464]:
+            - generic [ref=e468]: "82"
+          - cell "↑ 1.6" [ref=e469]
+        - row "15 Fermín López FC Barcelona · MID · 21y 81 84 72 83 ↑ 3.1" [ref=e470] [cursor=pointer]:
+          - cell "15" [ref=e471]:
+            - generic [ref=e472]: "15"
+          - cell "Fermín López FC Barcelona · MID · 21y" [ref=e473]:
+            - generic [ref=e474]:
+              - img [ref=e476]
+              - generic [ref=e477]:
+                - generic [ref=e478]: Fermín López
+                - generic [ref=e479]: FC Barcelona · MID · 21y
+          - cell "81" [ref=e480]
+          - cell "84" [ref=e481]:
+            - generic [ref=e485]: "84"
+          - cell "72" [ref=e486]:
+            - generic [ref=e490]: "72"
+          - cell "83" [ref=e491]:
+            - generic [ref=e495]: "83"
+          - cell "↑ 3.1" [ref=e496]
+        - row "16 P. Cubarsí FC Barcelona · DEF · 18y 81 85 71 80 ↑ 3.4" [ref=e497] [cursor=pointer]:
+          - cell "16" [ref=e498]:
+            - generic [ref=e499]: "16"
+          - cell "P. Cubarsí FC Barcelona · DEF · 18y" [ref=e500]:
+            - generic [ref=e501]:
+              - img [ref=e503]
+              - generic [ref=e504]:
+                - generic [ref=e505]: P. Cubarsí
+                - generic [ref=e506]: FC Barcelona · DEF · 18y
+          - cell "81" [ref=e507]
+          - cell "85" [ref=e508]:
+            - generic [ref=e512]: "85"
+          - cell "71" [ref=e513]:
+            - generic [ref=e517]: "71"
+          - cell "80" [ref=e518]:
+            - generic [ref=e522]: "80"
+          - cell "↑ 3.4" [ref=e523]
+        - row "17 M. Olise Bayern Munich · FWD · 23y 80 87 74 81 ↑ 2.8" [ref=e524] [cursor=pointer]:
+          - cell "17" [ref=e525]:
+            - generic [ref=e526]: "17"
+          - cell "M. Olise Bayern Munich · FWD · 23y" [ref=e527]:
+            - generic [ref=e528]:
+              - img [ref=e530]
+              - generic [ref=e531]:
+                - generic [ref=e532]: M. Olise
+                - generic [ref=e533]: Bayern Munich · FWD · 23y
+          - cell "80" [ref=e534]
+          - cell "87" [ref=e535]:
+            - generic [ref=e539]: "87"
+          - cell "74" [ref=e540]:
+            - generic [ref=e544]: "74"
+          - cell "81" [ref=e545]:
+            - generic [ref=e549]: "81"
+          - cell "↑ 2.8" [ref=e550]
+        - row "18 J. García FC Barcelona · GK · 23y 79 83 65 78 ↑ 3.8" [ref=e551] [cursor=pointer]:
+          - cell "18" [ref=e552]:
+            - generic [ref=e553]: "18"
+          - cell "J. García FC Barcelona · GK · 23y" [ref=e554]:
+            - generic [ref=e555]:
+              - img [ref=e557]
+              - generic [ref=e558]:
+                - generic [ref=e559]: J. García
+                - generic [ref=e560]: FC Barcelona · GK · 23y
+          - cell "79" [ref=e561]
+          - cell "83" [ref=e562]:
+            - generic [ref=e566]: "83"
+          - cell "65" [ref=e567]:
+            - generic [ref=e571]: "65"
+          - cell "78" [ref=e572]:
+            - generic [ref=e576]: "78"
+          - cell "↑ 3.8" [ref=e577]
+        - row "19 Vinicius Jr Real Madrid · FWD · 24y 78 93 91 74 ↓ 1.7" [ref=e578] [cursor=pointer]:
+          - cell "19" [ref=e579]:
+            - generic [ref=e580]: "19"
+          - cell "Vinicius Jr Real Madrid · FWD · 24y" [ref=e581]:
+            - generic [ref=e582]:
+              - img [ref=e584]
+              - generic [ref=e585]:
+                - generic [ref=e586]: Vinicius Jr
+                - generic [ref=e587]: Real Madrid · FWD · 24y
+          - cell "78" [ref=e588]
+          - cell "93" [ref=e589]:
+            - generic [ref=e593]: "93"
+          - cell "91" [ref=e594]:
+            - generic [ref=e598]: "91"
+          - cell "74" [ref=e599]:
+            - generic [ref=e603]: "74"
+          - cell "↓ 1.7" [ref=e604]
+        - row "20 H. Ekitike Liverpool · FWD · 22y 77 83 70 78 ↑ 3.5" [ref=e605] [cursor=pointer]:
+          - cell "20" [ref=e606]:
+            - generic [ref=e607]: "20"
+          - cell "H. Ekitike Liverpool · FWD · 22y" [ref=e608]:
+            - generic [ref=e609]:
+              - img [ref=e611]
+              - generic [ref=e612]:
+                - generic [ref=e613]: H. Ekitike
+                - generic [ref=e614]: Liverpool · FWD · 22y
+          - cell "77" [ref=e615]
+          - cell "83" [ref=e616]:
+            - generic [ref=e620]: "83"
+          - cell "70" [ref=e621]:
+            - generic [ref=e625]: "70"
+          - cell "78" [ref=e626]:
+            - generic [ref=e630]: "78"
+          - cell "↑ 3.5" [ref=e631]
+        - row "21 Rayan Cherki Manchester City · MID · 21y 76 80 69 77 ↑ 1.8" [ref=e632] [cursor=pointer]:
+          - cell "21" [ref=e633]:
+            - generic [ref=e634]: "21"
+          - cell "Rayan Cherki Manchester City · MID · 21y" [ref=e635]:
+            - generic [ref=e636]:
+              - img [ref=e638]
+              - generic [ref=e639]:
+                - generic [ref=e640]: Rayan Cherki
+                - generic [ref=e641]: Manchester City · MID · 21y
+          - cell "76" [ref=e642]
+          - cell "80" [ref=e643]:
+            - generic [ref=e647]: "80"
+          - cell "69" [ref=e648]:
+            - generic [ref=e652]: "69"
+          - cell "77" [ref=e653]:
+            - generic [ref=e657]: "77"
+          - cell "↑ 1.8" [ref=e658]
+        - row "22 R. Asencio Real Madrid · DEF · 19y 75 82 68 76 ↑ 2.9" [ref=e659] [cursor=pointer]:
+          - cell "22" [ref=e660]:
+            - generic [ref=e661]: "22"
+          - cell "R. Asencio Real Madrid · DEF · 19y" [ref=e662]:
+            - generic [ref=e663]:
+              - img [ref=e665]
+              - generic [ref=e666]:
+                - generic [ref=e667]: R. Asencio
+                - generic [ref=e668]: Real Madrid · DEF · 19y
+          - cell "75" [ref=e669]
+          - cell "82" [ref=e670]:
+            - generic [ref=e674]: "82"
+          - cell "68" [ref=e675]:
+            - generic [ref=e679]: "68"
+          - cell "76" [ref=e680]:
+            - generic [ref=e684]: "76"
+          - cell "↑ 2.9" [ref=e685]
+  - generic [ref=e687]:
+    - generic [ref=e688]:
+      - generic [ref=e689]: Community Voice
+      - heading "Fan Poll" [level=2] [ref=e690]
+      - paragraph [ref=e691]: Your rating directly impacts a player's FRI. 20% of the score comes from you — the fans.
+    - generic [ref=e692]:
+      - generic [ref=e693]:
+        - generic [ref=e694]: ⚽
+        - generic [ref=e695]:
+          - heading "Rate K. Mbappé" [level=3] [ref=e696]
+          - paragraph [ref=e697]: "Real Madrid · Forward · Last match: vs. Barcelona (UCL)"
+        - combobox [ref=e698] [cursor=pointer]:
+          - option "K. Mbappé" [selected]
+          - option "E. Haaland"
+          - option "J. Bellingham"
+          - option "M. Salah"
+          - option "H. Kane"
+          - option "Raphinha"
+          - option "T. Courtois"
+          - option "D. Rice"
+          - option "N'Golo Kanté"
+          - option "V. van Dijk"
+          - option "Pedri"
+          - option "L. Yamal"
+          - option "Vitinha"
+          - option "F. Valverde"
+          - option "Fermín López"
+          - option "P. Cubarsí"
+          - option "M. Olise"
+          - option "J. García"
+          - option "Vinicius Jr"
+          - option "H. Ekitike"
+          - option "Rayan Cherki"
+          - option "R. Asencio"
+      - generic [ref=e699]:
+        - heading "Overall performance this season" [level=4] [ref=e700]
+        - generic [ref=e701]:
+          - generic [ref=e702] [cursor=pointer]: ★
+          - generic [ref=e703] [cursor=pointer]: ★
+          - generic [ref=e704] [cursor=pointer]: ★
+          - generic [ref=e705] [cursor=pointer]: ★
+          - generic [ref=e706] [cursor=pointer]: ★
+      - generic [ref=e707]:
+        - heading "Fan engagement score (1–10)" [level=4] [ref=e708]
+        - generic [ref=e709]:
+          - slider [ref=e710]: "7"
+          - generic [ref=e711]: "7"
+      - generic [ref=e712]:
+        - heading "How do you see this player?" [level=4] [ref=e713]
+        - generic [ref=e714]:
+          - button "🏆 GOAT Candidate" [ref=e715] [cursor=pointer]
+          - button "🌟 World Class" [ref=e716] [cursor=pointer]
+          - button "⚡ Elite" [ref=e717] [cursor=pointer]
+          - button "📈 Improving" [ref=e718] [cursor=pointer]
+          - button "😐 Overrated" [ref=e719] [cursor=pointer]
+          - button "📉 Below Hype" [ref=e720] [cursor=pointer]
+      - generic [ref=e721]:
+        - heading "Off-field behavior" [level=4] [ref=e722]
+        - generic [ref=e723]:
+          - button "✅ Role Model" [ref=e724] [cursor=pointer]
+          - button "😶 Neutral" [ref=e725] [cursor=pointer]
+          - button "⚠️ Controversial" [ref=e726] [cursor=pointer]
+          - button "❌ Problematic" [ref=e727] [cursor=pointer]
+      - button "Submit My Rating → Impact FRI" [ref=e728] [cursor=pointer]
+  - generic [ref=e730]:
+    - generic [ref=e731]:
+      - generic [ref=e732]: Live Intelligence
+      - heading "News Feed" [level=2] [ref=e734]
+      - paragraph [ref=e735]: AI-analyzed news articles automatically adjust player FRI scores in real-time. Positive stories push it up, scandals push it down.
+    - generic [ref=e736]:
+      - generic [ref=e737] [cursor=pointer]:
+        - generic [ref=e738]:
+          - generic [ref=e739]: ↑ Positive
+          - generic [ref=e740]: 2h
+        - generic [ref=e741]: K. Mbappé
+        - generic [ref=e742]: Mbappé scores hat-trick to send Real Madrid through to UCL semis
+        - generic [ref=e743]: Delivered a masterclass with 3 goals and 2 key passes in a 4-1 victory. Crowd reception was exceptional.
+        - generic [ref=e744]:
+          - generic [ref=e745]: "FRI Impact:"
+          - generic [ref=e746]: "+1.8"
+          - generic [ref=e747]: pts (auto-applied)
+      - generic [ref=e748] [cursor=pointer]:
+        - generic [ref=e749]:
+          - generic [ref=e750]: ↑ Positive
+          - generic [ref=e751]: 3h
+        - generic [ref=e752]: L. Yamal
+        - generic [ref=e753]: Yamal scores and assists in El Clásico at 17 — youngest player to do so in history
+        - generic [ref=e754]: "The teenager delivered a historic performance in El Clásico — goal, assist, and 11 successful dribbles. Social media exploded with 45M combined views in 24 hours. Fan ratings: 9.8/10 across all platforms."
+        - generic [ref=e755]:
+          - generic [ref=e756]: "FRI Impact:"
+          - generic [ref=e757]: "+2.1"
+          - generic [ref=e758]: pts (auto-applied)
+      - generic [ref=e759] [cursor=pointer]:
+        - generic [ref=e760]:
+          - generic [ref=e761]: ↑ Positive
+          - generic [ref=e762]: 4h
+        - generic [ref=e763]: J. García
+        - generic [ref=e764]: Joan García saves penalty in El Clásico — voted Man of the Match
+        - generic [ref=e765]: The 23-year-old Barcelona goalkeeper made three world-class saves including a crucial penalty stop in the 87th minute. Post-match fan ratings hit 9.7/10 — the highest of any goalkeeper in FRI this season. Xavi's successor praised him as 'the best young keeper in Europe right now'.
+        - generic [ref=e766]:
+          - generic [ref=e767]: "FRI Impact:"
+          - generic [ref=e768]: "+2.1"
+          - generic [ref=e769]: pts (auto-applied)
+      - generic [ref=e770] [cursor=pointer]:
+        - generic [ref=e771]:
+          - generic [ref=e772]: ↑ Positive
+          - generic [ref=e773]: 8h
+        - generic [ref=e774]: P. Cubarsí
+        - generic [ref=e775]: Cubarsí named UEFA Champions League's best young defender — at 18
+        - generic [ref=e776]: UEFA's official statistical analysis crowned Cubarsí the top-performing U21 defender in the Champions League this season. 94% duel success rate, 0 errors leading to goals, and 87% long-pass accuracy. His profile went viral — 18M impressions in 24 hours.
+        - generic [ref=e777]:
+          - generic [ref=e778]: "FRI Impact:"
+          - generic [ref=e779]: "+1.7"
+          - generic [ref=e780]: pts (auto-applied)
+      - generic [ref=e781] [cursor=pointer]:
+        - generic [ref=e782]:
+          - generic [ref=e783]: ↑ Positive
+          - generic [ref=e784]: 12h
+        - generic [ref=e785]: Fermín López
+        - generic [ref=e786]: Fermín scores stunning volley and wins Man of the Match in Barcelona's UCL win
+        - generic [ref=e787]: "The 21-year-old midfielder controlled the game from box to box — 92% pass accuracy, 3 key chances created, and a spectacular volley from 20 yards. Post-match he dedicated the goal to the youth academy staff. Fan ratings: 9.6/10."
+        - generic [ref=e788]:
+          - generic [ref=e789]: "FRI Impact:"
+          - generic [ref=e790]: "+1.6"
+          - generic [ref=e791]: pts (auto-applied)
+      - generic [ref=e792] [cursor=pointer]:
+        - generic [ref=e793]:
+          - generic [ref=e794]: ↑ Positive
+          - generic [ref=e795]: 1d
+        - generic [ref=e796]: Rayan Cherki
+        - generic [ref=e797]: Cherki's backheel assist goes viral — called 'the touch of the season' by L'Équipe
+        - generic [ref=e798]: An instinctive backheel through-ball in traffic that set up a PSG winner. The clip has 28M views across social platforms in 24 hours, boosting his social FRI pillar significantly.
+        - generic [ref=e799]:
+          - generic [ref=e800]: "FRI Impact:"
+          - generic [ref=e801]: "+1.1"
+          - generic [ref=e802]: pts (auto-applied)
+      - generic [ref=e803] [cursor=pointer]:
+        - generic [ref=e804]:
+          - generic [ref=e805]: ↑ Positive
+          - generic [ref=e806]: 1d
+        - generic [ref=e807]: M. Olise
+        - generic [ref=e808]: Olise hat-trick in Bundesliga — Bayern's best individual performance of the season
+        - generic [ref=e809]: A stunning hat-trick from outside the box capped a complete 90-minute display. Tuchel called it the best individual performance he has seen this season. International media coverage spiked 280% post-match.
+        - generic [ref=e810]:
+          - generic [ref=e811]: "FRI Impact:"
+          - generic [ref=e812]: "+1.4"
+          - generic [ref=e813]: pts (auto-applied)
+      - generic [ref=e814] [cursor=pointer]:
+        - generic [ref=e815]:
+          - generic [ref=e816]: ↑ Positive
+          - generic [ref=e817]: 1d
+        - generic [ref=e818]: Pedri
+        - generic [ref=e819]: Pedri's 92% pass accuracy in El Clásico draws Iniesta comparisons from Xavi
+        - generic [ref=e820]: "A masterclass display — 92% pass accuracy, 4 key chances created, 11 successful dribbles. Post-match Xavi said: 'When Pedri plays like this, he is the best midfielder in the world.' Fan ratings: 9.5/10. His FRI has jumped 1.9 points in 24 hours."
+        - generic [ref=e821]:
+          - generic [ref=e822]: "FRI Impact:"
+          - generic [ref=e823]: "+1.9"
+          - generic [ref=e824]: pts (auto-applied)
+      - generic [ref=e825] [cursor=pointer]:
+        - generic [ref=e826]:
+          - generic [ref=e827]: ↑ Positive
+          - generic [ref=e828]: 1d
+        - generic [ref=e829]: D. Rice
+        - generic [ref=e830]: Rice's 92% pass accuracy and 9 ball recoveries lead Arsenal to title
+        - generic [ref=e831]: A masterclass in the title-deciding fixture — 92% pass accuracy, 9 ball recoveries and a goal. Arteta called him 'the best midfielder in England, no debate.' Premier League stats show Rice ranks first in defensive actions among all midfielders this season.
+        - generic [ref=e832]:
+          - generic [ref=e833]: "FRI Impact:"
+          - generic [ref=e834]: "+1.6"
+          - generic [ref=e835]: pts (auto-applied)
+      - generic [ref=e836] [cursor=pointer]:
+        - generic [ref=e837]:
+          - generic [ref=e838]: ↑ Positive
+          - generic [ref=e839]: 1d
+        - generic [ref=e840]: H. Ekitike
+        - generic [ref=e841]: Ekitike scores brace as Liverpool demolish title rivals — fans vote him MOTM
+        - generic [ref=e842]: "Two clinical finishes and an assist in a 4-0 win over Arsenal's closest rivals. Post-match fan vote: 9.3/10 — the highest rating of any Liverpool striker this season. Manager post-match: 'He's only 22 and playing like a world-class number 9 already.'"
+        - generic [ref=e843]:
+          - generic [ref=e844]: "FRI Impact:"
+          - generic [ref=e845]: "+2.1"
+          - generic [ref=e846]: pts (auto-applied)
+      - generic [ref=e847] [cursor=pointer]:
+        - generic [ref=e848]:
+          - generic [ref=e849]: ↑ Positive
+          - generic [ref=e850]: 1d
+        - generic [ref=e851]: E. Haaland
+        - generic [ref=e852]: Haaland named Premier League Player of the Month for third time in a row
+        - generic [ref=e853]: Record-breaking consistency recognised by PL. Social media engagement spiked 340% following announcement.
+        - generic [ref=e854]:
+          - generic [ref=e855]: "FRI Impact:"
+          - generic [ref=e856]: "+0.9"
+          - generic [ref=e857]: pts (auto-applied)
+      - generic [ref=e858] [cursor=pointer]:
+        - generic [ref=e859]:
+          - generic [ref=e860]: ↑ Positive
+          - generic [ref=e861]: 2d
+        - generic [ref=e862]: N'Golo Kanté
+        - generic [ref=e863]: Kanté named Fenerbahçe's best player of the season by fan vote — 94% approval
+        - generic [ref=e864]: In a fan poll of over 200,000 Fenerbahçe supporters, Kanté received 94% approval. His tireless work-rate, humility and zero-drama professionalism continue to win hearts everywhere he plays.
+        - generic [ref=e865]:
+          - generic [ref=e866]: "FRI Impact:"
+          - generic [ref=e867]: "+0.9"
+          - generic [ref=e868]: pts (auto-applied)
+      - generic [ref=e869] [cursor=pointer]:
+        - generic [ref=e870]:
+          - generic [ref=e871]: ↑ Positive
+          - generic [ref=e872]: 2d
+        - generic [ref=e873]: R. Asencio
+        - generic [ref=e874]: Asencio's last-minute header sends Real Madrid through in Copa del Rey
+        - generic [ref=e875]: "The 19-year-old defender rose highest to meet a corner and send Real Madrid through to the Copa del Rey semi-finals. Ancelotti singled him out post-match: 'He plays with the maturity of a player ten years older.' Fan ratings shot up to 9.1/10."
+        - generic [ref=e876]:
+          - generic [ref=e877]: "FRI Impact:"
+          - generic [ref=e878]: "+1.3"
+          - generic [ref=e879]: pts (auto-applied)
+      - generic [ref=e880] [cursor=pointer]:
+        - generic [ref=e881]:
+          - generic [ref=e882]: ↑ Positive
+          - generic [ref=e883]: 2d
+        - generic [ref=e884]: T. Courtois
+        - generic [ref=e885]: Courtois named Champions League's best goalkeeper — comeback complete
+        - generic [ref=e886]: UEFA's statistical analysis confirmed Courtois as the top-performing goalkeeper in this season's Champions League. His save percentage (84%) and sweeping actions are both best-in-class. A year ago he was on crutches — today he is the best goalkeeper in the world again.
+        - generic [ref=e887]:
+          - generic [ref=e888]: "FRI Impact:"
+          - generic [ref=e889]: "+1.6"
+          - generic [ref=e890]: pts (auto-applied)
+      - generic [ref=e891] [cursor=pointer]:
+        - generic [ref=e892]:
+          - generic [ref=e893]: ↑ Positive
+          - generic [ref=e894]: 2d
+        - generic [ref=e895]: H. Kane
+        - generic [ref=e896]: Kane breaks Bundesliga all-time scoring record — ovation from rival fans
+        - generic [ref=e897]: "Harry Kane surpassed Gerd Müller's legendary record, becoming the Bundesliga's all-time top scorer. Opposition fans gave him a standing ovation. Kompany: 'The most complete striker I have ever managed.' Fan ratings: 9.3/10."
+        - generic [ref=e898]:
+          - generic [ref=e899]: "FRI Impact:"
+          - generic [ref=e900]: "+1.2"
+          - generic [ref=e901]: pts (auto-applied)
+      - generic [ref=e902] [cursor=pointer]:
+        - generic [ref=e903]:
+          - generic [ref=e904]: ↑ Positive
+          - generic [ref=e905]: 2d
+        - generic [ref=e906]: Vitinha
+        - generic [ref=e907]: Vitinha named Ligue 1 Midfielder of the Season — third year running
+        - generic [ref=e908]: The Portuguese midfielder won his third consecutive Ligue 1 Midfielder of the Season award. His passing accuracy (94%), pressing output and assists tally led all midfielders in France. FRI jumped 1.4 points in 48 hours as fan polls flooded in.
+        - generic [ref=e909]:
+          - generic [ref=e910]: "FRI Impact:"
+          - generic [ref=e911]: "+1.4"
+          - generic [ref=e912]: pts (auto-applied)
+      - generic [ref=e913] [cursor=pointer]:
+        - generic [ref=e914]:
+          - generic [ref=e915]: ↑ Positive
+          - generic [ref=e916]: 2d
+        - generic [ref=e917]: H. Ekitike
+        - generic [ref=e918]: Ekitike hat-trick vs Man City sends Arsenal to UCL final
+        - generic [ref=e919]: Three goals in 25 minutes. Hugo Ekitike destroyed City's defence with pace and precision to send Arsenal to the Champions League final for the first time since 2006. Post-match fan ratings exploded to 9.8/10 — the highest for any Arsenal player this season.
+        - generic [ref=e920]:
+          - generic [ref=e921]: "FRI Impact:"
+          - generic [ref=e922]: "+2.7"
+          - generic [ref=e923]: pts (auto-applied)
+      - generic [ref=e924] [cursor=pointer]:
+        - generic [ref=e925]:
+          - generic [ref=e926]: ↑ Positive
+          - generic [ref=e927]: 3d
+        - generic [ref=e928]: F. Valverde
+        - generic [ref=e929]: Valverde's long-range thunderbolt wins Real Madrid the derby — 3rd screamer this season
+        - generic [ref=e930]: An unstoppable 25-yard drive in the 88th minute settled the Madrid derby. His third long-range goal this season has cemented his reputation as one of the most complete midfielders in Europe. Ancelotti called it 'the goal of the season'.
+        - generic [ref=e931]:
+          - generic [ref=e932]: "FRI Impact:"
+          - generic [ref=e933]: "+1.2"
+          - generic [ref=e934]: pts (auto-applied)
+      - generic [ref=e935] [cursor=pointer]:
+        - generic [ref=e936]:
+          - generic [ref=e937]: ↑ Positive
+          - generic [ref=e938]: 3d
+        - generic [ref=e939]: J. Doku
+        - generic [ref=e940]: Doku's 14 dribbles in one match break Premier League single-game record
+        - generic [ref=e941]: Jérémy Doku completed 14 successful dribbles in Arsenal's 3-1 win — smashing the Premier League single-game record. His direct, fearless style and elite pace make him virtually unplayable on form. Social media engagement jumped 340% after the performance.
+        - generic [ref=e942]:
+          - generic [ref=e943]: "FRI Impact:"
+          - generic [ref=e944]: "+1.7"
+          - generic [ref=e945]: pts (auto-applied)
+      - generic [ref=e946] [cursor=pointer]:
+        - generic [ref=e947]:
+          - generic [ref=e948]: ↑ Positive
+          - generic [ref=e949]: 3d
+        - generic [ref=e950]: J. Doku
+        - generic [ref=e951]: Doku breaks Premier League dribble record — 8 completed in a single match
+        - generic [ref=e952]: "Jeremy Doku completed 8 successful dribbles in Liverpool's 4-0 win — the most by any player in a single PL game this season. Slot called it 'one of the greatest individual performances I have seen.' Fan ratings: 9.6/10."
+        - generic [ref=e953]:
+          - generic [ref=e954]: "FRI Impact:"
+          - generic [ref=e955]: "+2.3"
+          - generic [ref=e956]: pts (auto-applied)
+      - generic [ref=e957] [cursor=pointer]:
+        - generic [ref=e958]:
+          - generic [ref=e959]: ↑ Positive
+          - generic [ref=e960]: 4d
+        - generic [ref=e961]: Fermín López
+        - generic [ref=e962]: Fermín named La Liga's best young player of the month for second consecutive time
+        - generic [ref=e963]: The award capped a remarkable run of form. Coaches across La Liga cited his pressing intensity and leadership qualities as exceptional for his age.
+        - generic [ref=e964]:
+          - generic [ref=e965]: "FRI Impact:"
+          - generic [ref=e966]: "+0.6"
+          - generic [ref=e967]: pts (auto-applied)
+      - generic [ref=e968] [cursor=pointer]:
+        - generic [ref=e969]:
+          - generic [ref=e970]: ↓ Negative
+          - generic [ref=e971]: 5d
+        - generic [ref=e972]: Vinicius Jr
+        - generic [ref=e973]: Vinicius caught on camera simulation sparks VAR controversy and fan backlash
+        - generic [ref=e974]: Clear simulation in the penalty area overturned by VAR. Fans at the Bernabéu and opposition supporters alike reacted negatively. Several Spanish outlets ran editorials questioning his conduct this season.
+        - generic [ref=e975]:
+          - generic [ref=e976]: "FRI Impact:"
+          - generic [ref=e977]: "-1.2"
+          - generic [ref=e978]: pts (auto-applied)
+      - generic [ref=e979] [cursor=pointer]:
+        - generic [ref=e980]:
+          - generic [ref=e981]: — Neutral
+          - generic [ref=e982]: 6d
+        - generic [ref=e983]: Rayan Cherki
+        - generic [ref=e984]: Cherki gives in-depth interview on his football philosophy and Barcelona comparisons
+        - generic [ref=e985]: A thoughtful long-form interview in which Cherki discussed Xavi's influence on his game, his admiration for Iniesta, and his ambitions for the national team. Mature tone praised by French media.
+        - generic [ref=e986]:
+          - generic [ref=e987]: "FRI Impact:"
+          - generic [ref=e988]: "+0.2"
+          - generic [ref=e989]: pts (auto-applied)
+  - generic [ref=e991]:
+    - generic [ref=e992]:
+      - generic [ref=e993]: Methodology
+      - heading "The Formula" [level=2] [ref=e994]
+      - paragraph [ref=e995]: Fair, transparent, and position-neutral. Every component is publicly auditable.
+    - generic [ref=e996]:
+      - generic [ref=e997]: FRI = (P × 0.35) + (S × 0.20) + (F × 0.20) + (M × 0.15) + (C × 0.10)
+      - text: All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation
+    - generic [ref=e998]:
+      - generic [ref=e999]:
+        - heading "🏟️ Field Performance" [level=4] [ref=e1000]
+        - generic [ref=e1001]: "Weight: 35%"
+        - paragraph [ref=e1002]: Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Age-adjusted for veterans.
+      - generic [ref=e1003]:
+        - heading "📱 Social Influence" [level=4] [ref=e1004]
+        - generic [ref=e1005]: "Weight: 20%"
+        - paragraph [ref=e1006]: Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.
+      - generic [ref=e1007]:
+        - heading "🗳️ Fan Sentiment" [level=4] [ref=e1008]
+        - generic [ref=e1009]: "Weight: 20%"
+        - paragraph [ref=e1010]: Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.
+      - generic [ref=e1011]:
+        - heading "📰 Media Score" [level=4] [ref=e1012]
+        - generic [ref=e1013]: "Weight: 15%"
+        - paragraph [ref=e1014]: NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.
+      - generic [ref=e1015]:
+        - heading "⚖️ Character Index" [level=4] [ref=e1016]
+        - generic [ref=e1017]: "Weight: 10%"
+        - paragraph [ref=e1018]: Yellow/red cards, confirmed scandals, fan conflicts, referee disputes subtract points. Charity work and fair play awards add. Older incidents decay 20% weight per year.
+  - generic [ref=e1020]:
+    - generic [ref=e1021]:
+      - generic [ref=e1022]: Platform Access
+      - heading "Built For Everyone" [level=2] [ref=e1023]
+      - paragraph [ref=e1024]: Whether you're a player, a fan, or a global brand — FRI gives you the data you need.
+    - generic [ref=e1025]:
+      - generic [ref=e1026]:
+        - generic [ref=e1027]: ⚽
+        - generic [ref=e1028]: Players
+        - paragraph [ref=e1029]: See exactly what's driving your score up or down. Get actionable feedback from millions of fans worldwide.
+        - list [ref=e1030]:
+          - listitem [ref=e1031]: → Full breakdown of all 5 FRI pillars
+          - listitem [ref=e1032]: → See what fans actually think about you
+          - listitem [ref=e1033]: → Historical trend — track your reputation arc
+          - listitem [ref=e1034]: → Compare to position peers worldwide
+          - listitem [ref=e1035]: → Media sentiment timeline
+      - generic [ref=e1036]:
+        - generic [ref=e1037]: 🏟️
+        - generic [ref=e1038]: Fans
+        - paragraph [ref=e1039]: Your voice matters. Vote in polls, rate performances, and directly shape the reputation of the players you follow.
+        - list [ref=e1040]:
+          - listitem [ref=e1041]: → 20% of FRI is yours — fan poll weight
+          - listitem [ref=e1042]: → Rate any player after any match
+          - listitem [ref=e1043]: → See how your votes move the score
+          - listitem [ref=e1044]: → Follow your club's full squad FRI
+          - listitem [ref=e1045]: → Leaderboard by club, league, nation
+      - generic [ref=e1046]:
+        - generic [ref=e1047]: 📊
+        - generic [ref=e1048]: Brands
+        - paragraph [ref=e1049]: End the guesswork on sponsorship ROI. FRI quantifies reputational risk and media value with a single auditable score.
+        - list [ref=e1050]:
+          - listitem [ref=e1051]: → Sponsorship viability score per player
+          - listitem [ref=e1052]: → Media influence vs. controversy risk ratio
+          - listitem [ref=e1053]: → Historical FRI stability — brand safety
+          - listitem [ref=e1054]: → Demographic breakdown of fan base
+          - listitem [ref=e1055]: → Competitor ambassador benchmarking
+  - contentinfo [ref=e1056]:
+    - generic [ref=e1057]: FRI
+    - generic [ref=e1058]: © 2025 Football Reputation Index. The global standard for player reputation analytics.

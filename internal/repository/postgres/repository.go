@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 
@@ -32,7 +33,7 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `TRUNCATE fan_votes, news_items, fri_history, fri_scores, players RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := tx.Exec(ctx, `TRUNCATE fan_votes, social_snapshots, component_updates, news_items, fri_history, fri_scores, players RESTART IDENTITY CASCADE`); err != nil {
 		return fmt.Errorf("truncate seed tables: %w", err)
 	}
 
@@ -65,8 +66,9 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO fri_scores (
-				player_id, fri, performance, social, fan, fan_base, media, character, trend_value, trend_direction, calculated_at
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+				player_id, fri, performance, social, fan, fan_base, media, character, trend_value, trend_direction, calculated_at,
+				performance_updated_at, social_updated_at, fan_updated_at, media_updated_at, character_updated_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$11,$11,$11,$11,$11)
 		`,
 			playerID,
 			player.FRI,
@@ -102,8 +104,8 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO news_items (
 				player_id, player_name, impact_type, impact_delta, relative_time,
-				title_en, title_ru, summary_en, summary_ru, source, published_at
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+				title_en, title_ru, summary_en, summary_ru, source, source_url, source_tier, sentiment, published_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 		`,
 			playerID,
 			item.PlayerName,
@@ -115,6 +117,9 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 			item.SummaryEN,
 			item.SummaryRU,
 			item.Source,
+			item.SourceURL,
+			defaultFloat(item.SourceTier, 50),
+			item.Sentiment,
 			item.PublishedAt,
 		); err != nil {
 			return fmt.Errorf("insert news %s: %w", item.TitleEN, err)
@@ -131,7 +136,8 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 	baseQuery := `
 		SELECT
 			p.id, p.slug, p.name, p.club, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
-			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at
+			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
+			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
 		JOIN fri_scores s ON s.player_id = p.id
 	`
@@ -163,33 +169,8 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 
 	var result []domain.PlayerWithScore
 	for rows.Next() {
-		var item domain.PlayerWithScore
-		if err := rows.Scan(
-			&item.ID,
-			&item.Slug,
-			&item.Name,
-			&item.Club,
-			&item.Position,
-			&item.Age,
-			&item.Emoji,
-			&item.PhotoData,
-			&item.ThemeBackground,
-			&item.SummaryEN,
-			&item.SummaryRU,
-			&item.CreatedAt,
-			&item.UpdatedAt,
-			&item.PlayerID,
-			&item.FRI,
-			&item.Performance,
-			&item.Social,
-			&item.Fan,
-			&item.FanBase,
-			&item.Media,
-			&item.Character,
-			&item.TrendValue,
-			&item.TrendDirection,
-			&item.CalculatedAt,
-		); err != nil {
+		item, err := scanPlayerWithScore(rows)
+		if err != nil {
 			return nil, err
 		}
 		result = append(result, item)
@@ -199,45 +180,70 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 }
 
 func (r *Repository) GetPlayer(ctx context.Context, id int64) (*domain.PlayerWithScore, error) {
-	var item domain.PlayerWithScore
-	err := r.pool.QueryRow(ctx, `
+	row := r.pool.QueryRow(ctx, `
 		SELECT
 			p.id, p.slug, p.name, p.club, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
-			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at
+			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
+			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
 		JOIN fri_scores s ON s.player_id = p.id
 		WHERE p.id = $1
-	`, id).Scan(
-		&item.ID,
-		&item.Slug,
-		&item.Name,
-		&item.Club,
-		&item.Position,
-		&item.Age,
-		&item.Emoji,
-		&item.PhotoData,
-		&item.ThemeBackground,
-		&item.SummaryEN,
-		&item.SummaryRU,
-		&item.CreatedAt,
-		&item.UpdatedAt,
-		&item.PlayerID,
-		&item.FRI,
-		&item.Performance,
-		&item.Social,
-		&item.Fan,
-		&item.FanBase,
-		&item.Media,
-		&item.Character,
-		&item.TrendValue,
-		&item.TrendDirection,
-		&item.CalculatedAt,
-	)
+	`, id)
+
+	item, err := scanPlayerWithScore(row)
 	if err != nil {
 		return nil, err
 	}
 
 	return &item, nil
+}
+
+func (r *Repository) ListSyncTargets(ctx context.Context) ([]domain.PlayerSyncTarget, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT
+			p.id, p.name, p.club, p.position,
+			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
+			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
+		FROM players p
+		JOIN fri_scores s ON s.player_id = p.id
+		ORDER BY p.name ASC
+	`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var targets []domain.PlayerSyncTarget
+	for rows.Next() {
+		var target domain.PlayerSyncTarget
+		if err := rows.Scan(
+			&target.ID,
+			&target.Name,
+			&target.Club,
+			&target.Position,
+			&target.Score.PlayerID,
+			&target.Score.FRI,
+			&target.Score.Performance,
+			&target.Score.Social,
+			&target.Score.Fan,
+			&target.Score.FanBase,
+			&target.Score.Media,
+			&target.Score.Character,
+			&target.Score.TrendValue,
+			&target.Score.TrendDirection,
+			&target.Score.CalculatedAt,
+			&target.Score.PerformanceUpdatedAt,
+			&target.Score.SocialUpdatedAt,
+			&target.Score.FanUpdatedAt,
+			&target.Score.MediaUpdatedAt,
+			&target.Score.CharacterUpdatedAt,
+		); err != nil {
+			return nil, err
+		}
+		targets = append(targets, target)
+	}
+
+	return targets, rows.Err()
 }
 
 func (r *Repository) GetHistory(ctx context.Context, playerID int64) ([]domain.HistoryPoint, error) {
@@ -266,7 +272,7 @@ func (r *Repository) GetHistory(ctx context.Context, playerID int64) ([]domain.H
 func (r *Repository) ListNews(ctx context.Context, playerID *int64) ([]domain.NewsItem, error) {
 	query := `
 		SELECT id, player_id, player_name, impact_type, impact_delta, relative_time,
-		       title_en, title_ru, summary_en, summary_ru, source, published_at, created_at
+		       title_en, title_ru, summary_en, summary_ru, source, source_url, source_tier, sentiment, published_at, created_at
 		FROM news_items
 	`
 	var args []any
@@ -297,6 +303,9 @@ func (r *Repository) ListNews(ctx context.Context, playerID *int64) ([]domain.Ne
 			&item.SummaryEN,
 			&item.SummaryRU,
 			&item.Source,
+			&item.SourceURL,
+			&item.SourceTier,
+			&item.Sentiment,
 			&item.PublishedAt,
 			&item.CreatedAt,
 		); err != nil {
@@ -331,7 +340,7 @@ func (r *Repository) CreateVoteAndRefreshScore(ctx context.Context, vote domain.
 		return nil, err
 	}
 
-	score, err := refreshFanScore(ctx, tx, vote.PlayerID)
+	score, _, err := refreshFanScore(ctx, tx, vote.PlayerID)
 	if err != nil {
 		return nil, err
 	}
@@ -343,10 +352,148 @@ func (r *Repository) CreateVoteAndRefreshScore(ctx context.Context, vote domain.
 	return score, nil
 }
 
-func refreshFanScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Score, error) {
+func (r *Repository) StartComponentUpdate(ctx context.Context, component, provider string) (int64, error) {
+	var id int64
+	err := r.pool.QueryRow(ctx, `
+		INSERT INTO component_updates(component, provider, status, started_at)
+		VALUES ($1, $2, 'running', now())
+		RETURNING id
+	`, component, provider).Scan(&id)
+	return id, err
+}
+
+func (r *Repository) FinishComponentUpdate(ctx context.Context, updateID int64, status, message string, recordsSeen int) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE component_updates
+		SET status = $2, message = $3, records_seen = $4, finished_at = now()
+		WHERE id = $1
+	`, updateID, status, message, recordsSeen)
+	return err
+}
+
+func (r *Repository) ListComponentUpdates(ctx context.Context, limit int) ([]domain.ComponentUpdate, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, component, provider, status, message, records_seen, started_at, finished_at
+		FROM component_updates
+		ORDER BY started_at DESC
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var items []domain.ComponentUpdate
+	for rows.Next() {
+		var item domain.ComponentUpdate
+		if err := rows.Scan(
+			&item.ID,
+			&item.Component,
+			&item.Provider,
+			&item.Status,
+			&item.Message,
+			&item.RecordsSeen,
+			&item.StartedAt,
+			&item.FinishedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, item)
+	}
+
+	return items, rows.Err()
+}
+
+func (r *Repository) SaveSocialSnapshot(ctx context.Context, snapshot domain.SocialSnapshot) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO social_snapshots (
+			player_id, provider, followers, engagement_rate, mentions_growth_7d, youtube_views_7d, normalized_score, snapshot_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+	`,
+		snapshot.PlayerID,
+		snapshot.Provider,
+		snapshot.Followers,
+		snapshot.EngagementRate,
+		snapshot.MentionsGrowth7D,
+		snapshot.YouTubeViews7D,
+		snapshot.NormalizedScore,
+		snapshot.SnapshotAt,
+	)
+	return err
+}
+
+func (r *Repository) ApplyMediaSync(ctx context.Context, results []domain.MediaSyncPlayerResult, provider string) ([]domain.PlayerSyncDelta, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	if _, err := tx.Exec(ctx, `DELETE FROM news_items WHERE source = $1 OR source = 'legacy-html'`, provider); err != nil {
+		return nil, err
+	}
+
+	var deltas []domain.PlayerSyncDelta
+	for _, result := range results {
+		score, delta, err := refreshComponentScore(ctx, tx, result.PlayerID, "media", result.MediaScore, time.Now().UTC())
+		if err != nil {
+			return nil, err
+		}
+
+		deltas = append(deltas, domain.PlayerSyncDelta{
+			PlayerID:    result.PlayerID,
+			PlayerName:  result.PlayerName,
+			Component:   "media",
+			OldValue:    delta.OldComponentValue,
+			NewValue:    result.MediaScore,
+			OldFRI:      delta.OldFRI,
+			NewFRI:      score.FRI,
+			ImpactDelta: round1(score.FRI - delta.OldFRI),
+		})
+
+		for _, article := range result.Articles {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO news_items (
+					player_id, player_name, impact_type, impact_delta, relative_time, title_en, title_ru, summary_en, summary_ru,
+					source, source_url, source_tier, sentiment, published_at
+				) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
+			`,
+				article.PlayerID,
+				article.PlayerName,
+				article.ImpactType,
+				article.ImpactDelta,
+				article.RelativeTime,
+				article.TitleEN,
+				article.TitleRU,
+				article.SummaryEN,
+				article.SummaryRU,
+				article.Source,
+				article.SourceURL,
+				article.SourceTier,
+				article.Sentiment,
+				article.PublishedAt,
+			); err != nil {
+				return nil, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return deltas, nil
+}
+
+func refreshFanScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Score, *scoreDelta, error) {
 	var current domain.Score
 	if err := tx.QueryRow(ctx, `
-		SELECT player_id, fri, performance, social, fan, fan_base, media, character, trend_value, trend_direction, calculated_at
+		SELECT player_id, fri, performance, social, fan, fan_base, media, character, trend_value, trend_direction, calculated_at,
+		       performance_updated_at, social_updated_at, fan_updated_at, media_updated_at, character_updated_at
 		FROM fri_scores
 		WHERE player_id = $1
 		FOR UPDATE
@@ -362,45 +509,218 @@ func refreshFanScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Sc
 		&current.TrendValue,
 		&current.TrendDirection,
 		&current.CalculatedAt,
+		&current.PerformanceUpdatedAt,
+		&current.SocialUpdatedAt,
+		&current.FanUpdatedAt,
+		&current.MediaUpdatedAt,
+		&current.CharacterUpdatedAt,
 	); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	var avgInternal float64
 	if err := tx.QueryRow(ctx, `SELECT COALESCE(AVG(internal_score), 0) FROM fan_votes WHERE player_id = $1`, playerID).Scan(&avgInternal); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	newFan := round1((current.FanBase * 0.7) + (avgInternal * 0.3))
-	newFRI := round1((current.Performance * 0.35) + (current.Social * 0.20) + (newFan * 0.20) + (current.Media * 0.15) + (current.Character * 0.10))
-	delta := round1(newFRI - current.FRI)
-	direction := trendDirection(delta)
+	oldFRI := current.FRI
+	oldFan := current.Fan
+
+	current.Fan = newFan
+	current.FanUpdatedAt = time.Now().UTC()
+	applyFriFormula(&current)
 
 	if _, err := tx.Exec(ctx, `
 		UPDATE fri_scores
-		SET fan = $2, fri = $3, trend_value = $4, trend_direction = $5, calculated_at = $6
+		SET fan = $2, fri = $3, trend_value = $4, trend_direction = $5, calculated_at = $6, fan_updated_at = $7
 		WHERE player_id = $1
-	`, playerID, newFan, newFRI, delta, direction, time.Now().UTC()); err != nil {
-		return nil, err
+	`, playerID, current.Fan, current.FRI, current.TrendValue, current.TrendDirection, current.CalculatedAt, current.FanUpdatedAt); err != nil {
+		return nil, nil, err
 	}
+
+	if historyDelta := round1(current.FRI - oldFRI); historyDelta != 0 {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO fri_history (player_id, fri, delta, calculated_at)
+			VALUES ($1,$2,$3,$4)
+		`, playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return &current, &scoreDelta{
+		OldFRI:            oldFRI,
+		OldComponentValue: oldFan,
+	}, nil
+}
+
+func refreshComponentScore(ctx context.Context, tx pgx.Tx, playerID int64, component string, newValue float64, updatedAt time.Time) (*domain.Score, *scoreDelta, error) {
+	current, err := lockScore(ctx, tx, playerID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	oldFRI := current.FRI
+	delta := &scoreDelta{OldFRI: oldFRI}
+
+	switch component {
+	case "media":
+		delta.OldComponentValue = current.Media
+		current.Media = round1(newValue)
+		current.MediaUpdatedAt = updatedAt
+	case "social":
+		delta.OldComponentValue = current.Social
+		current.Social = round1(newValue)
+		current.SocialUpdatedAt = updatedAt
+	case "performance":
+		delta.OldComponentValue = current.Performance
+		current.Performance = round1(newValue)
+		current.PerformanceUpdatedAt = updatedAt
+	case "character":
+		delta.OldComponentValue = current.Character
+		current.Character = round1(newValue)
+		current.CharacterUpdatedAt = updatedAt
+	default:
+		return nil, nil, fmt.Errorf("unsupported component %q", component)
+	}
+
+	applyFriFormula(current)
 
 	if _, err := tx.Exec(ctx, `
-		INSERT INTO fri_history (player_id, fri, delta, calculated_at)
-		VALUES ($1,$2,$3,$4)
-	`, playerID, newFRI, delta, time.Now().UTC()); err != nil {
-		return nil, err
+		UPDATE fri_scores
+		SET performance = $2,
+		    social = $3,
+		    fan = $4,
+		    media = $5,
+		    character = $6,
+		    fri = $7,
+		    trend_value = $8,
+		    trend_direction = $9,
+		    calculated_at = $10,
+		    performance_updated_at = $11,
+		    social_updated_at = $12,
+		    fan_updated_at = $13,
+		    media_updated_at = $14,
+		    character_updated_at = $15
+		WHERE player_id = $1
+	`,
+		playerID,
+		current.Performance,
+		current.Social,
+		current.Fan,
+		current.Media,
+		current.Character,
+		current.FRI,
+		current.TrendValue,
+		current.TrendDirection,
+		current.CalculatedAt,
+		current.PerformanceUpdatedAt,
+		current.SocialUpdatedAt,
+		current.FanUpdatedAt,
+		current.MediaUpdatedAt,
+		current.CharacterUpdatedAt,
+	); err != nil {
+		return nil, nil, err
 	}
 
-	current.Fan = newFan
-	current.FRI = newFRI
-	current.TrendValue = delta
-	current.TrendDirection = direction
-	current.CalculatedAt = time.Now().UTC()
+	if historyDelta := round1(current.FRI - oldFRI); historyDelta != 0 {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO fri_history (player_id, fri, delta, calculated_at)
+			VALUES ($1,$2,$3,$4)
+		`, playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
+			return nil, nil, err
+		}
+	}
+
+	return current, delta, nil
+}
+
+func lockScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Score, error) {
+	var current domain.Score
+	err := tx.QueryRow(ctx, `
+		SELECT player_id, fri, performance, social, fan, fan_base, media, character, trend_value, trend_direction, calculated_at,
+		       performance_updated_at, social_updated_at, fan_updated_at, media_updated_at, character_updated_at
+		FROM fri_scores
+		WHERE player_id = $1
+		FOR UPDATE
+	`, playerID).Scan(
+		&current.PlayerID,
+		&current.FRI,
+		&current.Performance,
+		&current.Social,
+		&current.Fan,
+		&current.FanBase,
+		&current.Media,
+		&current.Character,
+		&current.TrendValue,
+		&current.TrendDirection,
+		&current.CalculatedAt,
+		&current.PerformanceUpdatedAt,
+		&current.SocialUpdatedAt,
+		&current.FanUpdatedAt,
+		&current.MediaUpdatedAt,
+		&current.CharacterUpdatedAt,
+	)
+	if err != nil {
+		return nil, err
+	}
 	return &current, nil
 }
 
+type scoreDelta struct {
+	OldFRI            float64
+	OldComponentValue float64
+}
+
+func applyFriFormula(score *domain.Score) {
+	previousFRI := score.FRI
+	score.FRI = round1((score.Performance * 0.35) + (score.Social * 0.20) + (score.Fan * 0.20) + (score.Media * 0.15) + (score.Character * 0.10))
+	delta := round1(score.FRI - previousFRI)
+	score.TrendValue = round1(math.Abs(delta))
+	score.TrendDirection = trendDirection(delta)
+	score.CalculatedAt = time.Now().UTC()
+}
+
+func scanPlayerWithScore(row interface {
+	Scan(dest ...any) error
+}) (domain.PlayerWithScore, error) {
+	var item domain.PlayerWithScore
+	err := row.Scan(
+		&item.ID,
+		&item.Slug,
+		&item.Name,
+		&item.Club,
+		&item.Position,
+		&item.Age,
+		&item.Emoji,
+		&item.PhotoData,
+		&item.ThemeBackground,
+		&item.SummaryEN,
+		&item.SummaryRU,
+		&item.CreatedAt,
+		&item.UpdatedAt,
+		&item.PlayerID,
+		&item.FRI,
+		&item.Performance,
+		&item.Social,
+		&item.Fan,
+		&item.FanBase,
+		&item.Media,
+		&item.Character,
+		&item.TrendValue,
+		&item.TrendDirection,
+		&item.CalculatedAt,
+		&item.PerformanceUpdatedAt,
+		&item.SocialUpdatedAt,
+		&item.FanUpdatedAt,
+		&item.MediaUpdatedAt,
+		&item.CharacterUpdatedAt,
+	)
+	return item, err
+}
+
 func round1(value float64) float64 {
-	return float64(int(value*10+0.5)) / 10
+	return math.Round(value*10) / 10
 }
 
 func trendDirection(delta float64) string {
@@ -411,4 +731,11 @@ func trendDirection(delta float64) string {
 		return "down"
 	}
 	return "stable"
+}
+
+func defaultFloat(value, fallback float64) float64 {
+	if value == 0 {
+		return fallback
+	}
+	return value
 }

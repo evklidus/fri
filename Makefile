@@ -1,7 +1,7 @@
 APP_NAME := fri-api
 COMPOSE_FILE := deployments/docker-compose.yml
 
-.PHONY: help docker-up docker-down docker-restart docker-logs docker-ps docker-build build run import tidy fmt test check
+.PHONY: help docker-up docker-down docker-restart docker-logs docker-ps docker-build build run import sync-media tidy fmt test check
 
 help:
 	@echo "Available commands:"
@@ -14,6 +14,7 @@ help:
 	@echo "  make run          - run API locally without Docker"
 	@echo "  make import       - import legacy HTML into database"
 	@echo "  make build        - build API binary"
+	@echo "  make sync-media   - run phase 2 media sync against the live API"
 	@echo "  make fmt          - format Go code"
 	@echo "  make test         - run Go tests"
 	@echo "  make tidy         - tidy Go modules"
@@ -41,6 +42,9 @@ run:
 
 import:
 	go run ./cmd/importer
+
+sync-media:
+	curl -s -X POST http://localhost:8080/api/sync/media | jq
 
 build:
 	mkdir -p bin

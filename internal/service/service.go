@@ -20,17 +20,27 @@ type repository interface {
 	ReplaceAllSeedData(ctx context.Context, players []domain.PlayerWithScore, history map[string][]domain.HistoryPoint, news []domain.NewsItem) error
 	ListPlayers(ctx context.Context, search, position, club string) ([]domain.PlayerWithScore, error)
 	GetPlayer(ctx context.Context, id int64) (*domain.PlayerWithScore, error)
+	ListSyncTargets(ctx context.Context) ([]domain.PlayerSyncTarget, error)
 	GetHistory(ctx context.Context, playerID int64) ([]domain.HistoryPoint, error)
 	ListNews(ctx context.Context, playerID *int64) ([]domain.NewsItem, error)
 	CreateVoteAndRefreshScore(ctx context.Context, vote domain.Vote) (*domain.Score, error)
+	StartComponentUpdate(ctx context.Context, component, provider string) (int64, error)
+	FinishComponentUpdate(ctx context.Context, updateID int64, status, message string, recordsSeen int) error
+	ListComponentUpdates(ctx context.Context, limit int) ([]domain.ComponentUpdate, error)
+	SaveSocialSnapshot(ctx context.Context, snapshot domain.SocialSnapshot) error
+	ApplyMediaSync(ctx context.Context, results []domain.MediaSyncPlayerResult, provider string) ([]domain.PlayerSyncDelta, error)
 }
 
 type Service struct {
-	repo repository
+	repo          repository
+	mediaProvider mediaProvider
 }
 
-func New(repo repository) *Service {
-	return &Service{repo: repo}
+func New(repo repository, mediaProvider mediaProvider) *Service {
+	return &Service{
+		repo:          repo,
+		mediaProvider: mediaProvider,
+	}
 }
 
 func (s *Service) SeedIfEmpty(ctx context.Context, sourceHTMLPath string) error {
@@ -128,6 +138,10 @@ func (s *Service) GetHistory(ctx context.Context, playerID int64) ([]domain.Hist
 
 func (s *Service) ListNews(ctx context.Context, playerID *int64) ([]domain.NewsItem, error) {
 	return s.repo.ListNews(ctx, playerID)
+}
+
+func (s *Service) ListComponentUpdates(ctx context.Context, limit int) ([]domain.ComponentUpdate, error) {
+	return s.repo.ListComponentUpdates(ctx, limit)
 }
 
 func (s *Service) SubmitVote(ctx context.Context, playerID int64, input domain.VoteInput, rawIP string) (*domain.Score, error) {

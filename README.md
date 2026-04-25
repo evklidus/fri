@@ -2,6 +2,15 @@
 
 Первая фаза `Football Reputation Index` на `Go + Gin + PostgreSQL`.
 
+Статус:
+
+- Фаза 1 завершена
+- Базовая инфраструктура фазы 2 реализована
+
+Все фазы:
+
+- [docs/project-phases.md](/Users/evklidus/Desktop/Dev/my%20projects/fri/docs/project-phases.md)
+
 Что реализовано:
 
 - backend API на `Gin`
@@ -10,6 +19,10 @@
 - сидирование БД при первом запуске
 - фронтенд на основе исходного HTML, подключённый к live API
 - локальный запуск через `Docker Compose`
+- media ingestion через `Google News RSS`
+- фоновый scheduler для media sync
+- tracking таблица `component_updates`
+- автоматический пересчёт `FRI` и запись в `fri_history` после media sync
 
 ## Структура
 
@@ -24,7 +37,7 @@
 
 ## Roadmap
 
-Полный план фаз и задач вынесен в [docs/project-phases.md](/Users/evklidus/Documents/Codex/2026-04-20-fri-football-reputation-index-1-fri/dev/my_projects/fri/docs/project-phases.md).
+Полный план фаз и задач вынесен в [docs/project-phases.md](/Users/evklidus/Desktop/Dev/my%20projects/fri/docs/project-phases.md).
 
 ## Быстрый старт
 
@@ -45,5 +58,6 @@ make help
 make docker-ps
 make docker-logs
 make docker-down
+make sync-media
 make check
 ```

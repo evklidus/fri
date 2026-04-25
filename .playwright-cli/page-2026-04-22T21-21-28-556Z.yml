@@ -1,0 +1,1327 @@
+- generic [active] [ref=e1]:
+  - navigation [ref=e2]:
+    - generic [ref=e3]: FRI
+    - list [ref=e4]:
+      - listitem [ref=e5]:
+        - link "Rankings" [ref=e6] [cursor=pointer]:
+          - /url: "#leaderboard"
+      - listitem [ref=e7]:
+        - link "Fan Polls" [ref=e8] [cursor=pointer]:
+          - /url: "#polls"
+      - listitem [ref=e9]:
+        - link "Live News" [ref=e10] [cursor=pointer]:
+          - /url: "#news"
+      - listitem [ref=e11]:
+        - link "Formula" [ref=e12] [cursor=pointer]:
+          - /url: "#formula"
+      - listitem [ref=e13]:
+        - link "For You" [ref=e14] [cursor=pointer]:
+          - /url: "#personas"
+      - listitem [ref=e15]:
+        - link "Explore" [ref=e16] [cursor=pointer]:
+          - /url: "#leaderboard"
+    - generic [ref=e17]:
+      - button "🇬🇧 EN" [ref=e18] [cursor=pointer]:
+        - generic [ref=e19]: 🇬🇧
+        - text: EN
+      - button "🇷🇺 RU" [ref=e20] [cursor=pointer]:
+        - generic [ref=e21]: 🇷🇺
+        - text: RU
+  - generic [ref=e22]:
+    - generic [ref=e23]:
+      - generic [ref=e24]: The Global Standard for Player Reputation
+      - heading "FOOTBALL REPUTATION INDEX" [level=1] [ref=e25]:
+        - text: FOOTBALL
+        - text: REPUTATION
+        - text: INDEX
+      - paragraph [ref=e26]: FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, fan sentiment, media coverage, and character into one transparent number.
+      - generic [ref=e27]:
+        - button "View Rankings" [ref=e28] [cursor=pointer]
+        - button "How It Works" [ref=e29] [cursor=pointer]
+    - generic [ref=e31]:
+      - generic [ref=e32]:
+        - img [ref=e34]
+        - generic [ref=e35]:
+          - heading "K. Mbappé" [level=3] [ref=e36]
+          - paragraph [ref=e37]: FWD · Real Madrid
+        - generic [ref=e38]: Legendary
+      - generic [ref=e39]:
+        - generic [ref=e40]: "90.2"
+        - generic [ref=e41]: Football Reputation Index
+      - generic [ref=e42]:
+        - generic [ref=e43]:
+          - generic [ref=e44]: Performance
+          - generic [ref=e47]: "93"
+        - generic [ref=e48]:
+          - generic [ref=e49]: Social
+          - generic [ref=e52]: "98"
+        - generic [ref=e53]:
+          - generic [ref=e54]: Fan Poll
+          - generic [ref=e57]: "91.4"
+        - generic [ref=e58]:
+          - generic [ref=e59]: Media
+          - generic [ref=e62]: "72.4"
+        - generic [ref=e63]:
+          - generic [ref=e64]: Character
+          - generic [ref=e67]: "89"
+  - generic [ref=e68]:
+    - generic [ref=e69]:
+      - generic [ref=e70]: Global Rankings
+      - heading "FRI Leaderboard" [level=2] [ref=e71]
+      - paragraph [ref=e72]: Updated in real-time as matches end, news breaks, and fans vote. Every position, every age, one fair score.
+    - textbox "Search player name..." [ref=e74]
+    - generic [ref=e75]:
+      - button "All" [ref=e76] [cursor=pointer]
+      - button "Goalkeeper" [ref=e77] [cursor=pointer]
+      - button "Defender" [ref=e78] [cursor=pointer]
+      - button "Midfielder" [ref=e79] [cursor=pointer]
+      - button "Forward" [ref=e80] [cursor=pointer]
+    - table [ref=e81]:
+      - rowgroup [ref=e82]:
+        - row "# Player FRI Score Performance Social Fan Poll Trend" [ref=e83]:
+          - columnheader "#" [ref=e84]
+          - columnheader "Player" [ref=e85]
+          - columnheader "FRI Score" [ref=e86]
+          - columnheader "Performance" [ref=e87]
+          - columnheader "Social" [ref=e88]
+          - columnheader "Fan Poll" [ref=e89]
+          - columnheader "Trend" [ref=e90]
+      - rowgroup [ref=e91]:
+        - row "1 K. Mbappé Real Madrid · FWD · 26y 90.2 93 98 91.4 ↓ 0.0" [ref=e92] [cursor=pointer]:
+          - cell "1" [ref=e93]:
+            - generic [ref=e94]: "1"
+          - cell "K. Mbappé Real Madrid · FWD · 26y" [ref=e95]:
+            - generic [ref=e96]:
+              - img [ref=e98]
+              - generic [ref=e99]:
+                - generic [ref=e100]: K. Mbappé
+                - generic [ref=e101]: Real Madrid · FWD · 26y
+          - cell "90.2" [ref=e102]
+          - cell "93" [ref=e103]:
+            - generic [ref=e107]: "93"
+          - cell "98" [ref=e108]:
+            - generic [ref=e112]: "98"
+          - cell "91.4" [ref=e113]:
+            - generic [ref=e117]: "91.4"
+          - cell "↓ 0.0" [ref=e118]
+        - row "2 E. Haaland Man City · FWD · 24y 89 95 88 91 ↓ 0.0" [ref=e119] [cursor=pointer]:
+          - cell "2" [ref=e120]:
+            - generic [ref=e121]: "2"
+          - cell "E. Haaland Man City · FWD · 24y" [ref=e122]:
+            - generic [ref=e123]:
+              - img [ref=e125]
+              - generic [ref=e126]:
+                - generic [ref=e127]: E. Haaland
+                - generic [ref=e128]: Man City · FWD · 24y
+          - cell "89" [ref=e129]
+          - cell "95" [ref=e130]:
+            - generic [ref=e134]: "95"
+          - cell "88" [ref=e135]:
+            - generic [ref=e139]: "88"
+          - cell "91" [ref=e140]:
+            - generic [ref=e144]: "91"
+          - cell "↓ 0.0" [ref=e145]
+        - row "3 L. Yamal FC Barcelona · FWD · 17y 87.4 90 88 91 ↓ 0.0" [ref=e146] [cursor=pointer]:
+          - cell "3" [ref=e147]:
+            - generic [ref=e148]: "3"
+          - cell "L. Yamal FC Barcelona · FWD · 17y" [ref=e149]:
+            - generic [ref=e150]:
+              - img [ref=e152]
+              - generic [ref=e153]:
+                - generic [ref=e154]: L. Yamal
+                - generic [ref=e155]: FC Barcelona · FWD · 17y
+          - cell "87.4" [ref=e156]
+          - cell "90" [ref=e157]:
+            - generic [ref=e161]: "90"
+          - cell "88" [ref=e162]:
+            - generic [ref=e166]: "88"
+          - cell "91" [ref=e167]:
+            - generic [ref=e171]: "91"
+          - cell "↓ 0.0" [ref=e172]
+        - row "4 J. Bellingham Real Madrid · MID · 21y 87 91 85 95 ↓ 0.0" [ref=e173] [cursor=pointer]:
+          - cell "4" [ref=e174]:
+            - generic [ref=e175]: "4"
+          - cell "J. Bellingham Real Madrid · MID · 21y" [ref=e176]:
+            - generic [ref=e177]:
+              - img [ref=e179]
+              - generic [ref=e180]:
+                - generic [ref=e181]: J. Bellingham
+                - generic [ref=e182]: Real Madrid · MID · 21y
+          - cell "87" [ref=e183]
+          - cell "91" [ref=e184]:
+            - generic [ref=e188]: "91"
+          - cell "85" [ref=e189]:
+            - generic [ref=e193]: "85"
+          - cell "95" [ref=e194]:
+            - generic [ref=e198]: "95"
+          - cell "↓ 0.0" [ref=e199]
+        - row "5 M. Salah Liverpool · FWD · 32y 86.3 89 90 91 ↓ 0.0" [ref=e200] [cursor=pointer]:
+          - cell "5" [ref=e201]:
+            - generic [ref=e202]: "5"
+          - cell "M. Salah Liverpool · FWD · 32y" [ref=e203]:
+            - generic [ref=e204]:
+              - img [ref=e206]
+              - generic [ref=e207]:
+                - generic [ref=e208]: M. Salah
+                - generic [ref=e209]: Liverpool · FWD · 32y
+          - cell "86.3" [ref=e210]
+          - cell "89" [ref=e211]:
+            - generic [ref=e215]: "89"
+          - cell "90" [ref=e216]:
+            - generic [ref=e220]: "90"
+          - cell "91" [ref=e221]:
+            - generic [ref=e225]: "91"
+          - cell "↓ 0.0" [ref=e226]
+        - row "6 H. Kane Bayern Munich · FWD · 31y 86.1 93 82 87 ↓ 0.0" [ref=e227] [cursor=pointer]:
+          - cell "6" [ref=e228]:
+            - generic [ref=e229]: "6"
+          - cell "H. Kane Bayern Munich · FWD · 31y" [ref=e230]:
+            - generic [ref=e231]:
+              - img [ref=e233]
+              - generic [ref=e234]:
+                - generic [ref=e235]: H. Kane
+                - generic [ref=e236]: Bayern Munich · FWD · 31y
+          - cell "86.1" [ref=e237]
+          - cell "93" [ref=e238]:
+            - generic [ref=e242]: "93"
+          - cell "82" [ref=e243]:
+            - generic [ref=e247]: "82"
+          - cell "87" [ref=e248]:
+            - generic [ref=e252]: "87"
+          - cell "↓ 0.0" [ref=e253]
+        - row "7 Raphinha FC Barcelona · FWD · 28y 85.2 91 83 87 ↓ 0.0" [ref=e254] [cursor=pointer]:
+          - cell "7" [ref=e255]:
+            - generic [ref=e256]: "7"
+          - cell "Raphinha FC Barcelona · FWD · 28y" [ref=e257]:
+            - generic [ref=e258]:
+              - img [ref=e260]
+              - generic [ref=e261]:
+                - generic [ref=e262]: Raphinha
+                - generic [ref=e263]: FC Barcelona · FWD · 28y
+          - cell "85.2" [ref=e264]
+          - cell "91" [ref=e265]:
+            - generic [ref=e269]: "91"
+          - cell "83" [ref=e270]:
+            - generic [ref=e274]: "83"
+          - cell "87" [ref=e275]:
+            - generic [ref=e279]: "87"
+          - cell "↓ 0.0" [ref=e280]
+        - row "8 Pedri FC Barcelona · MID · 22y 83.4 88 80 90 ↓ 0.0" [ref=e281] [cursor=pointer]:
+          - cell "8" [ref=e282]:
+            - generic [ref=e283]: "8"
+          - cell "Pedri FC Barcelona · MID · 22y" [ref=e284]:
+            - generic [ref=e285]:
+              - img [ref=e287]
+              - generic [ref=e288]:
+                - generic [ref=e289]: Pedri
+                - generic [ref=e290]: FC Barcelona · MID · 22y
+          - cell "83.4" [ref=e291]
+          - cell "88" [ref=e292]:
+            - generic [ref=e296]: "88"
+          - cell "80" [ref=e297]:
+            - generic [ref=e301]: "80"
+          - cell "90" [ref=e302]:
+            - generic [ref=e306]: "90"
+          - cell "↓ 0.0" [ref=e307]
+        - row "9 N'Golo Kanté Fenerbahçe · MID · 34y 83.3 88 76 89 ↓ 0.0" [ref=e308] [cursor=pointer]:
+          - cell "9" [ref=e309]:
+            - generic [ref=e310]: "9"
+          - cell "N'Golo Kanté Fenerbahçe · MID · 34y" [ref=e311]:
+            - generic [ref=e312]:
+              - img [ref=e314]
+              - generic [ref=e315]:
+                - generic [ref=e316]: N'Golo Kanté
+                - generic [ref=e317]: Fenerbahçe · MID · 34y
+          - cell "83.3" [ref=e318]
+          - cell "88" [ref=e319]:
+            - generic [ref=e323]: "88"
+          - cell "76" [ref=e324]:
+            - generic [ref=e328]: "76"
+          - cell "89" [ref=e329]:
+            - generic [ref=e333]: "89"
+          - cell "↓ 0.0" [ref=e334]
+        - row "10 D. Rice Arsenal · MID · 26y 83.2 89 78 85 ↓ 0.0" [ref=e335] [cursor=pointer]:
+          - cell "10" [ref=e336]:
+            - generic [ref=e337]: "10"
+          - cell "D. Rice Arsenal · MID · 26y" [ref=e338]:
+            - generic [ref=e339]:
+              - img [ref=e341]
+              - generic [ref=e342]:
+                - generic [ref=e343]: D. Rice
+                - generic [ref=e344]: Arsenal · MID · 26y
+          - cell "83.2" [ref=e345]
+          - cell "89" [ref=e346]:
+            - generic [ref=e350]: "89"
+          - cell "78" [ref=e351]:
+            - generic [ref=e355]: "78"
+          - cell "85" [ref=e356]:
+            - generic [ref=e360]: "85"
+          - cell "↓ 0.0" [ref=e361]
+        - row "11 T. Courtois Real Madrid · GK · 32y 83.1 90 78 85 ↓ 0.0" [ref=e362] [cursor=pointer]:
+          - cell "11" [ref=e363]:
+            - generic [ref=e364]: "11"
+          - cell "T. Courtois Real Madrid · GK · 32y" [ref=e365]:
+            - generic [ref=e366]:
+              - img [ref=e368]
+              - generic [ref=e369]:
+                - generic [ref=e370]: T. Courtois
+                - generic [ref=e371]: Real Madrid · GK · 32y
+          - cell "83.1" [ref=e372]
+          - cell "90" [ref=e373]:
+            - generic [ref=e377]: "90"
+          - cell "78" [ref=e378]:
+            - generic [ref=e382]: "78"
+          - cell "85" [ref=e383]:
+            - generic [ref=e387]: "85"
+          - cell "↓ 0.0" [ref=e388]
+        - row "12 V. van Dijk Liverpool · DEF · 33y 82.8 87 72 88 ↓ 0.0" [ref=e389] [cursor=pointer]:
+          - cell "12" [ref=e390]:
+            - generic [ref=e391]: "12"
+          - cell "V. van Dijk Liverpool · DEF · 33y" [ref=e392]:
+            - generic [ref=e393]:
+              - img [ref=e395]
+              - generic [ref=e396]:
+                - generic [ref=e397]: V. van Dijk
+                - generic [ref=e398]: Liverpool · DEF · 33y
+          - cell "82.8" [ref=e399]
+          - cell "87" [ref=e400]:
+            - generic [ref=e404]: "87"
+          - cell "72" [ref=e405]:
+            - generic [ref=e409]: "72"
+          - cell "88" [ref=e410]:
+            - generic [ref=e414]: "88"
+          - cell "↓ 0.0" [ref=e415]
+        - row "13 F. Valverde Real Madrid · MID · 26y 82 89 74 82 ↓ 0.0" [ref=e416] [cursor=pointer]:
+          - cell "13" [ref=e417]:
+            - generic [ref=e418]: "13"
+          - cell "F. Valverde Real Madrid · MID · 26y" [ref=e419]:
+            - generic [ref=e420]:
+              - img [ref=e422]
+              - generic [ref=e423]:
+                - generic [ref=e424]: F. Valverde
+                - generic [ref=e425]: Real Madrid · MID · 26y
+          - cell "82" [ref=e426]
+          - cell "89" [ref=e427]:
+            - generic [ref=e431]: "89"
+          - cell "74" [ref=e432]:
+            - generic [ref=e436]: "74"
+          - cell "82" [ref=e437]:
+            - generic [ref=e441]: "82"
+          - cell "↓ 0.0" [ref=e442]
+        - row "14 M. Olise Bayern Munich · FWD · 23y 81.3 87 74 81 ↓ 0.0" [ref=e443] [cursor=pointer]:
+          - cell "14" [ref=e444]:
+            - generic [ref=e445]: "14"
+          - cell "M. Olise Bayern Munich · FWD · 23y" [ref=e446]:
+            - generic [ref=e447]:
+              - img [ref=e449]
+              - generic [ref=e450]:
+                - generic [ref=e451]: M. Olise
+                - generic [ref=e452]: Bayern Munich · FWD · 23y
+          - cell "81.3" [ref=e453]
+          - cell "87" [ref=e454]:
+            - generic [ref=e458]: "87"
+          - cell "74" [ref=e459]:
+            - generic [ref=e463]: "74"
+          - cell "81" [ref=e464]:
+            - generic [ref=e468]: "81"
+          - cell "↓ 0.0" [ref=e469]
+        - row "15 Vinicius Jr Real Madrid · FWD · 24y 80.6 93 91 74 ↓ 0.0" [ref=e470] [cursor=pointer]:
+          - cell "15" [ref=e471]:
+            - generic [ref=e472]: "15"
+          - cell "Vinicius Jr Real Madrid · FWD · 24y" [ref=e473]:
+            - generic [ref=e474]:
+              - img [ref=e476]
+              - generic [ref=e477]:
+                - generic [ref=e478]: Vinicius Jr
+                - generic [ref=e479]: Real Madrid · FWD · 24y
+          - cell "80.6" [ref=e480]
+          - cell "93" [ref=e481]:
+            - generic [ref=e485]: "93"
+          - cell "91" [ref=e486]:
+            - generic [ref=e490]: "91"
+          - cell "74" [ref=e491]:
+            - generic [ref=e495]: "74"
+          - cell "↓ 0.0" [ref=e496]
+        - row "16 P. Cubarsí FC Barcelona · DEF · 18y 80.1 85 71 80 ↓ 0.0" [ref=e497] [cursor=pointer]:
+          - cell "16" [ref=e498]:
+            - generic [ref=e499]: "16"
+          - cell "P. Cubarsí FC Barcelona · DEF · 18y" [ref=e500]:
+            - generic [ref=e501]:
+              - img [ref=e503]
+              - generic [ref=e504]:
+                - generic [ref=e505]: P. Cubarsí
+                - generic [ref=e506]: FC Barcelona · DEF · 18y
+          - cell "80.1" [ref=e507]
+          - cell "85" [ref=e508]:
+            - generic [ref=e512]: "85"
+          - cell "71" [ref=e513]:
+            - generic [ref=e517]: "71"
+          - cell "80" [ref=e518]:
+            - generic [ref=e522]: "80"
+          - cell "↓ 0.0" [ref=e523]
+        - row "17 Vitinha PSG · MID · 24y 79.9 87 72 84 ↓ 0.0" [ref=e524] [cursor=pointer]:
+          - cell "17" [ref=e525]:
+            - generic [ref=e526]: "17"
+          - cell "Vitinha PSG · MID · 24y" [ref=e527]:
+            - generic [ref=e528]:
+              - img [ref=e530]
+              - generic [ref=e531]:
+                - generic [ref=e532]: Vitinha
+                - generic [ref=e533]: PSG · MID · 24y
+          - cell "79.9" [ref=e534]
+          - cell "87" [ref=e535]:
+            - generic [ref=e539]: "87"
+          - cell "72" [ref=e540]:
+            - generic [ref=e544]: "72"
+          - cell "84" [ref=e545]:
+            - generic [ref=e549]: "84"
+          - cell "↓ 0.0" [ref=e550]
+        - row "18 Fermín López FC Barcelona · MID · 21y 78.9 84 72 83 ↓ 0.0" [ref=e551] [cursor=pointer]:
+          - cell "18" [ref=e552]:
+            - generic [ref=e553]: "18"
+          - cell "Fermín López FC Barcelona · MID · 21y" [ref=e554]:
+            - generic [ref=e555]:
+              - img [ref=e557]
+              - generic [ref=e558]:
+                - generic [ref=e559]: Fermín López
+                - generic [ref=e560]: FC Barcelona · MID · 21y
+          - cell "78.9" [ref=e561]
+          - cell "84" [ref=e562]:
+            - generic [ref=e566]: "84"
+          - cell "72" [ref=e567]:
+            - generic [ref=e571]: "72"
+          - cell "83" [ref=e572]:
+            - generic [ref=e576]: "83"
+          - cell "↓ 0.0" [ref=e577]
+        - row "19 H. Ekitike Liverpool · FWD · 22y 77.9 83 70 78 ↓ 0.0" [ref=e578] [cursor=pointer]:
+          - cell "19" [ref=e579]:
+            - generic [ref=e580]: "19"
+          - cell "H. Ekitike Liverpool · FWD · 22y" [ref=e581]:
+            - generic [ref=e582]:
+              - img [ref=e584]
+              - generic [ref=e585]:
+                - generic [ref=e586]: H. Ekitike
+                - generic [ref=e587]: Liverpool · FWD · 22y
+          - cell "77.9" [ref=e588]
+          - cell "83" [ref=e589]:
+            - generic [ref=e593]: "83"
+          - cell "70" [ref=e594]:
+            - generic [ref=e598]: "70"
+          - cell "78" [ref=e599]:
+            - generic [ref=e603]: "78"
+          - cell "↓ 0.0" [ref=e604]
+        - row "20 J. García FC Barcelona · GK · 23y 77.1 83 65 78 ↓ 0.0" [ref=e605] [cursor=pointer]:
+          - cell "20" [ref=e606]:
+            - generic [ref=e607]: "20"
+          - cell "J. García FC Barcelona · GK · 23y" [ref=e608]:
+            - generic [ref=e609]:
+              - img [ref=e611]
+              - generic [ref=e612]:
+                - generic [ref=e613]: J. García
+                - generic [ref=e614]: FC Barcelona · GK · 23y
+          - cell "77.1" [ref=e615]
+          - cell "83" [ref=e616]:
+            - generic [ref=e620]: "83"
+          - cell "65" [ref=e621]:
+            - generic [ref=e625]: "65"
+          - cell "78" [ref=e626]:
+            - generic [ref=e630]: "78"
+          - cell "↓ 0.0" [ref=e631]
+        - row "21 R. Asencio Real Madrid · DEF · 19y 76.5 82 68 76 ↓ 0.0" [ref=e632] [cursor=pointer]:
+          - cell "21" [ref=e633]:
+            - generic [ref=e634]: "21"
+          - cell "R. Asencio Real Madrid · DEF · 19y" [ref=e635]:
+            - generic [ref=e636]:
+              - img [ref=e638]
+              - generic [ref=e639]:
+                - generic [ref=e640]: R. Asencio
+                - generic [ref=e641]: Real Madrid · DEF · 19y
+          - cell "76.5" [ref=e642]
+          - cell "82" [ref=e643]:
+            - generic [ref=e647]: "82"
+          - cell "68" [ref=e648]:
+            - generic [ref=e652]: "68"
+          - cell "76" [ref=e653]:
+            - generic [ref=e657]: "76"
+          - cell "↓ 0.0" [ref=e658]
+        - row "22 Rayan Cherki Manchester City · MID · 21y 75 80 69 77 ↓ 0.0" [ref=e659] [cursor=pointer]:
+          - cell "22" [ref=e660]:
+            - generic [ref=e661]: "22"
+          - cell "Rayan Cherki Manchester City · MID · 21y" [ref=e662]:
+            - generic [ref=e663]:
+              - img [ref=e665]
+              - generic [ref=e666]:
+                - generic [ref=e667]: Rayan Cherki
+                - generic [ref=e668]: Manchester City · MID · 21y
+          - cell "75" [ref=e669]
+          - cell "80" [ref=e670]:
+            - generic [ref=e674]: "80"
+          - cell "69" [ref=e675]:
+            - generic [ref=e679]: "69"
+          - cell "77" [ref=e680]:
+            - generic [ref=e684]: "77"
+          - cell "↓ 0.0" [ref=e685]
+  - generic [ref=e687]:
+    - generic [ref=e688]:
+      - generic [ref=e689]: Community Voice
+      - heading "Fan Poll" [level=2] [ref=e690]
+      - paragraph [ref=e691]: Your rating directly impacts a player's FRI. 20% of the score comes from you — the fans.
+    - generic [ref=e692]:
+      - generic [ref=e693]:
+        - generic [ref=e694]: ⚽
+        - generic [ref=e695]:
+          - heading "Rate K. Mbappé" [level=3] [ref=e696]
+          - paragraph [ref=e697]: "Real Madrid · Forward · Last match: vs. Barcelona (UCL)"
+        - combobox [ref=e698] [cursor=pointer]:
+          - option "K. Mbappé" [selected]
+          - option "E. Haaland"
+          - option "L. Yamal"
+          - option "J. Bellingham"
+          - option "M. Salah"
+          - option "H. Kane"
+          - option "Raphinha"
+          - option "Pedri"
+          - option "N'Golo Kanté"
+          - option "D. Rice"
+          - option "T. Courtois"
+          - option "V. van Dijk"
+          - option "F. Valverde"
+          - option "M. Olise"
+          - option "Vinicius Jr"
+          - option "P. Cubarsí"
+          - option "Vitinha"
+          - option "Fermín López"
+          - option "H. Ekitike"
+          - option "J. García"
+          - option "R. Asencio"
+          - option "Rayan Cherki"
+      - generic [ref=e699]:
+        - heading "Overall performance this season" [level=4] [ref=e700]
+        - generic [ref=e701]:
+          - generic [ref=e702] [cursor=pointer]: ★
+          - generic [ref=e703] [cursor=pointer]: ★
+          - generic [ref=e704] [cursor=pointer]: ★
+          - generic [ref=e705] [cursor=pointer]: ★
+          - generic [ref=e706] [cursor=pointer]: ★
+      - generic [ref=e707]:
+        - heading "Fan engagement score (1–10)" [level=4] [ref=e708]
+        - generic [ref=e709]:
+          - slider [ref=e710]: "7"
+          - generic [ref=e711]: "7"
+      - generic [ref=e712]:
+        - heading "How do you see this player?" [level=4] [ref=e713]
+        - generic [ref=e714]:
+          - button "🏆 GOAT Candidate" [ref=e715] [cursor=pointer]
+          - button "🌟 World Class" [ref=e716] [cursor=pointer]
+          - button "⚡ Elite" [ref=e717] [cursor=pointer]
+          - button "📈 Improving" [ref=e718] [cursor=pointer]
+          - button "😐 Overrated" [ref=e719] [cursor=pointer]
+          - button "📉 Below Hype" [ref=e720] [cursor=pointer]
+      - generic [ref=e721]:
+        - heading "Off-field behavior" [level=4] [ref=e722]
+        - generic [ref=e723]:
+          - button "✅ Role Model" [ref=e724] [cursor=pointer]
+          - button "😶 Neutral" [ref=e725] [cursor=pointer]
+          - button "⚠️ Controversial" [ref=e726] [cursor=pointer]
+          - button "❌ Problematic" [ref=e727] [cursor=pointer]
+      - button "Submit My Rating → Impact FRI" [ref=e728] [cursor=pointer]
+  - generic [ref=e730]:
+    - generic [ref=e731]:
+      - generic [ref=e732]: Live Intelligence
+      - heading "News Feed" [level=2] [ref=e734]
+      - paragraph [ref=e735]: AI-analyzed news articles automatically adjust player FRI scores in real-time. Positive stories push it up, scandals push it down.
+    - generic [ref=e736]:
+      - generic [ref=e737] [cursor=pointer]:
+        - generic [ref=e738]:
+          - generic [ref=e739]: — Neutral
+          - generic [ref=e740]: 0h
+        - generic [ref=e741]: E. Haaland
+        - generic [ref=e742]: Post E Haaland (55) Burnley 0 - 1 Manchester City - Sky Sports
+        - generic [ref=e743]: Post E Haaland (55) Burnley 0 - 1 Manchester City Sky Sports
+        - generic [ref=e744]:
+          - generic [ref=e745]: "FRI Impact:"
+          - generic [ref=e746]: "0.0"
+          - generic [ref=e747]: pts (auto-applied)
+      - generic [ref=e748] [cursor=pointer]:
+        - generic [ref=e749]:
+          - generic [ref=e750]: ↑ Positive
+          - generic [ref=e751]: 2h
+        - generic [ref=e752]: E. Haaland
+        - generic [ref=e753]: Goal E Haaland (5) Burnley 0 - 1 Manchester City - Sky Sports
+        - generic [ref=e754]: Goal E Haaland (5) Burnley 0 - 1 Manchester City Sky Sports
+        - generic [ref=e755]:
+          - generic [ref=e756]: "FRI Impact:"
+          - generic [ref=e757]: "+0.6"
+          - generic [ref=e758]: pts (auto-applied)
+      - generic [ref=e759] [cursor=pointer]:
+        - generic [ref=e760]:
+          - generic [ref=e761]: — Neutral
+          - generic [ref=e762]: 10h
+        - generic [ref=e763]: M. Salah
+        - generic [ref=e764]: Virgil van Dijk's message to team-mates as 'leadership boys' prepare to leave Liverpool - The Mirror
+        - generic [ref=e765]: Virgil van Dijk's message to team-mates as 'leadership boys' prepare to leave Liverpool The Mirror
+        - generic [ref=e766]:
+          - generic [ref=e767]: "FRI Impact:"
+          - generic [ref=e768]: "0.0"
+          - generic [ref=e769]: pts (auto-applied)
+      - generic [ref=e770] [cursor=pointer]:
+        - generic [ref=e771]:
+          - generic [ref=e772]: — Neutral
+          - generic [ref=e773]: 12h
+        - generic [ref=e774]: Rayan Cherki
+        - generic [ref=e775]: Guardiola says Rayan Cherki has talent that ‘cannot be taught’ - The Football Faithful
+        - generic [ref=e776]: Guardiola says Rayan Cherki has talent that ‘cannot be taught’ The Football Faithful
+        - generic [ref=e777]:
+          - generic [ref=e778]: "FRI Impact:"
+          - generic [ref=e779]: "0.0"
+          - generic [ref=e780]: pts (auto-applied)
+      - generic [ref=e781] [cursor=pointer]:
+        - generic [ref=e782]:
+          - generic [ref=e783]: — Neutral
+          - generic [ref=e784]: 17h
+        - generic [ref=e785]: Vinicius Jr
+        - generic [ref=e786]: "La Liga: Mbappe, Vinicius Jr. score as Real Madrid beats Alaves to close in on Barcelona on top - Sportstar"
+        - generic [ref=e787]: "La Liga: Mbappe, Vinicius Jr. score as Real Madrid beats Alaves to close in on Barcelona on top Sportstar"
+        - generic [ref=e788]:
+          - generic [ref=e789]: "FRI Impact:"
+          - generic [ref=e790]: "0.0"
+          - generic [ref=e791]: pts (auto-applied)
+      - generic [ref=e792] [cursor=pointer]:
+        - generic [ref=e793]:
+          - generic [ref=e794]: ↑ Positive
+          - generic [ref=e795]: 1d
+        - generic [ref=e796]: M. Salah
+        - generic [ref=e797]: Mohamed Salah Liverpool derby goal was sweet but Arne Slot has to take drastic Alexander Isak action - Liverpool Echo
+        - generic [ref=e798]: Mohamed Salah Liverpool derby goal was sweet but Arne Slot has to take drastic Alexander Isak action Liverpool Echo
+        - generic [ref=e799]:
+          - generic [ref=e800]: "FRI Impact:"
+          - generic [ref=e801]: "+0.6"
+          - generic [ref=e802]: pts (auto-applied)
+      - generic [ref=e803] [cursor=pointer]:
+        - generic [ref=e804]:
+          - generic [ref=e805]: — Neutral
+          - generic [ref=e806]: 1d
+        - generic [ref=e807]: Vitinha
+        - generic [ref=e808]: PSG and Luis Enrique sweat on Vitinha ahead of Champions League semis - SportsDesk
+        - generic [ref=e809]: PSG and Luis Enrique sweat on Vitinha ahead of Champions League semis SportsDesk
+        - generic [ref=e810]:
+          - generic [ref=e811]: "FRI Impact:"
+          - generic [ref=e812]: "0.0"
+          - generic [ref=e813]: pts (auto-applied)
+      - generic [ref=e814] [cursor=pointer]:
+        - generic [ref=e815]:
+          - generic [ref=e816]: — Neutral
+          - generic [ref=e817]: 1d
+        - generic [ref=e818]: Rayan Cherki
+        - generic [ref=e819]: Semenyo almost three times as popular as Cherki despite similar points totals - The Sun
+        - generic [ref=e820]: Semenyo almost three times as popular as Cherki despite similar points totals The Sun
+        - generic [ref=e821]:
+          - generic [ref=e822]: "FRI Impact:"
+          - generic [ref=e823]: "0.0"
+          - generic [ref=e824]: pts (auto-applied)
+      - generic [ref=e825] [cursor=pointer]:
+        - generic [ref=e826]:
+          - generic [ref=e827]: — Neutral
+          - generic [ref=e828]: 1d
+        - generic [ref=e829]: M. Salah
+        - generic [ref=e830]: Freddie Woodman lifts lid on Mohamed Salah request as 'unreal' Liverpool chance emerges - Liverpool Echo
+        - generic [ref=e831]: Freddie Woodman lifts lid on Mohamed Salah request as 'unreal' Liverpool chance emerges Liverpool Echo
+        - generic [ref=e832]:
+          - generic [ref=e833]: "FRI Impact:"
+          - generic [ref=e834]: "0.0"
+          - generic [ref=e835]: pts (auto-applied)
+      - generic [ref=e836] [cursor=pointer]:
+        - generic [ref=e837]:
+          - generic [ref=e838]: ↓ Negative
+          - generic [ref=e839]: 1d
+        - generic [ref=e840]: Vitinha
+        - generic [ref=e841]: PSG’s Vitinha to miss Bayern Munich tie? - Get French Football News
+        - generic [ref=e842]: PSG’s Vitinha to miss Bayern Munich tie? Get French Football News
+        - generic [ref=e843]:
+          - generic [ref=e844]: "FRI Impact:"
+          - generic [ref=e845]: "-0.6"
+          - generic [ref=e846]: pts (auto-applied)
+      - generic [ref=e847] [cursor=pointer]:
+        - generic [ref=e848]:
+          - generic [ref=e849]: — Neutral
+          - generic [ref=e850]: 1d
+        - generic [ref=e851]: N'Golo Kanté
+        - generic [ref=e852]: My career 'suffered' after Leicester transfer - but I helped N'Golo Kante's rise and ended up winning Premier League title - talkSPORT
+        - generic [ref=e853]: My career 'suffered' after Leicester transfer - but I helped N'Golo Kante's rise and ended up winning Premier League title talkSPORT
+        - generic [ref=e854]:
+          - generic [ref=e855]: "FRI Impact:"
+          - generic [ref=e856]: "0.0"
+          - generic [ref=e857]: pts (auto-applied)
+      - generic [ref=e858] [cursor=pointer]:
+        - generic [ref=e859]:
+          - generic [ref=e860]: — Neutral
+          - generic [ref=e861]: 1d
+        - generic [ref=e862]: Raphinha
+        - generic [ref=e863]: Farke looks like he's unearthed a Raphinha & Bamford hybrid at Leeds - Football FanCast
+        - generic [ref=e864]: Farke looks like he's unearthed a Raphinha & Bamford hybrid at Leeds Football FanCast
+        - generic [ref=e865]:
+          - generic [ref=e866]: "FRI Impact:"
+          - generic [ref=e867]: "0.0"
+          - generic [ref=e868]: pts (auto-applied)
+      - generic [ref=e869] [cursor=pointer]:
+        - generic [ref=e870]:
+          - generic [ref=e871]: — Neutral
+          - generic [ref=e872]: 1d
+        - generic [ref=e873]: N'Golo Kanté
+        - generic [ref=e874]: "England Player Ratings: 'Cheat code Nico O'Reilly has become Man City's N'Golo Kante' - The Mirror"
+        - generic [ref=e875]: "England Player Ratings: 'Cheat code Nico O'Reilly has become Man City's N'Golo Kante' The Mirror"
+        - generic [ref=e876]:
+          - generic [ref=e877]: "FRI Impact:"
+          - generic [ref=e878]: "0.0"
+          - generic [ref=e879]: pts (auto-applied)
+      - generic [ref=e880] [cursor=pointer]:
+        - generic [ref=e881]:
+          - generic [ref=e882]: — Neutral
+          - generic [ref=e883]: 2d
+        - generic [ref=e884]: Vitinha
+        - generic [ref=e885]: "'It’s incredible to remember': Vitinha's turnaround leaves Ruud Gullit stunned - tribuna.com"
+        - generic [ref=e886]: "'It’s incredible to remember': Vitinha's turnaround leaves Ruud Gullit stunned tribuna.com"
+        - generic [ref=e887]:
+          - generic [ref=e888]: "FRI Impact:"
+          - generic [ref=e889]: "0.0"
+          - generic [ref=e890]: pts (auto-applied)
+      - generic [ref=e891] [cursor=pointer]:
+        - generic [ref=e892]:
+          - generic [ref=e893]: — Neutral
+          - generic [ref=e894]: 2d
+        - generic [ref=e895]: Rayan Cherki
+        - generic [ref=e896]: "Man City's Rayan Cherki: Football is 'like art,' it should make people forget life - MSN"
+        - generic [ref=e897]: "Man City's Rayan Cherki: Football is 'like art,' it should make people forget life MSN"
+        - generic [ref=e898]:
+          - generic [ref=e899]: "FRI Impact:"
+          - generic [ref=e900]: "0.0"
+          - generic [ref=e901]: pts (auto-applied)
+      - generic [ref=e902] [cursor=pointer]:
+        - generic [ref=e903]:
+          - generic [ref=e904]: — Neutral
+          - generic [ref=e905]: 2d
+        - generic [ref=e906]: Vinicius Jr
+        - generic [ref=e907]: Arteta promises Real Madrid man he ‘will be the star’ at Arsenal as Vinicius Jr makes contract U-turn - Football365
+        - generic [ref=e908]: Arteta promises Real Madrid man he ‘will be the star’ at Arsenal as Vinicius Jr makes contract U-turn Football365
+        - generic [ref=e909]:
+          - generic [ref=e910]: "FRI Impact:"
+          - generic [ref=e911]: "0.0"
+          - generic [ref=e912]: pts (auto-applied)
+      - generic [ref=e913] [cursor=pointer]:
+        - generic [ref=e914]:
+          - generic [ref=e915]: — Neutral
+          - generic [ref=e916]: 2d
+        - generic [ref=e917]: V. van Dijk
+        - generic [ref=e918]: Virgil van Dijk earns late Liverpool win in first derby at Everton’s new home - The Guardian
+        - generic [ref=e919]: Virgil van Dijk earns late Liverpool win in first derby at Everton’s new home The Guardian
+        - generic [ref=e920]:
+          - generic [ref=e921]: "FRI Impact:"
+          - generic [ref=e922]: "0.0"
+          - generic [ref=e923]: pts (auto-applied)
+      - generic [ref=e924] [cursor=pointer]:
+        - generic [ref=e925]:
+          - generic [ref=e926]: — Neutral
+          - generic [ref=e927]: 3d
+        - generic [ref=e928]: E. Haaland
+        - generic [ref=e929]: "Man City vs Arsenal: Erling Haaland and Gabriel Magalhaes go head-to-head - should Gabriel have seen red? - Sky Sports"
+        - generic [ref=e930]: "Man City vs Arsenal: Erling Haaland and Gabriel Magalhaes go head-to-head - should Gabriel have seen red? Sky Sports"
+        - generic [ref=e931]:
+          - generic [ref=e932]: "FRI Impact:"
+          - generic [ref=e933]: "0.0"
+          - generic [ref=e934]: pts (auto-applied)
+      - generic [ref=e935] [cursor=pointer]:
+        - generic [ref=e936]:
+          - generic [ref=e937]: ↑ Positive
+          - generic [ref=e938]: 3d
+        - generic [ref=e939]: V. van Dijk
+        - generic [ref=e940]: Virigl van Dijk heads home a dramatic 100th-minute WINNER in the Merseyside derby! - Sky Sports
+        - generic [ref=e941]: Virigl van Dijk heads home a dramatic 100th-minute WINNER in the Merseyside derby! Sky Sports
+        - generic [ref=e942]:
+          - generic [ref=e943]: "FRI Impact:"
+          - generic [ref=e944]: "+0.6"
+          - generic [ref=e945]: pts (auto-applied)
+      - generic [ref=e946] [cursor=pointer]:
+        - generic [ref=e947]:
+          - generic [ref=e948]: ↑ Positive
+          - generic [ref=e949]: 3d
+        - generic [ref=e950]: Vinicius Jr
+        - generic [ref=e951]: Vinicius Jr receives brutally honest ‘far from Neymar, Lionel Messi, Cristiano Ronaldo’ assessment as Real Madrid winger is told he ‘lacks something’ - Goal.com
+        - generic [ref=e952]: Vinicius Jr receives brutally honest ‘far from Neymar, Lionel Messi, Cristiano Ronaldo’ assessment as Real Madrid winger is told he ‘lacks something’ Goal.com
+        - generic [ref=e953]:
+          - generic [ref=e954]: "FRI Impact:"
+          - generic [ref=e955]: "+0.6"
+          - generic [ref=e956]: pts (auto-applied)
+      - generic [ref=e957] [cursor=pointer]:
+        - generic [ref=e958]:
+          - generic [ref=e959]: ↑ Positive
+          - generic [ref=e960]: 3d
+        - generic [ref=e961]: V. van Dijk
+        - generic [ref=e962]: "Everton 1-2 Liverpool: Virgil van Dijk scores 100th-minute winner in derby - BBC"
+        - generic [ref=e963]: "Everton 1-2 Liverpool: Virgil van Dijk scores 100th-minute winner in derby BBC"
+        - generic [ref=e964]:
+          - generic [ref=e965]: "FRI Impact:"
+          - generic [ref=e966]: "+0.6"
+          - generic [ref=e967]: pts (auto-applied)
+      - generic [ref=e968] [cursor=pointer]:
+        - generic [ref=e969]:
+          - generic [ref=e970]: ↑ Positive
+          - generic [ref=e971]: 5d
+        - generic [ref=e972]: L. Yamal
+        - generic [ref=e973]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League - Goal.com"
+        - generic [ref=e974]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League Goal.com"
+        - generic [ref=e975]:
+          - generic [ref=e976]: "FRI Impact:"
+          - generic [ref=e977]: "+0.6"
+          - generic [ref=e978]: pts (auto-applied)
+      - generic [ref=e979] [cursor=pointer]:
+        - generic [ref=e980]:
+          - generic [ref=e981]: ↑ Positive
+          - generic [ref=e982]: 5d
+        - generic [ref=e983]: K. Mbappé
+        - generic [ref=e984]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League - Goal.com"
+        - generic [ref=e985]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League Goal.com"
+        - generic [ref=e986]:
+          - generic [ref=e987]: "FRI Impact:"
+          - generic [ref=e988]: "+0.6"
+          - generic [ref=e989]: pts (auto-applied)
+      - generic [ref=e990] [cursor=pointer]:
+        - generic [ref=e991]:
+          - generic [ref=e992]: ↑ Positive
+          - generic [ref=e993]: 5d
+        - generic [ref=e994]: H. Kane
+        - generic [ref=e995]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League - Goal.com"
+        - generic [ref=e996]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League Goal.com"
+        - generic [ref=e997]:
+          - generic [ref=e998]: "FRI Impact:"
+          - generic [ref=e999]: "+0.6"
+          - generic [ref=e1000]: pts (auto-applied)
+      - generic [ref=e1001] [cursor=pointer]:
+        - generic [ref=e1002]:
+          - generic [ref=e1003]: ↑ Positive
+          - generic [ref=e1004]: 5d
+        - generic [ref=e1005]: D. Rice
+        - generic [ref=e1006]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League - Goal.com"
+        - generic [ref=e1007]: "Ballon d'Or 2026 Power Rankings: Bayern Munich duo Harry Kane and Michael Olise lead the way while Ousmane Dembele boosts hopes of Golden Ball defence - but it's World Cup or bust for both Kylian Mbappe and Lamine Yamal after Champions League Goal.com"
+        - generic [ref=e1008]:
+          - generic [ref=e1009]: "FRI Impact:"
+          - generic [ref=e1010]: "+0.6"
+          - generic [ref=e1011]: pts (auto-applied)
+      - generic [ref=e1012] [cursor=pointer]:
+        - generic [ref=e1013]:
+          - generic [ref=e1014]: — Neutral
+          - generic [ref=e1015]: 6d
+        - generic [ref=e1016]: Fermín López
+        - generic [ref=e1017]: Fermín López Rushed To Hospital After Collision In Barcelona’s Champions League Exit Vs Atlético - beIN SPORTS
+        - generic [ref=e1018]: Fermín López Rushed To Hospital After Collision In Barcelona’s Champions League Exit Vs Atlético beIN SPORTS
+        - generic [ref=e1019]:
+          - generic [ref=e1020]: "FRI Impact:"
+          - generic [ref=e1021]: "0.0"
+          - generic [ref=e1022]: pts (auto-applied)
+      - generic [ref=e1023] [cursor=pointer]:
+        - generic [ref=e1024]:
+          - generic [ref=e1025]: — Neutral
+          - generic [ref=e1026]: 7d
+        - generic [ref=e1027]: Raphinha
+        - generic [ref=e1028]: Football Daily | Atlético put boot into Barcelona as Raphinha gets rubbed up the wrong way - The Guardian
+        - generic [ref=e1029]: Football Daily | Atlético put boot into Barcelona as Raphinha gets rubbed up the wrong way The Guardian
+        - generic [ref=e1030]:
+          - generic [ref=e1031]: "FRI Impact:"
+          - generic [ref=e1032]: "0.0"
+          - generic [ref=e1033]: pts (auto-applied)
+      - generic [ref=e1034] [cursor=pointer]:
+        - generic [ref=e1035]:
+          - generic [ref=e1036]: — Neutral
+          - generic [ref=e1037]: 7d
+        - generic [ref=e1038]: Raphinha
+        - generic [ref=e1039]: Barcelona's Champions League exit was 'a robbery', says Raphinha - BBC
+        - generic [ref=e1040]: Barcelona's Champions League exit was 'a robbery', says Raphinha BBC
+        - generic [ref=e1041]:
+          - generic [ref=e1042]: "FRI Impact:"
+          - generic [ref=e1043]: "0.0"
+          - generic [ref=e1044]: pts (auto-applied)
+      - generic [ref=e1045] [cursor=pointer]:
+        - generic [ref=e1046]:
+          - generic [ref=e1047]: — Neutral
+          - generic [ref=e1048]: 7d
+        - generic [ref=e1049]: Fermín López
+        - generic [ref=e1050]: Fermin Lopez rushed to hospital after boot to face leaves him with bloody lip - TribalFootball
+        - generic [ref=e1051]: Fermin Lopez rushed to hospital after boot to face leaves him with bloody lip TribalFootball
+        - generic [ref=e1052]:
+          - generic [ref=e1053]: "FRI Impact:"
+          - generic [ref=e1054]: "0.0"
+          - generic [ref=e1055]: pts (auto-applied)
+      - generic [ref=e1056] [cursor=pointer]:
+        - generic [ref=e1057]:
+          - generic [ref=e1058]: — Neutral
+          - generic [ref=e1059]: 7d
+        - generic [ref=e1060]: Fermín López
+        - generic [ref=e1061]: Fermin Lopez injured as Barcelona crash out of Champions League - Kursiv Media
+        - generic [ref=e1062]: Fermin Lopez injured as Barcelona crash out of Champions League Kursiv Media
+        - generic [ref=e1063]:
+          - generic [ref=e1064]: "FRI Impact:"
+          - generic [ref=e1065]: "0.0"
+          - generic [ref=e1066]: pts (auto-applied)
+      - generic [ref=e1067] [cursor=pointer]:
+        - generic [ref=e1068]:
+          - generic [ref=e1069]: ↑ Positive
+          - generic [ref=e1070]: 8d
+        - generic [ref=e1071]: K. Mbappé
+        - generic [ref=e1072]: "'We can't always be good!' - Real Madrid star Kylian Mbappe vents frustration over football's 'era of excessive consumption' - Goal.com"
+        - generic [ref=e1073]: "'We can't always be good!' - Real Madrid star Kylian Mbappe vents frustration over football's 'era of excessive consumption' Goal.com"
+        - generic [ref=e1074]:
+          - generic [ref=e1075]: "FRI Impact:"
+          - generic [ref=e1076]: "+0.6"
+          - generic [ref=e1077]: pts (auto-applied)
+      - generic [ref=e1078] [cursor=pointer]:
+        - generic [ref=e1079]:
+          - generic [ref=e1080]: — Neutral
+          - generic [ref=e1081]: 8d
+        - generic [ref=e1082]: J. García
+        - generic [ref=e1083]: Stony Brook Seawolves 2025 College Football Players Stats - ESPN Singapore
+        - generic [ref=e1084]: Stony Brook Seawolves 2025 College Football Players Stats ESPN Singapore
+        - generic [ref=e1085]:
+          - generic [ref=e1086]: "FRI Impact:"
+          - generic [ref=e1087]: "0.0"
+          - generic [ref=e1088]: pts (auto-applied)
+      - generic [ref=e1089] [cursor=pointer]:
+        - generic [ref=e1090]:
+          - generic [ref=e1091]: ↑ Positive
+          - generic [ref=e1092]: 11d
+        - generic [ref=e1093]: T. Courtois
+        - generic [ref=e1094]: Real Madrid set to be handed Thibaut Courtois fitness boost in time for La Liga & Champions League run-in - Goal.com
+        - generic [ref=e1095]: Real Madrid set to be handed Thibaut Courtois fitness boost in time for La Liga & Champions League run-in Goal.com
+        - generic [ref=e1096]:
+          - generic [ref=e1097]: "FRI Impact:"
+          - generic [ref=e1098]: "+0.6"
+          - generic [ref=e1099]: pts (auto-applied)
+      - generic [ref=e1100] [cursor=pointer]:
+        - generic [ref=e1101]:
+          - generic [ref=e1102]: — Neutral
+          - generic [ref=e1103]: 13d
+        - generic [ref=e1104]: R. Asencio
+        - generic [ref=e1105]: Real Madrid youngster was banished from first team after Alvaro Arbeloa feud as coach forces academy hero to apologise to team-mates - Goal.com
+        - generic [ref=e1106]: Real Madrid youngster was banished from first team after Alvaro Arbeloa feud as coach forces academy hero to apologise to team-mates Goal.com
+        - generic [ref=e1107]:
+          - generic [ref=e1108]: "FRI Impact:"
+          - generic [ref=e1109]: "0.0"
+          - generic [ref=e1110]: pts (auto-applied)
+      - generic [ref=e1111] [cursor=pointer]:
+        - generic [ref=e1112]:
+          - generic [ref=e1113]: ↑ Positive
+          - generic [ref=e1114]: 13d
+        - generic [ref=e1115]: P. Cubarsí
+        - generic [ref=e1116]: A brutal two minutes for Barcelona! Pau Cubarsi sent off as VAR intervenes to overturn yellow card before Julian Alvarez strikes for Atletico Madrid - Goal.com
+        - generic [ref=e1117]: A brutal two minutes for Barcelona! Pau Cubarsi sent off as VAR intervenes to overturn yellow card before Julian Alvarez strikes for Atletico Madrid Goal.com
+        - generic [ref=e1118]:
+          - generic [ref=e1119]: "FRI Impact:"
+          - generic [ref=e1120]: "+0.6"
+          - generic [ref=e1121]: pts (auto-applied)
+      - generic [ref=e1122] [cursor=pointer]:
+        - generic [ref=e1123]:
+          - generic [ref=e1124]: — Neutral
+          - generic [ref=e1125]: 15d
+        - generic [ref=e1126]: H. Kane
+        - generic [ref=e1127]: "Real Madrid 1-2 Bayern Munich: Harry Kane and Luis Diaz give Bayern deserved edge - BBC"
+        - generic [ref=e1128]: "Real Madrid 1-2 Bayern Munich: Harry Kane and Luis Diaz give Bayern deserved edge BBC"
+        - generic [ref=e1129]:
+          - generic [ref=e1130]: "FRI Impact:"
+          - generic [ref=e1131]: "0.0"
+          - generic [ref=e1132]: pts (auto-applied)
+      - generic [ref=e1133] [cursor=pointer]:
+        - generic [ref=e1134]:
+          - generic [ref=e1135]: ↑ Positive
+          - generic [ref=e1136]: 16d
+        - generic [ref=e1137]: M. Olise
+        - generic [ref=e1138]: "From Crystal Palace to Europe's creator-in-chief: How Michael Olise became 'the best winger in the world' at Bayern Munich - Goal.com"
+        - generic [ref=e1139]: "From Crystal Palace to Europe's creator-in-chief: How Michael Olise became 'the best winger in the world' at Bayern Munich Goal.com"
+        - generic [ref=e1140]:
+          - generic [ref=e1141]: "FRI Impact:"
+          - generic [ref=e1142]: "+1.2"
+          - generic [ref=e1143]: pts (auto-applied)
+      - generic [ref=e1144] [cursor=pointer]:
+        - generic [ref=e1145]:
+          - generic [ref=e1146]: — Neutral
+          - generic [ref=e1147]: 20d
+        - generic [ref=e1148]: N'Golo Kanté
+        - generic [ref=e1149]: N’Golo Kanté Returns to European Football with Fenerbahçe - beIN SPORTS
+        - generic [ref=e1150]: N’Golo Kanté Returns to European Football with Fenerbahçe beIN SPORTS
+        - generic [ref=e1151]:
+          - generic [ref=e1152]: "FRI Impact:"
+          - generic [ref=e1153]: "0.0"
+          - generic [ref=e1154]: pts (auto-applied)
+      - generic [ref=e1155] [cursor=pointer]:
+        - generic [ref=e1156]:
+          - generic [ref=e1157]: ↑ Positive
+          - generic [ref=e1158]: 23d
+        - generic [ref=e1159]: M. Olise
+        - generic [ref=e1160]: "'He could break his leg!' - Didier Deschamps rages over 'American football' tackle on Michael Olise during France's win over Colombia - Goal.com"
+        - generic [ref=e1161]: "'He could break his leg!' - Didier Deschamps rages over 'American football' tackle on Michael Olise during France's win over Colombia Goal.com"
+        - generic [ref=e1162]:
+          - generic [ref=e1163]: "FRI Impact:"
+          - generic [ref=e1164]: "+0.6"
+          - generic [ref=e1165]: pts (auto-applied)
+      - generic [ref=e1166] [cursor=pointer]:
+        - generic [ref=e1167]:
+          - generic [ref=e1168]: — Neutral
+          - generic [ref=e1169]: 26d
+        - generic [ref=e1170]: P. Cubarsí
+        - generic [ref=e1171]: Spain vs Serbia live score, H2H and lineups - Sofascore
+        - generic [ref=e1172]: Spain vs Serbia live score, H2H and lineups Sofascore
+        - generic [ref=e1173]:
+          - generic [ref=e1174]: "FRI Impact:"
+          - generic [ref=e1175]: "0.0"
+          - generic [ref=e1176]: pts (auto-applied)
+      - generic [ref=e1177] [cursor=pointer]:
+        - generic [ref=e1178]:
+          - generic [ref=e1179]: — Neutral
+          - generic [ref=e1180]: 26d
+        - generic [ref=e1181]: J. García
+        - generic [ref=e1182]: "Football Union of Russia vs Nicaragua: Friendlies stats & head-to-head - BBC"
+        - generic [ref=e1183]: "Football Union of Russia vs Nicaragua: Friendlies stats & head-to-head BBC"
+        - generic [ref=e1184]:
+          - generic [ref=e1185]: "FRI Impact:"
+          - generic [ref=e1186]: "0.0"
+          - generic [ref=e1187]: pts (auto-applied)
+      - generic [ref=e1188] [cursor=pointer]:
+        - generic [ref=e1189]:
+          - generic [ref=e1190]: ↑ Positive
+          - generic [ref=e1191]: 27d
+        - generic [ref=e1192]: K. Mbappé
+        - generic [ref=e1193]: "Brazil 1-2 France: Kylian Mbappe one goal from equalling France's all-time scorer record - BBC"
+        - generic [ref=e1194]: "Brazil 1-2 France: Kylian Mbappe one goal from equalling France's all-time scorer record BBC"
+        - generic [ref=e1195]:
+          - generic [ref=e1196]: "FRI Impact:"
+          - generic [ref=e1197]: "+1.2"
+          - generic [ref=e1198]: pts (auto-applied)
+      - generic [ref=e1199] [cursor=pointer]:
+        - generic [ref=e1200]:
+          - generic [ref=e1201]: ↑ Positive
+          - generic [ref=e1202]: 29d
+        - generic [ref=e1203]: P. Cubarsí
+        - generic [ref=e1204]: "NXGN 2026: The 50 best teenage wonderkids in football - Goal.com"
+        - generic [ref=e1205]: "NXGN 2026: The 50 best teenage wonderkids in football Goal.com"
+        - generic [ref=e1206]:
+          - generic [ref=e1207]: "FRI Impact:"
+          - generic [ref=e1208]: "+1.8"
+          - generic [ref=e1209]: pts (auto-applied)
+      - generic [ref=e1210] [cursor=pointer]:
+        - generic [ref=e1211]:
+          - generic [ref=e1212]: ↑ Positive
+          - generic [ref=e1213]: 29d
+        - generic [ref=e1214]: L. Yamal
+        - generic [ref=e1215]: "NXGN 2026: Barcelona duo Lamine Yamal and Sydney Schertenleib crowned football's best teenage wonderkids - Goal.com"
+        - generic [ref=e1216]: "NXGN 2026: Barcelona duo Lamine Yamal and Sydney Schertenleib crowned football's best teenage wonderkids Goal.com"
+        - generic [ref=e1217]:
+          - generic [ref=e1218]: "FRI Impact:"
+          - generic [ref=e1219]: "+1.8"
+          - generic [ref=e1220]: pts (auto-applied)
+      - generic [ref=e1221] [cursor=pointer]:
+        - generic [ref=e1222]:
+          - generic [ref=e1223]: — Neutral
+          - generic [ref=e1224]: 31d
+        - generic [ref=e1225]: H. Ekitike
+        - generic [ref=e1226]: Arne Slot delivers Alexander Isak injury update as Liverpool boss plays down Hugo Ekitike fitness concerns ahead of Man City and PSG clashes - Goal.com
+        - generic [ref=e1227]: Arne Slot delivers Alexander Isak injury update as Liverpool boss plays down Hugo Ekitike fitness concerns ahead of Man City and PSG clashes Goal.com
+        - generic [ref=e1228]:
+          - generic [ref=e1229]: "FRI Impact:"
+          - generic [ref=e1230]: "0.0"
+          - generic [ref=e1231]: pts (auto-applied)
+      - generic [ref=e1232] [cursor=pointer]:
+        - generic [ref=e1233]:
+          - generic [ref=e1234]: — Neutral
+          - generic [ref=e1235]: 32d
+        - generic [ref=e1236]: H. Kane
+        - generic [ref=e1237]: FC Bayern München vs 1. FC Union Berlin live score, H2H and lineups - Sofascore
+        - generic [ref=e1238]: FC Bayern München vs 1. FC Union Berlin live score, H2H and lineups Sofascore
+        - generic [ref=e1239]:
+          - generic [ref=e1240]: "FRI Impact:"
+          - generic [ref=e1241]: "0.0"
+          - generic [ref=e1242]: pts (auto-applied)
+      - generic [ref=e1243] [cursor=pointer]:
+        - generic [ref=e1244]:
+          - generic [ref=e1245]: — Neutral
+          - generic [ref=e1246]: 33d
+        - generic [ref=e1247]: T. Courtois
+        - generic [ref=e1248]: Real Madrid handed Thibaut Courtois injury scare ahead of huge Champions League tie with Bayern Munich - Goal.com
+        - generic [ref=e1249]: Real Madrid handed Thibaut Courtois injury scare ahead of huge Champions League tie with Bayern Munich Goal.com
+        - generic [ref=e1250]:
+          - generic [ref=e1251]: "FRI Impact:"
+          - generic [ref=e1252]: "0.0"
+          - generic [ref=e1253]: pts (auto-applied)
+      - generic [ref=e1254] [cursor=pointer]:
+        - generic [ref=e1255]:
+          - generic [ref=e1256]: — Neutral
+          - generic [ref=e1257]: 35d
+        - generic [ref=e1258]: J. García
+        - generic [ref=e1259]: "Barcelona v Newcastle: Confirmed team news - BBC"
+        - generic [ref=e1260]: "Barcelona v Newcastle: Confirmed team news BBC"
+        - generic [ref=e1261]:
+          - generic [ref=e1262]: "FRI Impact:"
+          - generic [ref=e1263]: "0.0"
+          - generic [ref=e1264]: pts (auto-applied)
+      - generic [ref=e1265] [cursor=pointer]:
+        - generic [ref=e1266]:
+          - generic [ref=e1267]: — Neutral
+          - generic [ref=e1268]: 35d
+        - generic [ref=e1269]: D. Rice
+        - generic [ref=e1270]: "Arsenal 2-0 Bayer Leverkusen (3-1 on agg): Gunners cruise into Champions League quarter-finals - BBC"
+        - generic [ref=e1271]: "Arsenal 2-0 Bayer Leverkusen (3-1 on agg): Gunners cruise into Champions League quarter-finals BBC"
+        - generic [ref=e1272]:
+          - generic [ref=e1273]: "FRI Impact:"
+          - generic [ref=e1274]: "0.0"
+          - generic [ref=e1275]: pts (auto-applied)
+      - generic [ref=e1276] [cursor=pointer]:
+        - generic [ref=e1277]:
+          - generic [ref=e1278]: ↑ Positive
+          - generic [ref=e1279]: 36d
+        - generic [ref=e1280]: F. Valverde
+        - generic [ref=e1281]: "He has already been awarded the Ballon d'Or: Real Madrid have found a worthy successor to Toni Kroos in the \"most underrated player in the world\" - Goal.com"
+        - generic [ref=e1282]: "He has already been awarded the Ballon d'Or: Real Madrid have found a worthy successor to Toni Kroos in the \"most underrated player in the world\" Goal.com"
+        - generic [ref=e1283]:
+          - generic [ref=e1284]: "FRI Impact:"
+          - generic [ref=e1285]: "+1.2"
+          - generic [ref=e1286]: pts (auto-applied)
+      - generic [ref=e1287] [cursor=pointer]:
+        - generic [ref=e1288]:
+          - generic [ref=e1289]: — Neutral
+          - generic [ref=e1290]: 37d
+        - generic [ref=e1291]: Pedri
+        - generic [ref=e1292]: Pedri - Titles & achievements - Transfermarkt
+        - generic [ref=e1293]: Pedri - Titles & achievements Transfermarkt
+        - generic [ref=e1294]:
+          - generic [ref=e1295]: "FRI Impact:"
+          - generic [ref=e1296]: "0.0"
+          - generic [ref=e1297]: pts (auto-applied)
+      - generic [ref=e1298] [cursor=pointer]:
+        - generic [ref=e1299]:
+          - generic [ref=e1300]: — Neutral
+          - generic [ref=e1301]: 37d
+        - generic [ref=e1302]: Pedri
+        - generic [ref=e1303]: Pedri - Player profile 25/26 - Transfermarkt
+        - generic [ref=e1304]: Pedri - Player profile 25/26 Transfermarkt
+        - generic [ref=e1305]:
+          - generic [ref=e1306]: "FRI Impact:"
+          - generic [ref=e1307]: "0.0"
+          - generic [ref=e1308]: pts (auto-applied)
+      - generic [ref=e1309] [cursor=pointer]:
+        - generic [ref=e1310]:
+          - generic [ref=e1311]: ↑ Positive
+          - generic [ref=e1312]: 40d
+        - generic [ref=e1313]: T. Courtois
+        - generic [ref=e1314]: Thibaut Courtois responds to suggestion Real Madrid players were behind Xabi Alonso's sacking - Goal.com
+        - generic [ref=e1315]: Thibaut Courtois responds to suggestion Real Madrid players were behind Xabi Alonso's sacking Goal.com
+        - generic [ref=e1316]:
+          - generic [ref=e1317]: "FRI Impact:"
+          - generic [ref=e1318]: "+0.6"
+          - generic [ref=e1319]: pts (auto-applied)
+      - generic [ref=e1320] [cursor=pointer]:
+        - generic [ref=e1321]:
+          - generic [ref=e1322]: ↑ Positive
+          - generic [ref=e1323]: 41d
+        - generic [ref=e1324]: M. Olise
+        - generic [ref=e1325]: This absurd rule must be abolished immediately! Bayern Munich's "undeserved" yellow cards for Joshua Kimmich and Michael Olise should be a wake-up call for UEFA - Goal.com
+        - generic [ref=e1326]: This absurd rule must be abolished immediately! Bayern Munich's "undeserved" yellow cards for Joshua Kimmich and Michael Olise should be a wake-up call for UEFA Goal.com
+        - generic [ref=e1327]:
+          - generic [ref=e1328]: "FRI Impact:"
+          - generic [ref=e1329]: "+0.6"
+          - generic [ref=e1330]: pts (auto-applied)
+      - generic [ref=e1331] [cursor=pointer]:
+        - generic [ref=e1332]:
+          - generic [ref=e1333]: ↑ Positive
+          - generic [ref=e1334]: 41d
+        - generic [ref=e1335]: F. Valverde
+        - generic [ref=e1336]: Federico Valverde hat-trick puts Real Madrid in control over Man City - The Times
+        - generic [ref=e1337]: Federico Valverde hat-trick puts Real Madrid in control over Man City The Times
+        - generic [ref=e1338]:
+          - generic [ref=e1339]: "FRI Impact:"
+          - generic [ref=e1340]: "+0.6"
+          - generic [ref=e1341]: pts (auto-applied)
+      - generic [ref=e1342] [cursor=pointer]:
+        - generic [ref=e1343]:
+          - generic [ref=e1344]: ↑ Positive
+          - generic [ref=e1345]: 41d
+        - generic [ref=e1346]: F. Valverde
+        - generic [ref=e1347]: "Perfect 10s: Erling Haaland, Lionel Messi, Fede Valverde & the 20 players to have earned rare 10/10 rating from L’Equipe - Goal.com"
+        - generic [ref=e1348]: "Perfect 10s: Erling Haaland, Lionel Messi, Fede Valverde & the 20 players to have earned rare 10/10 rating from L’Equipe Goal.com"
+        - generic [ref=e1349]:
+          - generic [ref=e1350]: "FRI Impact:"
+          - generic [ref=e1351]: "+0.6"
+          - generic [ref=e1352]: pts (auto-applied)
+      - generic [ref=e1353] [cursor=pointer]:
+        - generic [ref=e1354]:
+          - generic [ref=e1355]: — Neutral
+          - generic [ref=e1356]: 46d
+        - generic [ref=e1357]: Pedri
+        - generic [ref=e1358]: Pedri gesture for family of Atletico Madrid captain goes viral - Football Espana
+        - generic [ref=e1359]: Pedri gesture for family of Atletico Madrid captain goes viral Football Espana
+        - generic [ref=e1360]:
+          - generic [ref=e1361]: "FRI Impact:"
+          - generic [ref=e1362]: "0.0"
+          - generic [ref=e1363]: pts (auto-applied)
+      - generic [ref=e1364] [cursor=pointer]:
+        - generic [ref=e1365]:
+          - generic [ref=e1366]: — Neutral
+          - generic [ref=e1367]: 51d
+        - generic [ref=e1368]: D. Rice
+        - generic [ref=e1369]: Mikel Arteta delivers Declan Rice injury update after Arsenal star asks to be substituted in win over Chelsea - Goal.com
+        - generic [ref=e1370]: Mikel Arteta delivers Declan Rice injury update after Arsenal star asks to be substituted in win over Chelsea Goal.com
+        - generic [ref=e1371]:
+          - generic [ref=e1372]: "FRI Impact:"
+          - generic [ref=e1373]: "0.0"
+          - generic [ref=e1374]: pts (auto-applied)
+      - generic [ref=e1375] [cursor=pointer]:
+        - generic [ref=e1376]:
+          - generic [ref=e1377]: ↑ Positive
+          - generic [ref=e1378]: 52d
+        - generic [ref=e1379]: L. Yamal
+        - generic [ref=e1380]: "'I didn't feel great' - Lamine Yamal explains why he’s smiling again at Barcelona after scoring first hat-trick against Villarreal - Goal.com"
+        - generic [ref=e1381]: "'I didn't feel great' - Lamine Yamal explains why he’s smiling again at Barcelona after scoring first hat-trick against Villarreal Goal.com"
+        - generic [ref=e1382]:
+          - generic [ref=e1383]: "FRI Impact:"
+          - generic [ref=e1384]: "+1.2"
+          - generic [ref=e1385]: pts (auto-applied)
+      - generic [ref=e1386] [cursor=pointer]:
+        - generic [ref=e1387]:
+          - generic [ref=e1388]: — Neutral
+          - generic [ref=e1389]: 53d
+        - generic [ref=e1390]: R. Asencio
+        - generic [ref=e1391]: Real Madrid's Raul Asencio ruled out with neck injury after Eduardo Camavinga collision as Alvaro Arbeloa handed defensive headache - Goal.com
+        - generic [ref=e1392]: Real Madrid's Raul Asencio ruled out with neck injury after Eduardo Camavinga collision as Alvaro Arbeloa handed defensive headache Goal.com
+        - generic [ref=e1393]:
+          - generic [ref=e1394]: "FRI Impact:"
+          - generic [ref=e1395]: "0.0"
+          - generic [ref=e1396]: pts (auto-applied)
+      - generic [ref=e1397] [cursor=pointer]:
+        - generic [ref=e1398]:
+          - generic [ref=e1399]: ↑ Positive
+          - generic [ref=e1400]: 59d
+        - generic [ref=e1401]: R. Asencio
+        - generic [ref=e1402]: "Real Madrid player ratings vs Osasuna: A Raul Asencio defensive disasterclass! Spaniard's late lapse costs Los Blancos as Vinicius Junior strike counts for nothing - Goal.com"
+        - generic [ref=e1403]: "Real Madrid player ratings vs Osasuna: A Raul Asencio defensive disasterclass! Spaniard's late lapse costs Los Blancos as Vinicius Junior strike counts for nothing Goal.com"
+        - generic [ref=e1404]:
+          - generic [ref=e1405]: "FRI Impact:"
+          - generic [ref=e1406]: "+0.6"
+          - generic [ref=e1407]: pts (auto-applied)
+      - generic [ref=e1408] [cursor=pointer]:
+        - generic [ref=e1409]:
+          - generic [ref=e1410]: ↑ Positive
+          - generic [ref=e1411]: 72d
+        - generic [ref=e1412]: H. Ekitike
+        - generic [ref=e1413]: "Liverpool player ratings vs Man City: What was Alisson thinking?! Goalkeeper's rush of blood proves costly while Hugo Ekitike has a shocker as Dominik Szoboszlai's stunner goes to waste - Goal.com"
+        - generic [ref=e1414]: "Liverpool player ratings vs Man City: What was Alisson thinking?! Goalkeeper's rush of blood proves costly while Hugo Ekitike has a shocker as Dominik Szoboszlai's stunner goes to waste Goal.com"
+        - generic [ref=e1415]:
+          - generic [ref=e1416]: "FRI Impact:"
+          - generic [ref=e1417]: "+0.6"
+          - generic [ref=e1418]: pts (auto-applied)
+      - generic [ref=e1419] [cursor=pointer]:
+        - generic [ref=e1420]:
+          - generic [ref=e1421]: — Neutral
+          - generic [ref=e1422]: 73d
+        - generic [ref=e1423]: H. Ekitike
+        - generic [ref=e1424]: Hugo Ekitike goes close to Liverpool opener - Sky Sports
+        - generic [ref=e1425]: Hugo Ekitike goes close to Liverpool opener Sky Sports
+        - generic [ref=e1426]:
+          - generic [ref=e1427]: "FRI Impact:"
+          - generic [ref=e1428]: "0.0"
+          - generic [ref=e1429]: pts (auto-applied)
+      - generic [ref=e1430] [cursor=pointer]:
+        - generic [ref=e1431]:
+          - generic [ref=e1432]: — Neutral
+          - generic [ref=e1433]: 129d
+        - generic [ref=e1434]: J. Bellingham
+        - generic [ref=e1435]: "Bundesliga: Jobe Bellingham sent off for the first time in Borussia Dortmund - BBC"
+        - generic [ref=e1436]: "Bundesliga: Jobe Bellingham sent off for the first time in Borussia Dortmund BBC"
+        - generic [ref=e1437]:
+          - generic [ref=e1438]: "FRI Impact:"
+          - generic [ref=e1439]: "0.0"
+          - generic [ref=e1440]: pts (auto-applied)
+      - generic [ref=e1441] [cursor=pointer]:
+        - generic [ref=e1442]:
+          - generic [ref=e1443]: ↑ Positive
+          - generic [ref=e1444]: 137d
+        - generic [ref=e1445]: J. Bellingham
+        - generic [ref=e1446]: Jude Bellingham's father joins German lower-league club in bid to be closer to son Jobe before scoring twice in 'lethal' debut - Goal.com
+        - generic [ref=e1447]: Jude Bellingham's father joins German lower-league club in bid to be closer to son Jobe before scoring twice in 'lethal' debut Goal.com
+        - generic [ref=e1448]:
+          - generic [ref=e1449]: "FRI Impact:"
+          - generic [ref=e1450]: "+0.6"
+          - generic [ref=e1451]: pts (auto-applied)
+      - generic [ref=e1452] [cursor=pointer]:
+        - generic [ref=e1453]:
+          - generic [ref=e1454]: ↑ Positive
+          - generic [ref=e1455]: 139d
+        - generic [ref=e1456]: J. Bellingham
+        - generic [ref=e1457]: Real Madrid legend David Beckham joins forces with current Blancos stars Jude Bellingham & Trent Alexander-Arnold to drop new throwback gunmetal adidas Predator Mania - Goal.com
+        - generic [ref=e1458]: Real Madrid legend David Beckham joins forces with current Blancos stars Jude Bellingham & Trent Alexander-Arnold to drop new throwback gunmetal adidas Predator Mania Goal.com
+        - generic [ref=e1459]:
+          - generic [ref=e1460]: "FRI Impact:"
+          - generic [ref=e1461]: "+0.6"
+          - generic [ref=e1462]: pts (auto-applied)
+  - generic [ref=e1464]:
+    - generic [ref=e1465]:
+      - generic [ref=e1466]: Methodology
+      - heading "The Formula" [level=2] [ref=e1467]
+      - paragraph [ref=e1468]: Fair, transparent, and position-neutral. Every component is publicly auditable.
+    - generic [ref=e1469]:
+      - generic [ref=e1470]: FRI = (P × 0.35) + (S × 0.20) + (F × 0.20) + (M × 0.15) + (C × 0.10)
+      - text: All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation
+    - generic [ref=e1471]:
+      - generic [ref=e1472]:
+        - heading "🏟️ Field Performance" [level=4] [ref=e1473]
+        - generic [ref=e1474]: "Weight: 35%"
+        - paragraph [ref=e1475]: Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Age-adjusted for veterans.
+      - generic [ref=e1476]:
+        - heading "📱 Social Influence" [level=4] [ref=e1477]
+        - generic [ref=e1478]: "Weight: 20%"
+        - paragraph [ref=e1479]: Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.
+      - generic [ref=e1480]:
+        - heading "🗳️ Fan Sentiment" [level=4] [ref=e1481]
+        - generic [ref=e1482]: "Weight: 20%"
+        - paragraph [ref=e1483]: Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.
+      - generic [ref=e1484]:
+        - heading "📰 Media Score" [level=4] [ref=e1485]
+        - generic [ref=e1486]: "Weight: 15%"
+        - paragraph [ref=e1487]: NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.
+      - generic [ref=e1488]:
+        - heading "⚖️ Character Index" [level=4] [ref=e1489]
+        - generic [ref=e1490]: "Weight: 10%"
+        - paragraph [ref=e1491]: Yellow/red cards, confirmed scandals, fan conflicts, referee disputes subtract points. Charity work and fair play awards add. Older incidents decay 20% weight per year.
+  - generic [ref=e1493]:
+    - generic [ref=e1494]:
+      - generic [ref=e1495]: Platform Access
+      - heading "Built For Everyone" [level=2] [ref=e1496]
+      - paragraph [ref=e1497]: Whether you're a player, a fan, or a global brand — FRI gives you the data you need.
+    - generic [ref=e1498]:
+      - generic [ref=e1499]:
+        - generic [ref=e1500]: ⚽
+        - generic [ref=e1501]: Players
+        - paragraph [ref=e1502]: See exactly what's driving your score up or down. Get actionable feedback from millions of fans worldwide.
+        - list [ref=e1503]:
+          - listitem [ref=e1504]: → Full breakdown of all 5 FRI pillars
+          - listitem [ref=e1505]: → See what fans actually think about you
+          - listitem [ref=e1506]: → Historical trend — track your reputation arc
+          - listitem [ref=e1507]: → Compare to position peers worldwide
+          - listitem [ref=e1508]: → Media sentiment timeline
+      - generic [ref=e1509]:
+        - generic [ref=e1510]: 🏟️
+        - generic [ref=e1511]: Fans
+        - paragraph [ref=e1512]: Your voice matters. Vote in polls, rate performances, and directly shape the reputation of the players you follow.
+        - list [ref=e1513]:
+          - listitem [ref=e1514]: → 20% of FRI is yours — fan poll weight
+          - listitem [ref=e1515]: → Rate any player after any match
+          - listitem [ref=e1516]: → See how your votes move the score
+          - listitem [ref=e1517]: → Follow your club's full squad FRI
+          - listitem [ref=e1518]: → Leaderboard by club, league, nation
+      - generic [ref=e1519]:
+        - generic [ref=e1520]: 📊
+        - generic [ref=e1521]: Brands
+        - paragraph [ref=e1522]: End the guesswork on sponsorship ROI. FRI quantifies reputational risk and media value with a single auditable score.
+        - list [ref=e1523]:
+          - listitem [ref=e1524]: → Sponsorship viability score per player
+          - listitem [ref=e1525]: → Media influence vs. controversy risk ratio
+          - listitem [ref=e1526]: → Historical FRI stability — brand safety
+          - listitem [ref=e1527]: → Demographic breakdown of fan base
+          - listitem [ref=e1528]: → Competitor ambassador benchmarking
+  - contentinfo [ref=e1529]:
+    - generic [ref=e1530]: FRI
+    - generic [ref=e1531]: © 2025 Football Reputation Index. The global standard for player reputation analytics.

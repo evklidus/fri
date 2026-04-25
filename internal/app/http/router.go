@@ -35,6 +35,8 @@ func NewRouter(cfg config.Config, svc *service.Service) *gin.Engine {
 		api.POST("/players/:id/vote", handler.submitVote)
 		api.GET("/leaderboard", handler.listPlayers)
 		api.GET("/news/feed", handler.listNewsFeed)
+		api.GET("/sync/updates", handler.listComponentUpdates)
+		api.POST("/sync/media", handler.runMediaSync)
 	}
 
 	router.Static("/assets", filepath.Join(cfg.WebDir, "assets"))
@@ -133,6 +135,24 @@ func (r *Router) submitVote(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusCreated, gin.H{"data": score})
+}
+
+func (r *Router) listComponentUpdates(c *gin.Context) {
+	updates, err := r.svc.ListComponentUpdates(c.Request.Context(), 20)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": updates})
+}
+
+func (r *Router) runMediaSync(c *gin.Context) {
+	result, err := r.svc.SyncMedia(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "data": result})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
 }
 
 func parseID(c *gin.Context) (int64, bool) {

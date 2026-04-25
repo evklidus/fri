@@ -31,7 +31,8 @@ func main() {
 	}
 
 	repo := postgres.NewRepository(pool)
-	svc := service.New(repo)
+	mediaProvider := service.NewMediaProvider(cfg.SyncHTTPTimeout, cfg.MediaArticlesPerRun)
+	svc := service.New(repo, mediaProvider)
 
 	if err := svc.ForceSeed(ctx, sourcePath); err != nil {
 		log.Fatalf("import legacy html: %v", err)

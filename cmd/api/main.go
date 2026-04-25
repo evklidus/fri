@@ -32,10 +32,15 @@ func main() {
 	}
 
 	repo := postgres.NewRepository(pool)
-	svc := service.New(repo)
+	mediaProvider := service.NewMediaProvider(cfg.SyncHTTPTimeout, cfg.MediaArticlesPerRun)
+	svc := service.New(repo, mediaProvider)
 
 	if err := svc.SeedIfEmpty(ctx, cfg.SourceHTMLPath); err != nil {
 		log.Fatalf("seed database: %v", err)
+	}
+
+	if cfg.AutoSyncEnabled {
+		svc.StartScheduler(ctx, cfg.MediaSyncInterval)
 	}
 
 	router := apphttp.NewRouter(cfg, svc)

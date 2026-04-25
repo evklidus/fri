@@ -60,7 +60,26 @@
 
 Статус:
 
-- запланирована
+- базовая реализация сделана
+
+Что уже реализовано:
+
+- ingestion infrastructure на backend
+- таблица `component_updates`
+- дополнительные timestamps обновления компонент в `fri_scores`
+- live media sync через `Google News RSS`
+- эвристический sentiment scoring и расчёт `Media Score`
+- автоматический пересчёт общего `FRI` после изменения media-компонента
+- фоновый scheduler в API-процессе
+- ручной запуск sync через `POST /api/sync/media`
+- просмотр статусов sync через `GET /api/sync/updates`
+
+Что ещё остаётся для полного покрытия исходного scope фазы 2:
+
+- внешние `Social` providers с реальными API/ключами
+- внешний `Performance` provider с надёжным источником статистики
+- более строгая нормализация по исторической базе игроков
+- retries/backoff/proxy strategy для сложных источников
 
 Цель:
 
