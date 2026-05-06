@@ -8,6 +8,7 @@ import (
 	"math"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 	"unicode"
 
@@ -27,19 +28,41 @@ type repository interface {
 	StartComponentUpdate(ctx context.Context, component, provider string) (int64, error)
 	FinishComponentUpdate(ctx context.Context, updateID int64, status, message string, recordsSeen int) error
 	ListComponentUpdates(ctx context.Context, limit int) ([]domain.ComponentUpdate, error)
-	SaveSocialSnapshot(ctx context.Context, snapshot domain.SocialSnapshot) error
+	ApplySocialSync(ctx context.Context, snapshots []domain.SocialSnapshot, provider string) ([]domain.PlayerSyncDelta, error)
+	ApplyPerformanceSync(ctx context.Context, snapshots []domain.PerformanceSnapshot, provider string) ([]domain.PlayerSyncDelta, error)
 	ApplyMediaSync(ctx context.Context, results []domain.MediaSyncPlayerResult, provider string) ([]domain.PlayerSyncDelta, error)
+	GetExternalIDs(ctx context.Context, playerID int64, provider string) (*domain.PlayerExternalIDs, error)
+	UpsertExternalIDs(ctx context.Context, ids domain.PlayerExternalIDs) error
+	DeleteExternalIDs(ctx context.Context, playerID int64, provider string) error
+	HasRecentVote(ctx context.Context, playerID int64, ipHash string, since time.Time) (bool, error)
+	ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error)
 }
+
+// voteCooldown bounds how often a single IP can vote for the same player.
+// Tuned so an honest fan can re-vote daily without obvious manual abuse.
+const voteCooldown = 24 * time.Hour
 
 type Service struct {
-	repo          repository
-	mediaProvider mediaProvider
+	repo                repository
+	mediaProvider       mediaProvider
+	socialProvider      socialProvider
+	performanceProvider performanceProvider
+
+	// Per-component sync locks prevent overlapping scheduled and ad-hoc HTTP
+	// runs of the same component. We use TryLock so a concurrent caller
+	// returns immediately with status=skipped instead of queueing.
+	performanceSyncMu sync.Mutex
+	socialSyncMu      sync.Mutex
+	mediaSyncMu       sync.Mutex
+	characterSyncMu   sync.Mutex
 }
 
-func New(repo repository, mediaProvider mediaProvider) *Service {
+func New(repo repository, mediaProvider mediaProvider, socialProvider socialProvider, performanceProvider performanceProvider) *Service {
 	return &Service{
-		repo:          repo,
-		mediaProvider: mediaProvider,
+		repo:                repo,
+		mediaProvider:       mediaProvider,
+		socialProvider:      socialProvider,
+		performanceProvider: performanceProvider,
 	}
 }
 
@@ -71,6 +94,7 @@ func (s *Service) ForceSeed(ctx context.Context, sourceHTMLPath string) error {
 				Slug:            slugify(item.Name),
 				Name:            item.Name,
 				Club:            item.Club,
+				League:          leagueForClub(item.Club),
 				Position:        item.Pos,
 				Age:             item.Age,
 				Emoji:           item.Emoji,
@@ -171,6 +195,19 @@ func (s *Service) SubmitVote(ctx context.Context, playerID int64, input domain.V
 	sum := sha256.Sum256([]byte(rawIP))
 	ipHash := hex.EncodeToString(sum[:])
 
+	// Anti-abuse: one vote per (player, IP) per 24h window. Empty/blank rawIP
+	// is treated as "no IP available" and skipped to keep tests/CLI happy.
+	if strings.TrimSpace(rawIP) != "" {
+		windowStart := time.Now().UTC().Add(-voteCooldown)
+		recent, err := s.repo.HasRecentVote(ctx, playerID, ipHash, windowStart)
+		if err != nil {
+			return nil, fmt.Errorf("check recent vote: %w", err)
+		}
+		if recent {
+			return nil, fmt.Errorf("vote rate limit: already voted for this player in the last 24h")
+		}
+	}
+
 	return s.repo.CreateVoteAndRefreshScore(ctx, domain.Vote{
 		PlayerID:      playerID,
 		SessionID:     input.SessionID,
@@ -231,6 +268,96 @@ func parseRelativeTime(now time.Time, raw string) time.Time {
 	default:
 		return now
 	}
+}
+
+// leagueForClub maps a canonical club name (as stored in seed data) to its
+// league. Seed contains a small, known set of clubs — keeping this as a
+// lookup table avoids the need for an external "leagues" reference table at
+// MVP scale. Unknown clubs fall through to "Other" so the leaderboard still
+// renders.
+func leagueForClub(club string) string {
+	normalized := normalizeClubName(club)
+	if league, ok := clubLeagueIndex[normalized]; ok {
+		return league
+	}
+	return "Other"
+}
+
+func normalizeClubName(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	replacer := strings.NewReplacer(
+		"á", "a", "à", "a", "â", "a", "ä", "a", "ã", "a", "å", "a",
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"í", "i", "ì", "i", "î", "i", "ï", "i",
+		"ó", "o", "ò", "o", "ô", "o", "ö", "o", "õ", "o",
+		"ú", "u", "ù", "u", "û", "u", "ü", "u",
+		"ñ", "n", "ç", "c",
+		".", " ", "-", " ",
+	)
+	return strings.Join(strings.Fields(replacer.Replace(value)), " ")
+}
+
+// clubLeagueIndex covers clubs present in current seed data plus common
+// aliases ("Man City" / "Manchester City"). Add entries as the player roster
+// grows.
+var clubLeagueIndex = map[string]string{
+	// Premier League
+	"manchester city":   "Premier League",
+	"man city":          "Premier League",
+	"manchester united": "Premier League",
+	"man united":        "Premier League",
+	"liverpool":         "Premier League",
+	"arsenal":           "Premier League",
+	"chelsea":           "Premier League",
+	"tottenham":         "Premier League",
+	"newcastle":         "Premier League",
+	"aston villa":       "Premier League",
+	"west ham":          "Premier League",
+
+	// La Liga
+	"real madrid":     "La Liga",
+	"fc barcelona":    "La Liga",
+	"barcelona":       "La Liga",
+	"atletico madrid": "La Liga",
+	"real sociedad":   "La Liga",
+	"villarreal":      "La Liga",
+
+	// Bundesliga
+	"bayern munich":     "Bundesliga",
+	"bayer leverkusen":  "Bundesliga",
+	"borussia dortmund": "Bundesliga",
+	"rb leipzig":        "Bundesliga",
+
+	// Serie A
+	"inter":       "Serie A",
+	"inter milan": "Serie A",
+	"ac milan":    "Serie A",
+	"juventus":    "Serie A",
+	"napoli":      "Serie A",
+	"roma":        "Serie A",
+	"atalanta":    "Serie A",
+
+	// Ligue 1
+	"psg":                 "Ligue 1",
+	"paris saint germain": "Ligue 1",
+	"marseille":           "Ligue 1",
+	"lyon":                "Ligue 1",
+	"monaco":              "Ligue 1",
+
+	// Saudi Pro League
+	"al nassr":   "Saudi Pro League",
+	"al ittihad": "Saudi Pro League",
+	"al hilal":   "Saudi Pro League",
+
+	// Süper Lig
+	"fenerbahce":  "Süper Lig",
+	"galatasaray": "Süper Lig",
+	"besiktas":    "Süper Lig",
+
+	// MLS
+	"inter miami": "MLS",
+	"la galaxy":   "MLS",
+	"lafc":        "MLS",
 }
 
 func slugify(value string) string {

@@ -1,5 +1,7 @@
 # FRI Project Phases
 
+FRI (Football Reputation Index) — платформа для автоматического расчёта репутационного рейтинга футболистов на основе агрегации данных из множества источников. Текущая версия — статичный HTML-файл с захардкоженными данными. Задача — превратить его в живую систему с автообновлением.
+
 Этот файл фиксирует согласованный roadmap проекта, чтобы фазы и scope не потерялись в переписке.
 
 Стек:
@@ -60,26 +62,65 @@
 
 Статус:
 
-- базовая реализация сделана
+- реализована для локального/demo-контура
 
-Что уже реализовано:
+Что реализовано:
 
 - ingestion infrastructure на backend
 - таблица `component_updates`
 - дополнительные timestamps обновления компонент в `fri_scores`
 - live media sync через `Google News RSS`
 - эвристический sentiment scoring и расчёт `Media Score`
-- автоматический пересчёт общего `FRI` после изменения media-компонента
+- social sync через локальный `demo-social-provider`
+- performance sync через `api-football`, если задан `API_FOOTBALL_KEY`
+- fallback на локальный `demo-performance-provider`, если ключа нет или игрок не найден
+- таблица `social_snapshots`
+- таблица `performance_snapshots`
+- автоматический пересчёт общего `FRI` после изменения `media`, `social`, `performance`
 - фоновый scheduler в API-процессе
 - ручной запуск sync через `POST /api/sync/media`
+- ручной запуск sync через `POST /api/sync/social`
+- ручной запуск sync через `POST /api/sync/performance`
+- общий запуск через `POST /api/sync/all`
 - просмотр статусов sync через `GET /api/sync/updates`
+- базовые retries/backoff для внешнего media RSS provider
 
-Что ещё остаётся для полного покрытия исходного scope фазы 2:
+Текущее состояние API-Football:
+
+- ключ подключается через `.env` как `API_FOOTBALL_KEY`, в код ключ не пишется
+- Pro-план активен
+- актуальный сезон по команде определяется автоматически через `/leagues?team={id}&current=true` с in-memory кешем на 24 часа
+- если auto-lookup упал, используется эвристика по календарному месяцу (июль+ → текущий год, иначе предыдущий)
+
+Что остаётся на последующие production-итерации:
 
 - внешние `Social` providers с реальными API/ключами
-- внешний `Performance` provider с надёжным источником статистики
-- более строгая нормализация по исторической базе игроков
-- retries/backoff/proxy strategy для сложных источников
+- повышение качества `Performance` provider после перехода с бюджетного API-Football на Sportmonks/STATSCORE/Opta при необходимости
+- нормализация по полной исторической базе игроков
+- proxy strategy для сложных источников
+
+Что остаётся за рамками текущего scope (требует бюджета или скрапинга, отложено до monetization):
+
+- Instagram Graph API / RapidAPI Instagram (~$50/мес) — закрывает 40% Social
+- Twitter/X API Basic ($200/мес) — закрывает 30% Social
+- TikTok view counts — нет официального API
+- WhoScored / SofaScore fan ratings — нет публичного API, риск блокировки парсингом
+- FBref / Transfermarkt продвинутая статистика и форма — без API, blocking-риск
+
+Сделано:
+
+- переход с API-Football Free на Pro
+- auto-current-season lookup вместо фиксированного `API_FOOTBALL_SEASON`
+- generic-таблица `player_external_ids (player_id, provider, external_id, external_team_id)` под мульти-провайдерность; на `(provider, external_id)` повешен `UNIQUE`
+- mapping заполняется автоматически после первого успешного matching через текстовый поиск
+- sanity-check перед сохранением mapping: position group, age window `±3`, минимум `1 матч` или `90 минут` активности
+- при mapping path → прямой запрос `/players?id={id}&season={auto}`, экономит ~60% запросов на sync
+- transfer-aware: при смене команды у игрока `external_team_id` обновляется автоматически
+- Performance: добавлены **last-5 form** (`/fixtures` + `/fixtures/players`) и **topN rank в лиге по позиции** (`/players/topscorers` + `/players/topassists`) с in-memory кешем (form 1h, topN 6h)
+- веса Performance перебалансированы: rating 0.30, GA/90 0.18, xGxA 0.18, posRank 0.14, minutes 0.10, form 0.10
+- Media: переход с `Google News RSS` на `GDELT DOC 2.0` (EN + RU)
+- Sentiment: `jonreiter/govader` (EN) + ручной RU-лексикон + футбольные доменные boosters; cyrillic-ratio detection
+- Social: `YouTube Data API` (search.list + videos.list) с factory-fallback на demo при пустом ключе
 
 Цель:
 
@@ -122,7 +163,17 @@
 
 Статус:
 
-- запланирована
+- в работе
+
+Сделано:
+
+- антиабьюз голосования: 1 голос на (player, IP) за 24 часа; HTTP 429 при превышении (миграция не нужна — уже храним `ip_hash` и `created_at` в `fan_votes`)
+- модалка игрока с графиком истории FRI через Chart.js + time-axis (`/api/players/:id/history`)
+- лента новостей по игроку в модалке (`/api/players/:id/news`)
+- skeleton loaders в модалке пока запросы в полёте
+- поле `players.league`, миграция `006_players_league.sql` с backfill для существующих игроков по club→league маппингу
+- dropdown фильтр по лиге на leaderboard (client-side фильтрация)
+- минимальный Character pipeline: keyword-scan по `news_items` (doping/racism/red card/scandal/fair play/charity и т.п.) с negator-защитой (`victim of`, `condemns`, …), cap ±15 на sync, audit-trail в `character_events`. Это покрытие 10% веса FRI на реальных данных без модерации; полноценный workflow с админкой — фаза 4.
 
 Цель:
 

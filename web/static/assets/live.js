@@ -17,6 +17,7 @@
       emoji: item.emoji || "⚽",
       name: item.name,
       club: item.club,
+      league: item.league || "",
       pos: item.position,
       age: item.age,
       fri: round1(item.fri),
@@ -70,12 +71,161 @@
     news.splice(0, news.length, ...state.news.map(toLegacyNews));
   }
 
+  // Modal-only data: history + per-player news. Returns plain arrays so the
+  // caller can render via Chart.js / DOM without coupling to live.js state.
+  let historyChart = null;
+  window.fetchPlayerHistory = async function fetchPlayerHistory(playerID) {
+    const payload = await fetchJSON(`/api/players/${playerID}/history`);
+    return Array.isArray(payload.data) ? payload.data : [];
+  };
+  window.fetchPlayerNews = async function fetchPlayerNews(playerID) {
+    const payload = await fetchJSON(`/api/players/${playerID}/news`);
+    return Array.isArray(payload.data) ? payload.data : [];
+  };
+
+  // showHistorySkeleton swaps the chart canvas for a pulsing placeholder
+  // while the history fetch is in flight. Caller hides it again by invoking
+  // renderHistoryChart with real data.
+  window.showHistorySkeleton = function showHistorySkeleton() {
+    const wrap = document.querySelector(".modal-chart-wrap");
+    const canvas = document.getElementById("modal-history-chart");
+    const empty = document.getElementById("modal-history-empty");
+    if (!wrap) return;
+    if (canvas) canvas.style.display = "none";
+    if (empty) empty.style.display = "none";
+    wrap.querySelector(".skeleton-chart")?.remove();
+    const sk = document.createElement("div");
+    sk.className = "skeleton-chart";
+    wrap.appendChild(sk);
+  };
+
+  window.showNewsSkeleton = function showNewsSkeleton() {
+    const list = document.getElementById("modal-news-list");
+    const empty = document.getElementById("modal-news-empty");
+    if (!list) return;
+    if (empty) empty.style.display = "none";
+    list.innerHTML = "";
+    for (let i = 0; i < 3; i++) {
+      const sk = document.createElement("div");
+      sk.className = "skeleton-news-item";
+      list.appendChild(sk);
+    }
+  };
+
+  // Renders the FRI history line chart inside the modal canvas. Destroys any
+  // previous chart instance so reopening the modal for another player doesn't
+  // leak Chart.js state.
+  window.renderHistoryChart = function renderHistoryChart(history) {
+    const canvas = document.getElementById("modal-history-chart");
+    const empty = document.getElementById("modal-history-empty");
+    if (!canvas || !empty) return;
+    document.querySelector(".modal-chart-wrap")?.querySelector(".skeleton-chart")?.remove();
+
+    if (historyChart) {
+      historyChart.destroy();
+      historyChart = null;
+    }
+
+    if (!history.length) {
+      canvas.style.display = "none";
+      empty.style.display = "block";
+      return;
+    }
+    canvas.style.display = "";
+    empty.style.display = "none";
+
+    const points = history.map((p) => ({
+      x: new Date(p.calculated_at),
+      y: round1(p.fri),
+    }));
+
+    historyChart = new Chart(canvas.getContext("2d"), {
+      type: "line",
+      data: {
+        datasets: [
+          {
+            label: "FRI",
+            data: points,
+            borderColor: "#F5C842",
+            backgroundColor: "rgba(245,200,66,0.10)",
+            borderWidth: 2,
+            pointRadius: 3,
+            pointBackgroundColor: "#F5C842",
+            tension: 0.35,
+            fill: true,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: "rgba(8,10,13,0.95)",
+            titleColor: "#F5C842",
+            bodyColor: "#E8EDF5",
+            borderColor: "rgba(255,255,255,0.08)",
+            borderWidth: 1,
+          },
+        },
+        scales: {
+          x: {
+            type: "time",
+            time: { unit: "day", displayFormats: { day: "MMM d" } },
+            ticks: { color: "#5A6B82", font: { size: 11 } },
+            grid: { color: "rgba(255,255,255,0.03)" },
+          },
+          y: {
+            min: 0,
+            max: 100,
+            ticks: { color: "#5A6B82", font: { size: 11 }, stepSize: 20 },
+            grid: { color: "rgba(255,255,255,0.05)" },
+          },
+        },
+      },
+    });
+  };
+
+  window.renderModalNews = function renderModalNews(items) {
+    const list = document.getElementById("modal-news-list");
+    const empty = document.getElementById("modal-news-empty");
+    if (!list || !empty) return;
+    list.innerHTML = ""; // also clears any skeleton items
+    if (!items.length) {
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    const langKey = typeof lang === "string" ? lang : "en";
+    items.slice(0, 8).forEach((item) => {
+      const impact = item.impact_type || "neu";
+      const delta = Number(item.impact_delta || 0);
+      const deltaSign = delta > 0 ? "+" : "";
+      const title = (langKey === "ru" ? item.title_ru : item.title_en) || item.title_en || "";
+      const source = item.source || "";
+      const card = document.createElement("div");
+      card.className = `modal-news-item ${impact}`;
+      card.innerHTML = `
+        <div class="modal-news-item-top">
+          <span class="modal-news-item-delta ${impact}">${deltaSign}${round1(delta).toFixed(1)} FRI</span>
+          <span class="modal-news-item-time">${item.relative_time || ""}</span>
+        </div>
+        <div class="modal-news-item-title">${title}</div>
+        <div class="modal-news-item-source">${source}</div>`;
+      list.appendChild(card);
+    });
+  };
+
   function renderLiveData() {
     const newsGrid = document.getElementById("news-grid");
     if (newsGrid) {
       newsGrid.innerHTML = "";
     }
 
+    if (typeof window.populateLeagueFilter === "function") {
+      window.populateLeagueFilter();
+    }
     renderTable();
     renderNews();
     updateHeroCard();

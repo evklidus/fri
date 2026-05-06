@@ -6,6 +6,7 @@ require (
 	github.com/dop251/goja v0.0.0-20260311135729-065cd970411c
 	github.com/gin-gonic/gin v1.12.0
 	github.com/jackc/pgx/v5 v5.9.2
+	github.com/jonreiter/govader v0.0.0-20250429093935-f6505c8d03cc
 )
 
 require (
@@ -44,5 +45,6 @@ require (
 	golang.org/x/sync v0.19.0 // indirect
 	golang.org/x/sys v0.41.0 // indirect
 	golang.org/x/text v0.34.0 // indirect
+	gonum.org/v1/gonum v0.8.2 // indirect
 	google.golang.org/protobuf v1.36.10 // indirect
 )

@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math"
 	"strings"
@@ -33,7 +34,7 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `TRUNCATE fan_votes, social_snapshots, component_updates, news_items, fri_history, fri_scores, players RESTART IDENTITY CASCADE`); err != nil {
+	if _, err := tx.Exec(ctx, `TRUNCATE fan_votes, social_snapshots, performance_snapshots, component_updates, news_items, fri_history, fri_scores, players RESTART IDENTITY CASCADE`); err != nil {
 		return fmt.Errorf("truncate seed tables: %w", err)
 	}
 
@@ -43,13 +44,14 @@ func (r *Repository) ReplaceAllSeedData(ctx context.Context, players []domain.Pl
 		var playerID int64
 		err := tx.QueryRow(ctx, `
 			INSERT INTO players (
-				slug, name, club, position, age, emoji, photo_data, theme_background, summary_en, summary_ru
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
+				slug, name, club, league, position, age, emoji, photo_data, theme_background, summary_en, summary_ru
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
 			RETURNING id
 		`,
 			player.Slug,
 			player.Name,
 			player.Club,
+			player.League,
 			player.Position,
 			player.Age,
 			player.Emoji,
@@ -135,7 +137,7 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 
 	baseQuery := `
 		SELECT
-			p.id, p.slug, p.name, p.club, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
+			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
 			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
 			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
@@ -182,7 +184,7 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 func (r *Repository) GetPlayer(ctx context.Context, id int64) (*domain.PlayerWithScore, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT
-			p.id, p.slug, p.name, p.club, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
+			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
 			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
 			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
@@ -201,7 +203,7 @@ func (r *Repository) GetPlayer(ctx context.Context, id int64) (*domain.PlayerWit
 func (r *Repository) ListSyncTargets(ctx context.Context) ([]domain.PlayerSyncTarget, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT
-			p.id, p.name, p.club, p.position,
+			p.id, p.name, p.club, p.position, p.age,
 			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
 			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
@@ -221,6 +223,7 @@ func (r *Repository) ListSyncTargets(ctx context.Context) ([]domain.PlayerSyncTa
 			&target.Name,
 			&target.Club,
 			&target.Position,
+			&target.Age,
 			&target.Score.PlayerID,
 			&target.Score.FRI,
 			&target.Score.Performance,
@@ -408,21 +411,311 @@ func (r *Repository) ListComponentUpdates(ctx context.Context, limit int) ([]dom
 	return items, rows.Err()
 }
 
-func (r *Repository) SaveSocialSnapshot(ctx context.Context, snapshot domain.SocialSnapshot) error {
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO social_snapshots (
-			player_id, provider, followers, engagement_rate, mentions_growth_7d, youtube_views_7d, normalized_score, snapshot_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-	`,
-		snapshot.PlayerID,
-		snapshot.Provider,
-		snapshot.Followers,
-		snapshot.EngagementRate,
-		snapshot.MentionsGrowth7D,
-		snapshot.YouTubeViews7D,
-		snapshot.NormalizedScore,
-		snapshot.SnapshotAt,
+func (r *Repository) ApplySocialSync(ctx context.Context, snapshots []domain.SocialSnapshot, provider string) ([]domain.PlayerSyncDelta, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	deltas := make([]domain.PlayerSyncDelta, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		snapshotProvider := provider
+		if strings.TrimSpace(snapshot.Provider) != "" {
+			snapshotProvider = snapshot.Provider
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO social_snapshots (
+				player_id, provider, followers, engagement_rate, mentions_growth_7d, youtube_views_7d, normalized_score, snapshot_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
+		`,
+			snapshot.PlayerID,
+			snapshotProvider,
+			snapshot.Followers,
+			snapshot.EngagementRate,
+			snapshot.MentionsGrowth7D,
+			snapshot.YouTubeViews7D,
+			snapshot.NormalizedScore,
+			snapshot.SnapshotAt,
+		); err != nil {
+			return nil, err
+		}
+
+		score, delta, err := refreshComponentScore(ctx, tx, snapshot.PlayerID, "social", snapshot.NormalizedScore, snapshot.SnapshotAt)
+		if err != nil {
+			return nil, err
+		}
+
+		deltas = append(deltas, domain.PlayerSyncDelta{
+			PlayerID:    snapshot.PlayerID,
+			PlayerName:  snapshot.PlayerName,
+			Component:   "social",
+			OldValue:    delta.OldComponentValue,
+			NewValue:    snapshot.NormalizedScore,
+			OldFRI:      delta.OldFRI,
+			NewFRI:      score.FRI,
+			ImpactDelta: round1(score.FRI - delta.OldFRI),
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return deltas, nil
+}
+
+func (r *Repository) ApplyPerformanceSync(ctx context.Context, snapshots []domain.PerformanceSnapshot, provider string) ([]domain.PlayerSyncDelta, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	deltas := make([]domain.PlayerSyncDelta, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		snapshotProvider := provider
+		if strings.TrimSpace(snapshot.Provider) != "" {
+			snapshotProvider = snapshot.Provider
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO performance_snapshots (
+				player_id, provider, average_rating, goals_assists_per90, xg_xa_per90, position_rank_score, minutes_share,
+				form_score, last5_goals, last5_assists, last5_rating,
+				normalized_score, snapshot_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+		`,
+			snapshot.PlayerID,
+			snapshotProvider,
+			snapshot.AverageRating,
+			snapshot.GoalsAssistsPer90,
+			snapshot.XGXAPer90,
+			snapshot.PositionRankScore,
+			snapshot.MinutesShare,
+			snapshot.FormScore,
+			snapshot.Last5Goals,
+			snapshot.Last5Assists,
+			snapshot.Last5Rating,
+			snapshot.NormalizedScore,
+			snapshot.SnapshotAt,
+		); err != nil {
+			return nil, err
+		}
+
+		score, delta, err := refreshComponentScore(ctx, tx, snapshot.PlayerID, "performance", snapshot.NormalizedScore, snapshot.SnapshotAt)
+		if err != nil {
+			return nil, err
+		}
+
+		deltas = append(deltas, domain.PlayerSyncDelta{
+			PlayerID:    snapshot.PlayerID,
+			PlayerName:  snapshot.PlayerName,
+			Component:   "performance",
+			OldValue:    delta.OldComponentValue,
+			NewValue:    snapshot.NormalizedScore,
+			OldFRI:      delta.OldFRI,
+			NewFRI:      score.FRI,
+			ImpactDelta: round1(score.FRI - delta.OldFRI),
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+
+	return deltas, nil
+}
+
+// GetExternalIDs returns the mapping for (playerID, provider) or (nil, nil)
+// when no record exists. Other errors propagate.
+func (r *Repository) GetExternalIDs(ctx context.Context, playerID int64, provider string) (*domain.PlayerExternalIDs, error) {
+	var ids domain.PlayerExternalIDs
+	var teamID *string
+	err := r.pool.QueryRow(ctx, `
+		SELECT player_id, provider, external_id, external_team_id, updated_at
+		FROM player_external_ids
+		WHERE player_id = $1 AND provider = $2
+	`, playerID, provider).Scan(
+		&ids.PlayerID,
+		&ids.Provider,
+		&ids.ExternalID,
+		&teamID,
+		&ids.UpdatedAt,
 	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	if teamID != nil {
+		ids.ExternalTeamID = *teamID
+	}
+	return &ids, nil
+}
+
+func (r *Repository) UpsertExternalIDs(ctx context.Context, ids domain.PlayerExternalIDs) error {
+	var teamID *string
+	if trimmed := strings.TrimSpace(ids.ExternalTeamID); trimmed != "" {
+		teamID = &trimmed
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO player_external_ids (player_id, provider, external_id, external_team_id, updated_at)
+		VALUES ($1, $2, $3, $4, now())
+		ON CONFLICT (player_id, provider) DO UPDATE
+		SET external_id = EXCLUDED.external_id,
+		    external_team_id = EXCLUDED.external_team_id,
+		    updated_at = now()
+	`, ids.PlayerID, ids.Provider, ids.ExternalID, teamID)
+	return err
+}
+
+// ApplyCharacterSync inserts new character events (idempotently via the
+// unique index on (player_id, news_item_id, trigger_word)) and applies a
+// per-player aggregated delta to fri_scores.character. The delta is clamped
+// per call so a single sync can't tank a score below 0 or above 100.
+//
+// Returns one PlayerSyncDelta per player whose Character actually moved —
+// players where every event was a duplicate are silently skipped.
+func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error) {
+	if len(candidates) == 0 {
+		return nil, nil
+	}
+
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Group fired (newly-inserted) candidates by player so we can apply one
+	// capped delta per player.
+	perPlayerDelta := make(map[int64]float64)
+
+	for _, c := range candidates {
+		// Idempotent insert; ON CONFLICT skips duplicates already on file.
+		var inserted int
+		if err := tx.QueryRow(ctx, `
+			INSERT INTO character_events (player_id, news_item_id, trigger_word, delta, status)
+			VALUES ($1, $2, $3, $4, 'auto')
+			ON CONFLICT (player_id, news_item_id, trigger_word) WHERE news_item_id IS NOT NULL
+			DO NOTHING
+			RETURNING 1
+		`, c.PlayerID, c.NewsItemID, c.TriggerWord, c.Delta).Scan(&inserted); err != nil {
+			if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
+			continue // duplicate — already counted in a previous sync
+		}
+		perPlayerDelta[c.PlayerID] += c.Delta
+	}
+
+	if len(perPlayerDelta) == 0 {
+		// All events were dedupes; nothing to do but still commit (no inserts).
+		return nil, tx.Commit(ctx)
+	}
+
+	// Preload player names so the resulting deltas carry a human-readable
+	// label without an extra round-trip per player.
+	names := make(map[int64]string, len(perPlayerDelta))
+	for playerID := range perPlayerDelta {
+		var name string
+		if err := tx.QueryRow(ctx, `SELECT name FROM players WHERE id = $1`, playerID).Scan(&name); err == nil {
+			names[playerID] = name
+		}
+	}
+
+	deltas := make([]domain.PlayerSyncDelta, 0, len(perPlayerDelta))
+	now := time.Now().UTC()
+	for playerID, delta := range perPlayerDelta {
+		// Cap aggregated delta so one sync can't move Character by more than
+		// `perPlayerCap` points either direction.
+		applied := delta
+		if applied > perPlayerCap {
+			applied = perPlayerCap
+		}
+		if applied < -perPlayerCap {
+			applied = -perPlayerCap
+		}
+
+		current, err := lockScore(ctx, tx, playerID)
+		if err != nil {
+			return nil, err
+		}
+		oldFRI := current.FRI
+		oldChar := current.Character
+		newChar := round1(oldChar + applied)
+		if newChar < 0 {
+			newChar = 0
+		}
+		if newChar > 100 {
+			newChar = 100
+		}
+
+		current.Character = newChar
+		current.CharacterUpdatedAt = now
+		applyFriFormula(current)
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE fri_scores
+			SET character = $2,
+			    fri = $3,
+			    trend_value = $4,
+			    trend_direction = $5,
+			    calculated_at = $6,
+			    character_updated_at = $7
+			WHERE player_id = $1
+		`, playerID, current.Character, current.FRI, current.TrendValue, current.TrendDirection, current.CalculatedAt, current.CharacterUpdatedAt); err != nil {
+			return nil, err
+		}
+
+		if historyDelta := round1(current.FRI - oldFRI); historyDelta != 0 {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO fri_history (player_id, fri, delta, calculated_at)
+				VALUES ($1,$2,$3,$4)
+			`, playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
+				return nil, err
+			}
+		}
+
+		deltas = append(deltas, domain.PlayerSyncDelta{
+			PlayerID:    playerID,
+			PlayerName:  names[playerID],
+			Component:   "character",
+			OldValue:    oldChar,
+			NewValue:    newChar,
+			OldFRI:      oldFRI,
+			NewFRI:      current.FRI,
+			ImpactDelta: round1(current.FRI - oldFRI),
+		})
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return nil, err
+	}
+	return deltas, nil
+}
+
+// HasRecentVote returns true when a vote exists for (playerID, ipHash) with
+// created_at >= since. Used by the anti-abuse cooldown check.
+func (r *Repository) HasRecentVote(ctx context.Context, playerID int64, ipHash string, since time.Time) (bool, error) {
+	var count int
+	err := r.pool.QueryRow(ctx, `
+		SELECT COUNT(*)
+		FROM fan_votes
+		WHERE player_id = $1 AND ip_hash = $2 AND created_at >= $3
+	`, playerID, ipHash, since).Scan(&count)
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
+
+func (r *Repository) DeleteExternalIDs(ctx context.Context, playerID int64, provider string) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM player_external_ids
+		WHERE player_id = $1 AND provider = $2
+	`, playerID, provider)
 	return err
 }
 
@@ -690,6 +983,7 @@ func scanPlayerWithScore(row interface {
 		&item.Slug,
 		&item.Name,
 		&item.Club,
+		&item.League,
 		&item.Position,
 		&item.Age,
 		&item.Emoji,

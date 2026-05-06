@@ -30,9 +30,22 @@ services:
       SOURCE_HTML_PATH: /app/web/source/fri-index.html
       WEB_DIR: /app/web/static
       DB_MAX_CONNS: 10
+      AUTO_SYNC_ENABLED: "true"
+      SYNC_ON_STARTUP: "false"
+      MEDIA_SYNC_INTERVAL_MINUTES: 360
+      SOCIAL_SYNC_INTERVAL_MINUTES: 1440
+      PERFORMANCE_SYNC_INTERVAL_MINUTES: 1440
+      CHARACTER_SYNC_INTERVAL_MINUTES: 720
+      SYNC_HTTP_TIMEOUT_SECONDS: 15
+      MEDIA_ARTICLES_PER_PLAYER: 3
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY:-}
+      API_FOOTBALL_BASE_URL: ${API_FOOTBALL_BASE_URL:-https://v3.football.api-sports.io}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_BASE_URL: ${YOUTUBE_BASE_URL:-https://www.googleapis.com/youtube/v3}
+      MEDIASTACK_API_KEY: ${MEDIASTACK_API_KEY:-}
+      MEDIASTACK_BASE_URL: ${MEDIASTACK_BASE_URL:-http://api.mediastack.com/v1}
     ports:
       - "8080:8080"
 
 volumes:
   postgres-data:
-

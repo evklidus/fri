@@ -15,9 +15,13 @@ import (
 	"fri.local/football-reputation-index/internal/domain"
 )
 
-const mediaProviderName = "google-news-rss"
+const (
+	mediaProviderName  = "gdelt"
+	mediaSyncBatchSize = 25
+)
 
 type mediaProvider interface {
+	Name() string
 	FetchPlayerArticles(ctx context.Context, player domain.PlayerSyncTarget) ([]domain.MediaArticleCandidate, error)
 }
 
@@ -39,21 +43,25 @@ func newGoogleNewsRSSProvider(timeout time.Duration, articlesPerPlayer int) medi
 	}
 }
 
-func NewMediaProvider(timeout time.Duration, articlesPerPlayer int) mediaProvider {
-	return newGoogleNewsRSSProvider(timeout, articlesPerPlayer)
+func NewMediaProvider(timeout time.Duration, articlesPerPlayer int, mediaStackAPIKey, mediaStackBaseURL string) mediaProvider {
+	if strings.TrimSpace(mediaStackAPIKey) != "" {
+		return newMediaStackMediaProvider(mediaStackAPIKey, mediaStackBaseURL, timeout, articlesPerPlayer)
+	}
+	// Fallback to GDELT (no key required) for development without a paid
+	// MediaStack subscription. GDELT throttles aggressively, so bump timeout.
+	if timeout < gdeltDefaultTimeout {
+		timeout = gdeltDefaultTimeout
+	}
+	return newGDELTMediaProvider(timeout, articlesPerPlayer, gdeltDefaultMinGap)
 }
+
+func (p *googleNewsRSSProvider) Name() string { return "google-news-rss" }
 
 func (p *googleNewsRSSProvider) FetchPlayerArticles(ctx context.Context, player domain.PlayerSyncTarget) ([]domain.MediaArticleCandidate, error) {
 	query := fmt.Sprintf(`"%s" football`, player.Name)
 	feedURL := "https://news.google.com/rss/search?q=" + url.QueryEscape(query) + "&hl=en-US&gl=US&ceid=US:en"
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "FRI-Bot/1.0 (+https://localhost)")
-
-	resp, err := p.client.Do(req)
+	resp, err := p.getWithRetry(ctx, feedURL)
 	if err != nil {
 		return nil, err
 	}
@@ -96,6 +104,43 @@ func (p *googleNewsRSSProvider) FetchPlayerArticles(ctx context.Context, player 
 	}
 
 	return dedupeArticles(candidates), nil
+}
+
+func (p *googleNewsRSSProvider) getWithRetry(ctx context.Context, feedURL string) (*http.Response, error) {
+	var lastErr error
+	backoff := 300 * time.Millisecond
+
+	for attempt := 0; attempt < 3; attempt++ {
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, feedURL, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "FRI-Bot/1.0 (+https://localhost)")
+
+		resp, err := p.client.Do(req)
+		if err == nil && resp.StatusCode < http.StatusInternalServerError && resp.StatusCode != http.StatusTooManyRequests {
+			return resp, nil
+		}
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		if err != nil {
+			lastErr = err
+		} else {
+			lastErr = fmt.Errorf("rss provider returned retryable status %d", resp.StatusCode)
+		}
+
+		timer := time.NewTimer(backoff)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+		backoff *= 2
+	}
+
+	return nil, lastErr
 }
 
 type rssFeed struct {
@@ -158,6 +203,21 @@ func stripHTML(value string) string {
 	return strings.Join(strings.Fields(cleaned), " ")
 }
 
+// topByFRI returns up to `limit` targets sorted by current FRI descending.
+// Used to bound expensive sync passes (media) to the most-watched players.
+// Returns the original slice unchanged when no truncation is needed.
+func topByFRI(targets []domain.PlayerSyncTarget, limit int) []domain.PlayerSyncTarget {
+	if limit <= 0 || len(targets) <= limit {
+		return targets
+	}
+	sorted := make([]domain.PlayerSyncTarget, len(targets))
+	copy(sorted, targets)
+	sort.Slice(sorted, func(i, j int) bool {
+		return sorted[i].Score.FRI > sorted[j].Score.FRI
+	})
+	return sorted[:limit]
+}
+
 func extractSourceName(source, title string) string {
 	source = strings.TrimSpace(source)
 	if source != "" {
@@ -170,15 +230,29 @@ func extractSourceName(source, title string) string {
 }
 
 func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, error) {
+	providerName := s.mediaProvider.Name()
+	if !s.mediaSyncMu.TryLock() {
+		now := time.Now().UTC()
+		return &domain.ComponentSyncResult{
+			Component:  "media",
+			Provider:   providerName,
+			Status:     "skipped",
+			Message:    "media sync already in progress",
+			StartedAt:  now,
+			FinishedAt: now,
+		}, nil
+	}
+	defer s.mediaSyncMu.Unlock()
+
 	startedAt := time.Now().UTC()
-	updateID, err := s.repo.StartComponentUpdate(ctx, "media", mediaProviderName)
+	updateID, err := s.repo.StartComponentUpdate(ctx, "media", providerName)
 	if err != nil {
 		return nil, err
 	}
 
 	result := &domain.ComponentSyncResult{
 		Component: "media",
-		Provider:  mediaProviderName,
+		Provider:  providerName,
 		Status:    "running",
 		StartedAt: startedAt,
 	}
@@ -200,6 +274,11 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		return finish("failed", err.Error(), 0, nil, err)
 	}
 
+	// Media sync is heavily rate-limited (GDELT ≈3s/req × EN+RU per player =
+	// 6s/player). Cap each run to the top-N by FRI to keep wall-clock under a
+	// few minutes; less popular players get refreshed on subsequent runs.
+	targets = topByFRI(targets, mediaSyncBatchSize)
+
 	var syncResults []domain.MediaSyncPlayerResult
 	var articlesSeen int
 
@@ -218,7 +297,7 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		return finish("completed", "no external media articles found", 0, nil, nil)
 	}
 
-	deltas, err := s.repo.ApplyMediaSync(ctx, syncResults, mediaProviderName)
+	deltas, err := s.repo.ApplyMediaSync(ctx, syncResults, providerName)
 	if err != nil {
 		return finish("failed", err.Error(), articlesSeen, nil, err)
 	}
@@ -253,7 +332,7 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 			TitleRU:      article.Title,
 			SummaryEN:    article.Summary,
 			SummaryRU:    article.Summary,
-			Source:       mediaProviderName,
+			Source:       s.mediaProvider.Name(),
 			SourceURL:    article.SourceURL,
 			SourceTier:   tier,
 			Sentiment:    sentiment,
@@ -278,33 +357,17 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 	}
 }
 
+// sentimentScore wraps the package-level analyzer so that the rest of
+// media_sync continues to consume a single function. Returns a score in
+// [-1, +1] (compatible with VADER's compound output).
 func sentimentScore(text string) float64 {
-	text = strings.ToLower(text)
-	positive := []string{
-		"goal", "assist", "winner", "wins", "won", "hat-trick", "best", "record", "motm", "man of the match",
-		"brace", "masterclass", "award", "ovation", "historic", "praised", "excellent", "clean sheet", "comeback",
-	}
-	negative := []string{
-		"injury", "ban", "banned", "controversy", "backlash", "criticism", "suspended", "red card", "charged",
-		"arrest", "scandal", "problem", "poor", "misses", "miss", "negative", "abuse", "racism", "doping",
-	}
-
-	score := 0.0
-	for _, token := range positive {
-		if strings.Contains(text, token) {
-			score += 1
-		}
-	}
-	for _, token := range negative {
-		if strings.Contains(text, token) {
-			score -= 1
-		}
-	}
-	return score
+	return analyzeSentiment(text)
 }
 
+// normalizeSentiment maps a [-1, +1] polarity score onto the [0, 100] media
+// component scale: -1 → 0, 0 → 50, +1 → 100.
 func normalizeSentiment(value float64) float64 {
-	normalized := 50 + (value * 12)
+	normalized := 50 + (value * 50)
 	if normalized < 0 {
 		return 0
 	}
@@ -332,18 +395,23 @@ func sourceTier(source string) float64 {
 	return 60
 }
 
+// sentimentImpactType buckets a [-1, +1] polarity score into pos/neg/neu.
+// Threshold 0.15 follows VADER's standard cutoff for short text (with a bit
+// of slack: short football headlines rarely cross 0.5).
 func sentimentImpactType(value float64) string {
-	if value > 0.25 {
+	if value > 0.15 {
 		return "pos"
 	}
-	if value < -0.25 {
+	if value < -0.15 {
 		return "neg"
 	}
 	return "neu"
 }
 
+// sentimentImpactDelta scales a [-1, +1] polarity score onto the FRI delta
+// budget of [-3, +3].
 func sentimentImpactDelta(value float64) float64 {
-	delta := round1(value * 0.6)
+	delta := round1(value * 3)
 	if delta > 3 {
 		return 3
 	}

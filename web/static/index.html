@@ -6,6 +6,8 @@
 <title>FRI — Football Reputation Index</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3.0.0/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 <style>
   :root {
     --black: #080A0D;
@@ -93,6 +95,10 @@
   .filter-tabs { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:32px; justify-content:center; }
   .filter-tab { padding:7px 18px; border-radius:4px; border:1px solid var(--border); background:transparent; color:var(--muted); font-size:12px; font-weight:500; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:all 0.2s; font-family:'DM Sans',sans-serif; }
   .filter-tab.active, .filter-tab:hover { background:var(--gold); color:#000; border-color:var(--gold); }
+  .league-filter-wrap { display:flex; align-items:center; gap:10px; justify-content:center; margin:-16px 0 32px; flex-wrap:wrap; }
+  .league-filter-label { font-size:11px; font-family:'Space Mono',monospace; letter-spacing:2px; color:var(--muted); text-transform:uppercase; }
+  .league-filter { background:var(--card); border:1px solid var(--border); color:var(--text); padding:8px 14px; border-radius:4px; font-size:12px; font-family:'DM Sans',sans-serif; cursor:pointer; min-width:180px; outline:none; }
+  .league-filter:hover, .league-filter:focus { border-color:var(--gold); }
   .leaderboard-table { width:100%; border-collapse:collapse; }
   .leaderboard-table thead th { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase; color:var(--muted); text-align:left; padding:12px 16px; border-bottom:1px solid var(--border); }
   .leaderboard-table tbody tr { border-bottom:1px solid var(--border); transition:background 0.2s; cursor:pointer; }
@@ -110,6 +116,7 @@
   .mini-bar-fill { height:100%; border-radius:10px; }
   .trend-up { color:var(--green); font-size:12px; font-family:'Space Mono',monospace; }
   .trend-down { color:var(--red); font-size:12px; font-family:'Space Mono',monospace; }
+  .trend-stable { color:var(--muted); font-size:12px; font-family:'Space Mono',monospace; }
 
   /* POLL */
   .poll-section { padding:100px 48px; max-width:900px; margin:0 auto; }
@@ -199,6 +206,26 @@
   .pillar-card-score { font-family:'Bebas Neue',sans-serif; font-size:32px; line-height:1; margin-bottom:6px; }
   .pillar-track { height:4px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; }
   .pillar-fill { height:100%; border-radius:10px; }
+  .modal-section { padding-top:20px; border-top:1px solid var(--border); }
+  .modal-section-eyebrow { font-size:11px; font-family:'Space Mono',monospace; letter-spacing:2px; color:var(--gold); text-transform:uppercase; margin-bottom:14px; }
+  .modal-chart-wrap { background:rgba(255,255,255,0.02); border:1px solid var(--border); border-radius:10px; padding:16px; height:260px; position:relative; }
+  .modal-chart-wrap canvas { max-height:228px; }
+  .modal-empty { font-size:12px; color:var(--muted); padding:12px 0; font-style:italic; }
+  .modal-news-list { display:flex; flex-direction:column; gap:10px; }
+  .modal-news-item { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-left:3px solid var(--muted); border-radius:8px; padding:12px 14px; }
+  .modal-news-item.pos { border-left-color:#22C55E; }
+  .modal-news-item.neg { border-left-color:#EF4444; }
+  .modal-news-item-top { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:11px; font-family:'Space Mono',monospace; letter-spacing:1px; }
+  .modal-news-item-time { color:var(--muted); }
+  .modal-news-item-delta.pos { color:#22C55E; }
+  .modal-news-item-delta.neg { color:#EF4444; }
+  .modal-news-item-title { font-size:13px; line-height:1.5; color:var(--text); margin-bottom:4px; }
+  .modal-news-item-source { font-size:11px; color:var(--muted); }
+  @keyframes fri-skeleton-pulse { 0%,100% { opacity:0.35 } 50% { opacity:0.7 } }
+  .skeleton-chart { background:rgba(255,255,255,0.05); border-radius:8px; height:228px; animation:fri-skeleton-pulse 1.5s ease-in-out infinite; }
+  .skeleton-news-item { background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px; height:62px; margin-bottom:10px; animation:fri-skeleton-pulse 1.5s ease-in-out infinite; }
+  .skeleton-news-item:nth-child(2) { animation-delay:0.15s; }
+  .skeleton-news-item:nth-child(3) { animation-delay:0.3s; }
 
   /* FOOTER */
   footer { position:relative; z-index:1; border-top:1px solid var(--border); padding:48px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
@@ -290,6 +317,12 @@
     <button class="filter-tab" onclick="filterPos('DEF',this)" data-i18n="f_def">Defender</button>
     <button class="filter-tab" onclick="filterPos('MID',this)" data-i18n="f_mid">Midfielder</button>
     <button class="filter-tab" onclick="filterPos('FWD',this)" data-i18n="f_fwd">Forward</button>
+  </div>
+  <div class="league-filter-wrap">
+    <label class="league-filter-label" for="league-filter" data-i18n="lg_label">League</label>
+    <select class="league-filter" id="league-filter" onchange="filterLeague(this.value)">
+      <option value="all" data-i18n="lg_all">All leagues</option>
+    </select>
   </div>
   <table class="leaderboard-table">
     <thead><tr>
@@ -481,6 +514,18 @@
         <div style="font-size:11px;font-family:'Space Mono',monospace;letter-spacing:1.5px;color:#22C55E;text-transform:uppercase;margin-bottom:6px">✓ Character Index — Exemplary</div>
         <div id="char-badge-text" style="font-size:12px;color:var(--muted);line-height:1.6"></div>
       </div>
+
+      <div class="modal-section" style="margin-top:24px">
+        <div class="modal-section-eyebrow">FRI History</div>
+        <div class="modal-chart-wrap"><canvas id="modal-history-chart"></canvas></div>
+        <div id="modal-history-empty" class="modal-empty" style="display:none">No history yet — votes and sync will populate this graph over time.</div>
+      </div>
+
+      <div class="modal-section" style="margin-top:24px">
+        <div class="modal-section-eyebrow">Recent News</div>
+        <div id="modal-news-list" class="modal-news-list"></div>
+        <div id="modal-news-empty" class="modal-empty" style="display:none">No recent media coverage for this player.</div>
+      </div>
     </div>
   </div>
 </div>
@@ -592,16 +637,41 @@ const news = [];
 function friClass(v) { return v>=90?'fri-legendary':v>=75?'fri-elite':v>=60?'fri-pro':'fri-solid'; }
 function friColor(v) { return v>=90?'#F5C842':v>=75?'#C8D8E8':v>=60?'#3B82F6':v>=45?'#22C55E':'#EAB308'; }
 let posFilter = 'all';
+let leagueFilter = 'all';
+
+function populateLeagueFilter() {
+  const select = document.getElementById('league-filter');
+  if (!select) return;
+  const leagues = Array.from(new Set(players.map(p => p.league).filter(Boolean))).sort();
+  // Preserve "All leagues" first option, replace the rest.
+  const allOption = select.options[0];
+  select.innerHTML = '';
+  if (allOption) select.appendChild(allOption);
+  leagues.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    select.appendChild(opt);
+  });
+  select.value = leagueFilter;
+}
+window.populateLeagueFilter = populateLeagueFilter;
+
+function filterLeague(value) { leagueFilter = value || 'all'; renderTable(); }
 
 function renderTable() {
   const q = (document.getElementById('player-search').value||'').toLowerCase();
   const tb = document.getElementById('table-body');
   tb.innerHTML = '';
   const t = T[lang];
-  players.filter(p => (p.name.toLowerCase().includes(q)||p.club.toLowerCase().includes(q)) && (posFilter==='all'||p.pos===posFilter)).sort((a,b) => b.fri - a.fri)
+  players.filter(p => (p.name.toLowerCase().includes(q)||p.club.toLowerCase().includes(q)) && (posFilter==='all'||p.pos===posFilter) && (leagueFilter==='all'||p.league===leagueFilter)).sort((a,b) => b.fri - a.fri)
     .forEach((p, idx) => {
       const displayRank = idx+1; const rc = displayRank===1?'rank-1':displayRank===2?'rank-2':displayRank===3?'rank-3':'';
-      const trend = p.dir==='up' ? `<span class="trend-up">↑ ${p.trend}</span>` : `<span class="trend-down">↓ ${p.trend}</span>`;
+      const trend = p.dir==='up'
+        ? `<span class="trend-up">↑ ${p.trend}</span>`
+        : p.dir==='down'
+          ? `<span class="trend-down">↓ ${p.trend}</span>`
+          : `<span class="trend-stable">→ ${p.trend}</span>`;
       const c = friColor(p.fri);
       const al = lang==='ru'?'лет':'y';
       const tr = document.createElement('tr');
@@ -655,6 +725,20 @@ function openModal(p) {
       : `Character Index ${p.char}/100 — exemplary. Zero red cards in 18+ months, consistent respect for referees and teammates, active social and charitable engagement.`;
   }
   document.getElementById('modal').classList.add('open');
+
+  // Async-load history + news for the chart and news list. Show skeletons
+  // immediately so the modal never displays the previous player's data while
+  // the new player's fetch is in flight. Failures fall back to empty state.
+  if (typeof window.fetchPlayerHistory === 'function' && p.id) {
+    if (typeof window.showHistorySkeleton === 'function') window.showHistorySkeleton();
+    if (typeof window.showNewsSkeleton === 'function') window.showNewsSkeleton();
+    window.fetchPlayerHistory(p.id)
+      .then((history) => window.renderHistoryChart(history))
+      .catch(() => window.renderHistoryChart([]));
+    window.fetchPlayerNews(p.id)
+      .then((items) => window.renderModalNews(items))
+      .catch(() => window.renderModalNews([]));
+  }
 }
 function closeModal(e) { if(e.target===document.getElementById('modal')) document.getElementById('modal').classList.remove('open'); }
 

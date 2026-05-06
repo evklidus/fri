@@ -7,6 +7,7 @@ type Player struct {
 	Slug            string    `json:"slug"`
 	Name            string    `json:"name"`
 	Club            string    `json:"club"`
+	League          string    `json:"league"`
 	Position        string    `json:"position"`
 	Age             int       `json:"age"`
 	Emoji           string    `json:"emoji"`
@@ -126,7 +127,29 @@ type PlayerSyncTarget struct {
 	Name     string
 	Club     string
 	Position string
+	Age      int
 	Score    Score
+}
+
+type CharacterEvent struct {
+	ID          int64     `json:"id"`
+	PlayerID    int64     `json:"player_id"`
+	PlayerName  string    `json:"player_name,omitempty"`
+	NewsItemID  *int64    `json:"news_item_id,omitempty"`
+	TriggerWord string    `json:"trigger_word"`
+	Delta       float64   `json:"delta"`
+	Status      string    `json:"status"`
+	DetectedAt  time.Time `json:"detected_at"`
+}
+
+// CharacterEventCandidate is what the keyword scanner emits before the
+// repository deduplicates it against the unique index. PlayerID + NewsItemID
+// + TriggerWord forms the natural key.
+type CharacterEventCandidate struct {
+	PlayerID    int64
+	NewsItemID  int64
+	TriggerWord string
+	Delta       float64
 }
 
 type ComponentUpdate struct {
@@ -143,6 +166,7 @@ type ComponentUpdate struct {
 type SocialSnapshot struct {
 	ID               int64     `json:"id"`
 	PlayerID         int64     `json:"player_id"`
+	PlayerName       string    `json:"player_name,omitempty"`
 	Provider         string    `json:"provider"`
 	Followers        int64     `json:"followers"`
 	EngagementRate   float64   `json:"engagement_rate"`
@@ -150,6 +174,32 @@ type SocialSnapshot struct {
 	YouTubeViews7D   int64     `json:"youtube_views_7d"`
 	NormalizedScore  float64   `json:"normalized_score"`
 	SnapshotAt       time.Time `json:"snapshot_at"`
+}
+
+type PlayerExternalIDs struct {
+	PlayerID       int64     `json:"player_id"`
+	Provider       string    `json:"provider"`
+	ExternalID     string    `json:"external_id"`
+	ExternalTeamID string    `json:"external_team_id,omitempty"`
+	UpdatedAt      time.Time `json:"updated_at"`
+}
+
+type PerformanceSnapshot struct {
+	ID                int64     `json:"id"`
+	PlayerID          int64     `json:"player_id"`
+	PlayerName        string    `json:"player_name,omitempty"`
+	Provider          string    `json:"provider"`
+	AverageRating     float64   `json:"average_rating"`
+	GoalsAssistsPer90 float64   `json:"goals_assists_per90"`
+	XGXAPer90         float64   `json:"xg_xa_per90"`
+	PositionRankScore float64   `json:"position_rank_score"`
+	MinutesShare      float64   `json:"minutes_share"`
+	FormScore         float64   `json:"form_score"`
+	Last5Goals        int       `json:"last5_goals"`
+	Last5Assists      int       `json:"last5_assists"`
+	Last5Rating       float64   `json:"last5_rating"`
+	NormalizedScore   float64   `json:"normalized_score"`
+	SnapshotAt        time.Time `json:"snapshot_at"`
 }
 
 type MediaArticleCandidate struct {

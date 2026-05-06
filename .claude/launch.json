@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "fri-app",
+      "runtimeExecutable": "docker",
+      "runtimeArgs": [
+        "compose",
+        "-f",
+        "/Users/evklidus/Desktop/Dev/my projects/fri/deployments/docker-compose.yml",
+        "up",
+        "--build"
+      ],
+      "port": 8080
+    }
+  ]
+}

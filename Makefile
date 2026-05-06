@@ -1,7 +1,12 @@
 APP_NAME := fri-api
 COMPOSE_FILE := deployments/docker-compose.yml
 
-.PHONY: help docker-up docker-down docker-restart docker-logs docker-ps docker-build build run import sync-media tidy fmt test check
+ifneq (,$(wildcard .env))
+include .env
+export
+endif
+
+.PHONY: help docker-up docker-down docker-restart docker-logs docker-ps docker-build build run import sync-media sync-social sync-performance sync-all api-football-status tidy fmt test check
 
 help:
 	@echo "Available commands:"
@@ -15,6 +20,11 @@ help:
 	@echo "  make import       - import legacy HTML into database"
 	@echo "  make build        - build API binary"
 	@echo "  make sync-media   - run phase 2 media sync against the live API"
+	@echo "  make sync-social  - run phase 2 social sync against the live API"
+	@echo "  make sync-performance - run phase 2 performance sync against the live API"
+	@echo "  make sync-character - run character keyword scan against recent news"
+	@echo "  make sync-all     - run all phase 2/3 sync jobs against the live API"
+	@echo "  make api-football-status - show API-Football request limit/status"
 	@echo "  make fmt          - format Go code"
 	@echo "  make test         - run Go tests"
 	@echo "  make tidy         - tidy Go modules"
@@ -45,6 +55,22 @@ import:
 
 sync-media:
 	curl -s -X POST http://localhost:8080/api/sync/media | jq
+
+sync-social:
+	curl -s -X POST http://localhost:8080/api/sync/social | jq
+
+sync-performance:
+	curl -s -X POST http://localhost:8080/api/sync/performance | jq
+
+sync-character:
+	curl -s -X POST http://localhost:8080/api/sync/character | jq
+
+sync-all:
+	curl -s -X POST http://localhost:8080/api/sync/all | jq
+
+api-football-status:
+	@test -n "$$API_FOOTBALL_KEY" || (echo "API_FOOTBALL_KEY is not set" && exit 1)
+	@curl -s -H "x-apisports-key: $$API_FOOTBALL_KEY" https://v3.football.api-sports.io/status | jq
 
 build:
 	mkdir -p bin

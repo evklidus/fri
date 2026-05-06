@@ -32,15 +32,23 @@ func main() {
 	}
 
 	repo := postgres.NewRepository(pool)
-	mediaProvider := service.NewMediaProvider(cfg.SyncHTTPTimeout, cfg.MediaArticlesPerRun)
-	svc := service.New(repo, mediaProvider)
+	mediaProvider := service.NewMediaProvider(cfg.SyncHTTPTimeout, cfg.MediaArticlesPerRun, cfg.MediaStackAPIKey, cfg.MediaStackBaseURL)
+	socialProvider := service.NewSocialProvider(cfg.YouTubeAPIKey, cfg.YouTubeBaseURL, cfg.SyncHTTPTimeout)
+	performanceProvider := service.NewPerformanceProvider(cfg.APIFootballKey, cfg.APIFootballBaseURL, repo, cfg.SyncHTTPTimeout)
+	svc := service.New(repo, mediaProvider, socialProvider, performanceProvider)
 
 	if err := svc.SeedIfEmpty(ctx, cfg.SourceHTMLPath); err != nil {
 		log.Fatalf("seed database: %v", err)
 	}
 
 	if cfg.AutoSyncEnabled {
-		svc.StartScheduler(ctx, cfg.MediaSyncInterval)
+		svc.StartScheduler(ctx, service.ScheduleConfig{
+			MediaInterval:       cfg.MediaSyncInterval,
+			SocialInterval:      cfg.SocialSyncInterval,
+			PerformanceInterval: cfg.PerformanceInterval,
+			CharacterInterval:   cfg.CharacterInterval,
+			RunOnStartup:        cfg.SyncOnStartup,
+		})
 	}
 
 	router := apphttp.NewRouter(cfg, svc)
