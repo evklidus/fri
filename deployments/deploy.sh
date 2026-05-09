@@ -73,6 +73,52 @@ fi
 log "Docker version: $(docker --version)"
 log "Compose version: $(docker compose version)"
 
+# ─── 3.5. Docker daemon: registry mirror + IPv6 ────────────────────────
+# Two reasons we replace daemon.json:
+#   1. Docker Hub rate-limits unauthenticated pulls per IP. Timeweb VPSs
+#      share IP ranges, so the limit is often already exhausted. We
+#      configure mirror.gcr.io (Google's public Docker Hub mirror) which
+#      has a separate quota.
+#   2. On IPv6-only VPSs (cheap Timeweb tier without a paid IPv4) we need
+#      Docker containers themselves to have IPv6 — otherwise outbound
+#      requests to MediaStack / YouTube APIs fail with "no route". The
+#      `ipv6: true` + `ip6tables: true` + `fixed-cidr-v6` triple does
+#      this; the `dns` block points containers at public DNS64 resolvers
+#      so IPv4-only hostnames still resolve (via NAT64 synthesis).
+if ! grep -q 'mirror.gcr.io' /etc/docker/daemon.json 2>/dev/null; then
+  log "Configuring Docker daemon (registry mirror + IPv6)..."
+  mkdir -p /etc/docker
+  cat > /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": ["https://mirror.gcr.io"],
+  "ipv6": true,
+  "fixed-cidr-v6": "fd00:dead:beef::/48",
+  "ip6tables": true,
+  "experimental": true,
+  "dns": ["2001:4860:4860::6464", "2001:4860:4860::64", "2a01:4f9:c010:3f02::1"]
+}
+EOF
+  systemctl restart docker
+  sleep 3
+fi
+
+# Host-level NAT64 DNS so the host itself can reach IPv4-only services
+# like github.com (which has no AAAA record). Trex's free public DNS64
+# synthesizes AAAA for IPv4-only hosts, routed through their NAT64
+# gateway. Without this, even `git clone` fails on an IPv6-only VPS.
+if ! grep -q 'nat64' /etc/systemd/resolved.conf.d/nat64.conf 2>/dev/null; then
+  log "Configuring host NAT64 DNS (so the host can clone github.com)..."
+  mkdir -p /etc/systemd/resolved.conf.d
+  cat > /etc/systemd/resolved.conf.d/nat64.conf <<'EOF'
+[Resolve]
+DNS=2a01:4f9:c010:3f02::1 2a00:1098:2b::1 2a00:1098:2c::1
+DNSOverTLS=opportunistic
+EOF
+  systemctl restart systemd-resolved
+  resolvectl flush-caches
+  sleep 2
+fi
+
 # ─── 4. Repo ─────────────────────────────────────────────────────────────
 if [[ ! -d "$REPO_DIR/.git" ]]; then
   if [[ -z "$REPO_URL" ]]; then

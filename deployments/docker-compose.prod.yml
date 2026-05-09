@@ -77,6 +77,14 @@ services:
       YOUTUBE_BASE_URL: ${YOUTUBE_BASE_URL:-https://www.googleapis.com/youtube/v3}
       MEDIASTACK_API_KEY: ${MEDIASTACK_API_KEY:-}
       MEDIASTACK_BASE_URL: ${MEDIASTACK_BASE_URL:-http://api.mediastack.com/v1}
+    # Hardcode IPv6 for api.mediastack.com because their DNS provider
+    # returns SERVFAIL through public DNS64 resolvers (Trex / Google),
+    # making the host unresolvable on IPv6-only servers. The address below
+    # is mediastack's Cloudflare-hosted IPv6 endpoint — stable as long as
+    # they stay on Cloudflare. If sync starts failing again, re-resolve:
+    #   dig +short AAAA api.mediastack.com
+    extra_hosts:
+      - "api.mediastack.com:2606:4700:3030::ac43:96e1"
     # No "ports:" — Caddy talks to app over the docker network on port 8080.
     expose:
       - "8080"
@@ -112,3 +120,12 @@ volumes:
   postgres-data:
   caddy-data:
   caddy-config:
+
+# Enable IPv6 on the default compose network. Required when the host is
+# IPv6-only (e.g. cheap VPS without a paid IPv4): containers need their
+# own IPv6 address to reach external services like the MediaStack and
+# YouTube APIs. The actual /64 prefix is allocated by Docker from
+# `fixed-cidr-v6` in /etc/docker/daemon.json — see deploy.sh for that.
+networks:
+  default:
+    enable_ipv6: true
