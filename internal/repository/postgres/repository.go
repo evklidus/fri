@@ -726,7 +726,14 @@ func (r *Repository) ApplyMediaSync(ctx context.Context, results []domain.MediaS
 	}
 	defer tx.Rollback(ctx)
 
-	if _, err := tx.Exec(ctx, `DELETE FROM news_items WHERE source = $1 OR source = 'legacy-html'`, provider); err != nil {
+	// Each media sync replaces the full media news set. We delete every
+	// known media-provider source (not just the current one), so switching
+	// providers — e.g. google-news-rss → gdelt → mediastack — doesn't leave
+	// stale articles from earlier providers in the feed.
+	if _, err := tx.Exec(ctx, `
+		DELETE FROM news_items
+		WHERE source IN ('mediastack', 'gdelt', 'google-news-rss', 'legacy-html')
+	`); err != nil {
 		return nil, err
 	}
 

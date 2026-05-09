@@ -1,0 +1,49 @@
+# Caddy reverse-proxy config. Two paths depending on what you set as
+# PUBLIC_HOSTNAME in the .env:
+#
+#   1. A real domain (e.g. fri.example.com):
+#      Caddy auto-fetches a Let's Encrypt cert via ACME and serves HTTPS.
+#      ACME_EMAIL is used for renewal notifications. Plain HTTP redirects
+#      to HTTPS automatically.
+#
+#   2. A bare IP address (e.g. 89.111.222.33):
+#      ACME challenge can't issue a cert for IP, so we serve HTTP only on
+#      port 80. Use this for the very first deploy before the domain points
+#      at the server. Switch to a real domain after DNS propagates.
+
+{$PUBLIC_HOSTNAME} {
+	# Email for Let's Encrypt cert renewal warnings. Empty = anonymous.
+	tls {$ACME_EMAIL}
+
+	# Reverse-proxy everything to the Go app over the docker network.
+	# `app` resolves via docker DNS, port 8080 is the internal expose.
+	reverse_proxy app:8080 {
+		# Pass real client IP for our IP-hash voting rate-limiter.
+		header_up X-Real-IP {remote_host}
+		header_up X-Forwarded-For {remote_host}
+	}
+
+	# Standard security headers — cheap defaults.
+	header {
+		# HSTS: tell browsers to always use HTTPS for the next year.
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		# Prevent the page from being framed (clickjacking defense).
+		X-Frame-Options "DENY"
+		# Tell browsers not to MIME-sniff away from declared content type.
+		X-Content-Type-Options "nosniff"
+		# Don't leak referrer to third-party news article links.
+		Referrer-Policy "strict-origin-when-cross-origin"
+		# Remove the default `Server: Caddy` banner.
+		-Server
+	}
+
+	# Compress text responses on the fly.
+	encode zstd gzip
+
+	# Access log — small, rotated by Caddy automatically.
+	log {
+		output stdout
+		format console
+		level INFO
+	}
+}

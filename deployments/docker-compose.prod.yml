@@ -1,0 +1,115 @@
+# Production compose. Differences from docker-compose.yml:
+#   - Postgres is NOT exposed to the host (no public 5432).
+#   - App is NOT exposed to the host directly (no public 8080) — Caddy
+#     reverse-proxies and terminates TLS via Let's Encrypt.
+#   - All services restart automatically on crash and on host reboot.
+#   - Log rotation caps disk usage at ~30MB per service.
+#   - Postgres tuned for a 2GB-RAM VPS (shared_buffers=256M, effective_cache=1G).
+#
+# Required env vars (loaded from .env in this directory):
+#   POSTGRES_PASSWORD        — strong random secret (generate with `openssl rand -hex 24`)
+#   API_FOOTBALL_KEY         — your API-Football Pro key
+#   YOUTUBE_API_KEY          — YouTube Data API v3 key
+#   MEDIASTACK_API_KEY       — MediaStack Pro key
+#   PUBLIC_HOSTNAME          — your domain (e.g. fri.example.com) OR server IP
+#   ACME_EMAIL               — email for Let's Encrypt (used for cert renewal alerts)
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: fri-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fri
+      POSTGRES_USER: fri
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
+    # No "ports:" block — postgres is reachable only inside the docker network.
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=128MB
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U fri -d fri"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  app:
+    build:
+      context: ..
+      dockerfile: build/package/Dockerfile
+    image: fri-app:latest
+    container_name: fri-app
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_PORT: 8080
+      DATABASE_URL: postgres://fri:${POSTGRES_PASSWORD}@postgres:5432/fri?sslmode=disable
+      SOURCE_HTML_PATH: /app/web/source/fri-index.html
+      WEB_DIR: /app/web/static
+      DB_MAX_CONNS: 10
+      AUTO_SYNC_ENABLED: "true"
+      SYNC_ON_STARTUP: "false"
+      MEDIA_SYNC_INTERVAL_MINUTES: 360
+      SOCIAL_SYNC_INTERVAL_MINUTES: 1440
+      PERFORMANCE_SYNC_INTERVAL_MINUTES: 1440
+      CHARACTER_SYNC_INTERVAL_MINUTES: 720
+      SYNC_HTTP_TIMEOUT_SECONDS: 15
+      MEDIA_ARTICLES_PER_PLAYER: 3
+      API_FOOTBALL_KEY: ${API_FOOTBALL_KEY:-}
+      API_FOOTBALL_BASE_URL: ${API_FOOTBALL_BASE_URL:-https://v3.football.api-sports.io}
+      YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
+      YOUTUBE_BASE_URL: ${YOUTUBE_BASE_URL:-https://www.googleapis.com/youtube/v3}
+      MEDIASTACK_API_KEY: ${MEDIASTACK_API_KEY:-}
+      MEDIASTACK_BASE_URL: ${MEDIASTACK_BASE_URL:-http://api.mediastack.com/v1}
+    # No "ports:" — Caddy talks to app over the docker network on port 8080.
+    expose:
+      - "8080"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: fri-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"     # HTTP — needed for Let's Encrypt challenge + redirect to HTTPS
+      - "443:443"   # HTTPS
+      - "443:443/udp"  # HTTP/3 (QUIC)
+    environment:
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME is required}
+      ACME_EMAIL: ${ACME_EMAIL:-}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data           # Let's Encrypt certs (persisted across restarts)
+      - caddy-config:/config
+    depends_on:
+      - app
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  postgres-data:
+  caddy-data:
+  caddy-config:

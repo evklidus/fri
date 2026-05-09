@@ -47,7 +47,22 @@
       t_ru: item.title_ru || "",
       s_en: item.summary_en || "",
       s_ru: item.summary_ru || "",
+      url: item.source_url || "",
+      domain: extractDomain(item.source_url || ""),
     };
+  }
+
+  // extractDomain pulls the human-readable host name out of an article URL
+  // ("https://www.bbc.com/sport/12345" → "bbc.com") for display next to the
+  // headline so readers see who reported the story before they click.
+  function extractDomain(url) {
+    if (!url) return "";
+    try {
+      const host = new URL(url).hostname;
+      return host.replace(/^www\./, "");
+    } catch (_) {
+      return "";
+    }
   }
 
   async function fetchJSON(url, options) {
@@ -203,16 +218,27 @@
       const delta = Number(item.impact_delta || 0);
       const deltaSign = delta > 0 ? "+" : "";
       const title = (langKey === "ru" ? item.title_ru : item.title_en) || item.title_en || "";
-      const source = item.source || "";
-      const card = document.createElement("div");
+      const url = item.source_url || "";
+      const domain = extractDomain(url) || item.source || "";
+
+      // Use <a> when we have a URL so the reader can open the original
+      // article in a new tab. Fall back to <div> for legacy items (older
+      // syncs that didn't store source_url).
+      const card = document.createElement(url ? "a" : "div");
       card.className = `modal-news-item ${impact}`;
+      if (url) {
+        card.href = url;
+        card.target = "_blank";
+        card.rel = "noopener noreferrer";
+      }
+      const arrow = url ? `<span class="modal-news-arrow">↗</span>` : "";
       card.innerHTML = `
         <div class="modal-news-item-top">
           <span class="modal-news-item-delta ${impact}">${deltaSign}${round1(delta).toFixed(1)} FRI</span>
           <span class="modal-news-item-time">${item.relative_time || ""}</span>
         </div>
         <div class="modal-news-item-title">${title}</div>
-        <div class="modal-news-item-source">${source}</div>`;
+        <div class="modal-news-item-source">${domain}${arrow}</div>`;
       list.appendChild(card);
     });
   };
@@ -352,6 +378,53 @@
       }, 2500);
     } finally {
       button.disabled = false;
+    }
+  };
+
+  // Dev-only: kick off a full backend sync (Performance + Social + Media +
+  // Character) and refresh the UI when it finishes. The production build
+  // drops the `.dev-tools` footer block, so this handler is harmless to ship.
+  window.triggerFullSync = async function triggerFullSync() {
+    const btn = document.getElementById("dev-sync-btn");
+    const text = document.getElementById("dev-sync-text");
+    const status = document.getElementById("dev-sync-status");
+    if (!btn || !text || !status) return;
+
+    btn.disabled = true;
+    status.classList.remove("success", "error");
+    text.textContent = "Syncing…";
+    status.textContent = "Hitting external APIs (60–90s)…";
+
+    const startedAt = Date.now();
+    try {
+      const r = await fetch("/api/sync/all", { method: "POST" });
+      const payload = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        throw new Error(payload?.error || `HTTP ${r.status}`);
+      }
+      const elapsed = ((Date.now() - startedAt) / 1000).toFixed(1);
+      const summary = (payload.data || [])
+        .map((c) => `${c.component}: ${c.records_seen}`)
+        .join(" · ");
+      status.classList.add("success");
+      status.textContent = `done in ${elapsed}s · ${summary || "no records"}`;
+
+      // Refresh leaderboard + news so the impact of the sync is visible.
+      await Promise.all([loadPlayers(), loadNews()]);
+      renderLiveData();
+    } catch (err) {
+      status.classList.add("error");
+      status.textContent = `failed: ${err.message}`;
+    } finally {
+      btn.disabled = false;
+      text.textContent = "Trigger full sync";
+      // Auto-clear status after 12s so the footer doesn't carry stale text.
+      setTimeout(() => {
+        if (!btn.disabled) {
+          status.textContent = "";
+          status.classList.remove("success", "error");
+        }
+      }, 12000);
     }
   };
 

@@ -89,12 +89,56 @@ func (p *mediaStackMediaProvider) FetchPlayerArticles(ctx context.Context, playe
 	candidates = append(candidates, ruArticles...)
 
 	candidates = applyDomainDenylist(candidates)
+	candidates = filterTitleMentionsPlayer(candidates, player.Name)
 	candidates = dedupeArticles(candidates)
 
 	if len(candidates) > p.articlesPerPlayer {
 		candidates = candidates[:p.articlesPerPlayer]
 	}
 	return candidates, nil
+}
+
+// filterTitleMentionsPlayer drops articles where the player's name (full or
+// surname) doesn't appear in the title. MediaStack matches on body text too,
+// which produces false positives — e.g. an Anthony Gordon transfer article
+// that mentions "Raphinha not interested in Saudi" gets attributed to
+// Raphinha. Title-only filtering is a strict but cheap heuristic that cuts
+// the obvious off-topic mentions while keeping articles where the player is
+// the actual subject.
+//
+// Both sides of the substring check are run through asciiOnly so accented
+// Latin characters match plain ASCII surnames. Otherwise "Cubarsí dazzles"
+// (title) doesn't contain "cubarsi" (asciiOnly surname) — same for López,
+// Kanté, and any other diacritic-bearing name.
+func filterTitleMentionsPlayer(items []domain.MediaArticleCandidate, playerName string) []domain.MediaArticleCandidate {
+	fullNormalized := asciiOnly(playerName)
+	if fullNormalized == "" {
+		return items
+	}
+	surname := playerSearchTerm(playerName) // ascii-normalized surname (≥4 chars when possible)
+	out := make([]domain.MediaArticleCandidate, 0, len(items))
+	for _, item := range items {
+		// Cyrillic titles can't be matched against an ASCII surname directly
+		// (e.g. "Месси" vs "Messi"). MediaStack already filters by latin
+		// keyword, so cyrillic results are statistically clean — let them
+		// through without title-check.
+		if cyrillicRatio(item.Title) >= 0.3 {
+			out = append(out, item)
+			continue
+		}
+		titleNormalized := asciiOnly(item.Title)
+		if strings.Contains(titleNormalized, fullNormalized) {
+			out = append(out, item)
+			continue
+		}
+		// Match on surname only when it's specific enough (≥4 chars) — short
+		// names like "Jr" would let everything through.
+		if len(surname) >= 4 && strings.Contains(titleNormalized, surname) {
+			out = append(out, item)
+			continue
+		}
+	}
+	return out
 }
 
 func (p *mediaStackMediaProvider) respectRateLimit(ctx context.Context) error {
@@ -125,15 +169,20 @@ func (p *mediaStackMediaProvider) markCalled() {
 	p.callMu.Unlock()
 }
 
-// fetch hits the MediaStack /news endpoint for one language. Uses a quoted
-// player name to anchor on the exact phrase; MediaStack's keyword filter is
-// substring-style so unquoted "Lionel Messi" would match "Lionel" alone.
+// fetch hits the MediaStack /news endpoint for one language. The keyword is
+// the player's *surname* in quotes — MediaStack does exact-phrase matching,
+// and journalists never write our seed-style "E. Haaland" (they use
+// "Haaland" or "Erling Haaland"). Searching by surname returns articles for
+// every well-known player; the title-mention filter downstream still
+// guarantees the surname appears in the headline before we attribute it.
+//
 // Retries once on rate-limit errors (HTTP 429 or `error.code` =
 // rate_limit_reached) — free-tier buckets refill in a few seconds.
 func (p *mediaStackMediaProvider) fetch(ctx context.Context, playerName, language, fromDate, toDate string) ([]domain.MediaArticleCandidate, error) {
+	keyword := mediaStackKeywordFor(playerName)
 	params := url.Values{
 		"access_key": []string{p.apiKey},
-		"keywords":   []string{`"` + playerName + `"`},
+		"keywords":   []string{`"` + keyword + `"`},
 		"languages":  []string{language},
 		"date":       []string{fromDate + "," + toDate},
 		"limit":      []string{strconv.Itoa(mediaStackPageSize)},
@@ -218,6 +267,59 @@ func (p *mediaStackMediaProvider) doRequest(ctx context.Context, endpoint, playe
 		})
 	}
 	return candidates, 0, nil
+}
+
+// mediaStackKeywordFor extracts the search term we send to MediaStack from a
+// seed-style player name. Strategy:
+//  1. Drop initials ("E.", "M.").
+//  2. Drop short suffixes ("Jr", "Sr").
+//  3. Drop tokens containing punctuation that breaks MediaStack's tokenizer
+//     (apostrophes, hyphens). For "N'Golo Kanté" this drops "N'Golo" — the
+//     asciiOnly form "ngolo" won't match MediaStack's index (which sees
+//     "n'golo" tokenized into ["n", "golo"]). Surname alone matches reliably.
+//  4. Run the result through asciiOnly. MediaStack's exact-phrase matcher is
+//     case-insensitive but inconsistent on diacritics: "Mbappé" works,
+//     "Cubarsí" returns zero. Stripping diacritics fixes it across the board.
+//
+// Empirical results from /v1/news with quoted keyword:
+//
+//	"Cubarsí" → 0   |  "cubarsi"      → 5
+//	"Kanté"   → 0   |  "kante"        → 10
+//	"Fermín López" → works either way (we still ascii-fold for consistency)
+func mediaStackKeywordFor(playerName string) string {
+	parts := strings.Fields(strings.TrimSpace(playerName))
+	cleaned := make([]string, 0, len(parts))
+	for _, p := range parts {
+		// Skip initials like "E.", "K.", "M." — they're not in headlines.
+		if strings.HasSuffix(p, ".") && len(p) <= 2 {
+			continue
+		}
+		// Skip stray short tokens ("Jr", "Sr") that match too many articles.
+		if len(p) < 3 {
+			continue
+		}
+		// Skip tokens with apostrophes/hyphens — MediaStack tokenizes on
+		// those and the asciiOnly form ("ngolo") won't match the indexed
+		// tokens ("n", "golo"). Better to drop the first-name part entirely
+		// and search by surname only ("kante" → 10 articles).
+		if strings.ContainsAny(p, "'’’‘-") {
+			continue
+		}
+		cleaned = append(cleaned, p)
+	}
+	var phrase string
+	if len(cleaned) == 0 {
+		// Pathological: every token was filtered. Fall back to the raw name
+		// so we at least try to match something.
+		phrase = strings.TrimSpace(playerName)
+	} else {
+		phrase = strings.Join(cleaned, " ")
+	}
+	// asciiOnly lowercases and strips diacritics — both safe for MediaStack.
+	if normalized := asciiOnly(phrase); normalized != "" {
+		return normalized
+	}
+	return phrase
 }
 
 func parseMediaStackDate(raw string) time.Time {

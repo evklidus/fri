@@ -143,8 +143,12 @@
   /* NEWS */
   .news-section { padding:100px 48px; max-width:1200px; margin:0 auto; }
   .news-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:20px; }
-  .news-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; transition:transform 0.2s,border-color 0.2s; cursor:pointer; }
+  .news-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; transition:transform 0.2s,border-color 0.2s; cursor:pointer; display:block; color:inherit; text-decoration:none; }
+  a.news-card { text-decoration:none; }
   .news-card:hover { transform:translateY(-4px); border-color:rgba(255,255,255,0.15); }
+  .news-source-line { display:flex; align-items:center; gap:6px; margin-top:12px; font-size:11px; font-family:'Space Mono',monospace; color:var(--muted); letter-spacing:0.5px; }
+  .news-source-arrow { font-size:10px; opacity:0.6; }
+  .news-card:hover .news-source-line { color:var(--gold); }
   .news-card-top { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
   .news-impact { font-size:11px; font-family:'Space Mono',monospace; letter-spacing:1px; padding:4px 10px; border-radius:4px; text-transform:uppercase; }
   .impact-pos { background:rgba(34,197,94,0.15); color:var(--green); }
@@ -212,7 +216,10 @@
   .modal-chart-wrap canvas { max-height:228px; }
   .modal-empty { font-size:12px; color:var(--muted); padding:12px 0; font-style:italic; }
   .modal-news-list { display:flex; flex-direction:column; gap:10px; }
-  .modal-news-item { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-left:3px solid var(--muted); border-radius:8px; padding:12px 14px; }
+  .modal-news-item { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-left:3px solid var(--muted); border-radius:8px; padding:12px 14px; display:block; color:inherit; text-decoration:none; transition:border-color 0.15s; }
+  a.modal-news-item:hover { border-color:rgba(255,255,255,0.18); }
+  a.modal-news-item:hover .modal-news-item-source { color:var(--gold); }
+  .modal-news-arrow { margin-left:6px; font-size:10px; opacity:0.6; }
   .modal-news-item.pos { border-left-color:#22C55E; }
   .modal-news-item.neg { border-left-color:#EF4444; }
   .modal-news-item-top { display:flex; align-items:center; gap:8px; margin-bottom:6px; font-size:11px; font-family:'Space Mono',monospace; letter-spacing:1px; }
@@ -231,6 +238,21 @@
   footer { position:relative; z-index:1; border-top:1px solid var(--border); padding:48px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
   .footer-logo { font-family:'Bebas Neue',sans-serif; font-size:24px; letter-spacing:4px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .footer-copy { font-size:13px; color:var(--muted); }
+
+  /* Dev-only sync trigger. Visually muted on purpose so the production
+     build can drop the whole `.dev-tools` block without leaving a hole
+     in the layout. The dashed border + uppercase badge make it clear to
+     non-engineering viewers that this is a debug control. */
+  .dev-tools { width:100%; margin-top:24px; padding:16px 20px; border:1px dashed rgba(255,255,255,0.12); border-radius:8px; display:flex; flex-wrap:wrap; align-items:center; gap:14px; background:rgba(255,255,255,0.015); }
+  .dev-tools-btn { background:transparent; color:var(--muted); border:1px solid rgba(255,255,255,0.12); border-radius:4px; padding:7px 14px; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; text-transform:uppercase; cursor:pointer; display:flex; align-items:center; gap:8px; transition:all 0.2s; }
+  .dev-tools-btn:hover:not(:disabled) { color:var(--text); border-color:rgba(255,255,255,0.25); background:rgba(255,255,255,0.03); }
+  .dev-tools-btn:disabled { opacity:0.5; cursor:wait; }
+  .dev-tools-btn-icon { display:inline-block; }
+  .dev-tools-btn:disabled .dev-tools-btn-icon { animation:dev-tools-spin 1.2s linear infinite; }
+  @keyframes dev-tools-spin { from { transform:rotate(0); } to { transform:rotate(360deg); } }
+  .dev-tools-status { font-family:'Space Mono',monospace; font-size:11px; color:var(--muted); flex:1; min-width:200px; }
+  .dev-tools-status.success { color:#22C55E; }
+  .dev-tools-status.error { color:#EF4444; }
 
   .section-divider { width:100%; height:1px; background:var(--border); max-width:1200px; margin:0 auto; }
   .live-dot { width:8px; height:8px; background:var(--red); border-radius:50%; display:inline-block; margin-right:8px; animation:pulse 1.5s infinite; }
@@ -481,6 +503,14 @@
 <footer>
   <div class="footer-logo">FRI</div>
   <div class="footer-copy" data-i18n="footer">© 2025 Football Reputation Index. The global standard for player reputation analytics.</div>
+
+  <div class="dev-tools" title="Test-only control: triggers a full data sync. Production runs the same logic on a 6–24h scheduler.">
+    <button class="dev-tools-btn" id="dev-sync-btn" onclick="triggerFullSync()">
+      <span class="dev-tools-btn-icon">⟳</span>
+      <span id="dev-sync-text">Trigger full sync (test)</span>
+    </button>
+    <span id="dev-sync-status" class="dev-tools-status"></span>
+  </div>
 </footer>
 
 <!-- MODAL -->
@@ -750,16 +780,36 @@ function renderNews() {
     const ic = n.impact==='pos'?'impact-pos':n.impact==='neg'?'impact-neg':'impact-neu';
     const il = n.impact==='pos'?t.news_pos:n.impact==='neg'?t.news_neg:t.news_neu;
     const dc = n.impact==='pos'?'fri-delta-pos':'fri-delta-neg';
-    const card = document.createElement('div');
+    // Wrap card in <a> when source URL is available so readers can verify the
+    // article. target=_blank + rel=noopener keeps tab navigation safe; href
+    // falls back to '#' (with onclick:return false) when no URL is present.
+    const wrapTag = n.url ? 'a' : 'div';
+    const wrapAttrs = n.url
+      ? `href="${escapeHtml(n.url)}" target="_blank" rel="noopener noreferrer"`
+      : '';
+    const card = document.createElement(wrapTag);
+    if (wrapAttrs) {
+      n.url && card.setAttribute('href', n.url);
+      card.setAttribute('target', '_blank');
+      card.setAttribute('rel', 'noopener noreferrer');
+    }
     card.className = 'news-card';
+    const sourceLine = n.domain
+      ? `<div class="news-source-line">${n.domain}<span class="news-source-arrow">↗</span></div>`
+      : '';
     card.innerHTML = `
       <div class="news-card-top"><span class="news-impact ${ic}">${il}</span><span class="news-time">${n.time}</span></div>
       <div class="news-player-tag">${n.player}</div>
       <div class="news-title">${lang==='ru'?n.t_ru:n.t_en}</div>
       <div class="news-summary">${lang==='ru'?n.s_ru:n.s_en}</div>
+      ${sourceLine}
       <div class="news-fri-change"><span>${t.news_impact}</span><span class="${dc}">${n.delta}</span><span style="color:var(--muted);margin-left:4px">${t.news_auto}</span></div>`;
     g.appendChild(card);
   });
+}
+
+function escapeHtml(s) {
+  return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 // ── POLL ──────────────────────────────────────────────────

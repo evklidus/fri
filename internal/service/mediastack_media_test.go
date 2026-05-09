@@ -27,7 +27,7 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 				"pagination":{"limit":25,"offset":0,"count":2,"total":2},
 				"data":[
 					{"title":"Messi scored a brilliant goal","description":"Masterclass display","url":"https://bbc.com/a","source":"BBC","language":"en","published_at":"2026-05-05T10:00:00+00:00"},
-					{"title":"Inter Miami win","description":"Late winner","url":"https://espn.com/b","source":"ESPN","language":"en","published_at":"2026-05-04T18:00:00+00:00"}
+					{"title":"Messi leads Inter Miami to win","description":"Late winner","url":"https://espn.com/b","source":"ESPN","language":"en","published_at":"2026-05-04T18:00:00+00:00"}
 				],
 				"error":{}
 			}`))
@@ -69,7 +69,9 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 		if got := q.Get("access_key"); got != "test-key" {
 			t.Errorf("access_key = %q, want test-key", got)
 		}
-		if got := q.Get("keywords"); got != `"Lionel Messi"` {
+		// Keyword is asciiOnly'd (lowercased, diacritics stripped) before
+		// being quoted — see mediaStackKeywordFor.
+		if got := q.Get("keywords"); got != `"lionel messi"` {
 			t.Errorf("keywords = %q, want quoted phrase", got)
 		}
 	}
@@ -222,6 +224,99 @@ func TestMediaStackDedupAcrossLanguages(t *testing.T) {
 	}
 	if len(candidates) != 1 {
 		t.Errorf("got %d candidates, want 1 (deduplicated by title+source)", len(candidates))
+	}
+}
+
+func TestFilterTitleMentionsPlayerDropsBodyOnlyMatches(t *testing.T) {
+	items := []domain.MediaArticleCandidate{
+		// Real article about the player — title contains the name
+		{Title: "Raphinha hits out at lies over transfer", PlayerName: "Raphinha"},
+		// False-positive: Anthony Gordon transfer article that *also* mentions
+		// Raphinha somewhere in the body. Title-only check should drop it.
+		{Title: "Bayern Munich News: FC Bayern, Newcastle United make contact on Gordon", PlayerName: "Raphinha"},
+		// Surname-only mention in title is acceptable.
+		{Title: "Olise wonder-strike caps Bayern win", PlayerName: "M. Olise"},
+		// Short last token "Jr" should NOT trigger surname match — needs full
+		// name in title in that case.
+		{Title: "Manchester City eye Brazilian winger transfer", PlayerName: "Vinicius Jr"},
+		// Same player, full name in title — kept.
+		{Title: "Vinicius Jr scores stunner for Real Madrid", PlayerName: "Vinicius Jr"},
+		// Diacritic in headline: "Cubarsí" must still match surname "cubarsi"
+		// after asciiOnly normalization on both sides. Before the fix, the
+		// title-filter dropped every Cubarsí article because strings.Contains
+		// compared "cubarsí stunner" against "cubarsi" and got false.
+		{Title: "Cubarsí stunner caps Barcelona win at the Bernabéu", PlayerName: "P. Cubarsí"},
+		// Same regression for López — accented "ó" in title vs ascii "lopez".
+		{Title: "Fermín López strikes late for Barça", PlayerName: "Fermín López"},
+		// And for Kanté — accented "é" in title vs ascii "kante".
+		{Title: "Kanté returns to form in Saudi clash", PlayerName: "N'Golo Kanté"},
+	}
+
+	cases := map[string]int{
+		"Raphinha":     1, // first kept, second dropped
+		"M. Olise":     1, // surname match
+		"Vinicius Jr":  1, // only the title with full name
+		"P. Cubarsí":   1, // diacritic in title matches asciiOnly surname
+		"Fermín López": 1, // accented surname matches asciiOnly form
+		"N'Golo Kanté": 1, // accented Kanté matches asciiOnly "kante"
+	}
+	for player, wantCount := range cases {
+		var input []domain.MediaArticleCandidate
+		for _, it := range items {
+			if it.PlayerName == player {
+				input = append(input, it)
+			}
+		}
+		got := filterTitleMentionsPlayer(input, player)
+		if len(got) != wantCount {
+			t.Errorf("player %q: got %d articles, want %d. Kept titles: %v",
+				player, len(got), wantCount, titles(got))
+		}
+	}
+}
+
+func titles(items []domain.MediaArticleCandidate) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.Title
+	}
+	return out
+}
+
+func TestMediaStackKeywordForExtractsSurname(t *testing.T) {
+	cases := []struct {
+		in, want string
+	}{
+		// Initial dropped, surname kept and ASCII-folded.
+		{"E. Haaland", "haaland"},
+		{"M. Salah", "salah"},
+		{"K. Mbappé", "mbappe"},
+		{"H. Kane", "kane"},
+		{"J. Bellingham", "bellingham"},
+		// Compound surname kept intact ("van" passes the ≥3-char filter).
+		{"V. van Dijk", "van dijk"},
+		// "Jr" dropped (too short).
+		{"Vinicius Jr", "vinicius"},
+		// Single-name players ASCII-fold cleanly.
+		{"Pedri", "pedri"},
+		{"Raphinha", "raphinha"},
+		{"Vitinha", "vitinha"},
+		// Apostrophe-bearing first name dropped — MediaStack quoted match
+		// for "ngolo kante" returns 0 because the index has "n'golo"
+		// tokenized as ["n", "golo"]. Surname alone returns 10.
+		{"N'Golo Kanté", "kante"},
+		// Diacritic stripped: full-name search with both words is more
+		// specific than just "lopez" (which would match every Lopez).
+		{"Fermín López", "fermin lopez"},
+		// Direct regression for the bug we're fixing here.
+		{"P. Cubarsí", "cubarsi"},
+		// Hyphenated first name should also be dropped.
+		{"J.-M. Pirlo", "pirlo"},
+	}
+	for _, tc := range cases {
+		if got := mediaStackKeywordFor(tc.in); got != tc.want {
+			t.Errorf("mediaStackKeywordFor(%q) = %q, want %q", tc.in, got, tc.want)
+		}
 	}
 }
 

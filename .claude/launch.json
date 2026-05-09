@@ -8,6 +8,8 @@
         "compose",
         "-f",
         "/Users/evklidus/Desktop/Dev/my projects/fri/deployments/docker-compose.yml",
+        "--env-file",
+        "/Users/evklidus/Desktop/Dev/my projects/fri/.env",
         "up",
         "--build"
       ],
