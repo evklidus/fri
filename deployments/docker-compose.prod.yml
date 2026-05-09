@@ -90,16 +90,15 @@ services:
     image: caddy:2-alpine
     container_name: fri-caddy
     restart: unless-stopped
+    # Cloudflare proxies HTTPS at the edge and talks HTTP to the origin,
+    # so we only need port 80 here. No 443, no Let's Encrypt cert.
     ports:
-      - "80:80"     # HTTP — needed for Let's Encrypt challenge + redirect to HTTPS
-      - "443:443"   # HTTPS
-      - "443:443/udp"  # HTTP/3 (QUIC)
+      - "80:80"
     environment:
       PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME is required}
-      ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy-data:/data           # Let's Encrypt certs (persisted across restarts)
+      - caddy-data:/data
       - caddy-config:/config
     depends_on:
       - app

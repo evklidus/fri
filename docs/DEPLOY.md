@@ -1,86 +1,76 @@
 # Production Deploy Guide
 
-End-to-end: from a fresh Timeweb VPS to a live `https://fri.your-domain.com`.
+End-to-end: from a fresh Timeweb VPS to a live `https://footballreputation.ru`.
+
+Topology:
+
+```
+Visitor (IPv4) ──HTTPS──► Cloudflare ──HTTP──► Caddy ──► Go app
+                          (Free plan)         (port 80)  (port 8080)
+```
+
+Cloudflare handles HTTPS, DDoS, and the IPv4↔IPv6 bridge for free. Origin is HTTP-only (CF SSL mode = "Flexible").
 
 ---
 
 ## Prerequisites
 
-- Timeweb VPS ordered with Ubuntu 24.04 + your SSH key uploaded
-- The VPS IP address (from Timeweb dashboard once it boots)
-- Your local SSH key (`~/.ssh/id_ed25519`) — same one you uploaded to Timeweb
-- Production keys for the three external APIs (already in your local `.env`):
+- Timeweb VPS provisioned with Ubuntu 24.04 + your SSH key
+- The VPS IPv6 (visible in Timeweb dashboard, e.g. `2a03:6f00:a::1:9d5e`)
+- Domain registered (e.g. `footballreputation.ru` at reg.ru)
+- Cloudflare account with the domain added, NS switched to CF, AAAA + CNAME records added with **Proxied (orange cloud)** status, SSL/TLS mode = **Flexible**
+- Production keys for the three external APIs (in your local `.env`):
   - `API_FOOTBALL_KEY`
   - `YOUTUBE_API_KEY`
   - `MEDIASTACK_API_KEY`
-- Your repo pushed to GitHub (private is fine — see step 3 if it is)
-
-Domain is **optional for the first deploy**. You can launch on `http://<IP>` and add a domain later.
+- Repo pushed to GitHub
 
 ---
 
-## Step 1 — Push the repo to GitHub
+## Step 1 — Push the latest code
 
 ```bash
-# from the project root, locally:
-git status                                # confirm everything is clean
+# locally:
+git status                                # clean?
 git push origin main
 ```
 
-Note the URL — e.g. `https://github.com/yourname/fri.git`. Make it private if you don't want the code public.
-
 ---
 
-## Step 2 — First SSH login
+## Step 2 — Get into the server
+
+If your local network supports IPv6:
 
 ```bash
-ssh root@<IP>
+ssh root@2a03:6f00:a::1:9d5e
 ```
 
-The first time it'll ask to trust the server fingerprint — type `yes`. After that you're in.
+If you get `No route to host` — your ISP doesn't do IPv6 (typical for RU residential). Two workarounds:
 
-If you get `Permission denied (publickey)` — the SSH key wasn't uploaded correctly. Re-add it via Timeweb panel → Servers → your server → SSH keys.
+1. **Timeweb web console** (easiest): panel → your server → **«Консоль»** button. Login: `root`, password: from server creation email.
+2. **Mobile hotspot** with an operator that has IPv6 (MTS, Megafon usually do).
+
+The web console works equally well — every command below runs the same.
 
 ---
 
 ## Step 3 — Run the deploy script
 
-Easiest: pull the script straight from your repo. **If your repo is private**, skip ahead to "Private repo" below.
-
-### Public repo
+If your repo is **public**:
 
 ```bash
-# inside the SSH session on the server:
 curl -fsSL https://raw.githubusercontent.com/<you>/fri/main/deployments/deploy.sh -o deploy.sh
 bash deploy.sh
 ```
 
-The script will:
-1. Disable SSH password auth (defense in depth — Timeweb already disabled it)
-2. Set up UFW firewall (only 22, 80, 443 open)
-3. Install Docker
-4. Clone your repo to `/opt/fri`
-5. Create `deployments/.env` from the template
-6. Generate a strong `POSTGRES_PASSWORD` automatically
-
-It'll **stop and ask you to fill in the rest of `.env`**.
-
-### Private repo
-
-You need to give the server read access first. Easiest path: a **deploy key**.
+If **private** — set up a deploy key first:
 
 ```bash
 # on the server:
 ssh-keygen -t ed25519 -f /root/.ssh/github_deploy -N "" -C "fri-vps-deploy"
 cat /root/.ssh/github_deploy.pub
-```
+# copy that line, paste into GitHub → repo → Settings → Deploy keys → Add (read-only)
 
-Copy that public key. On GitHub: your repo → Settings → Deploy keys → Add deploy key, paste it, name it "FRI VPS", **read-only**.
-
-Then add the SSH alias and clone via SSH:
-
-```bash
-# on the server, add to ~/.ssh/config:
 cat >> /root/.ssh/config <<'EOF'
 Host github-fri
   HostName github.com
@@ -90,35 +80,35 @@ Host github-fri
 EOF
 chmod 600 /root/.ssh/config
 
-# Test it:
-ssh -T git@github-fri    # should say "Hi yourname/fri!"
-```
+ssh -T git@github-fri    # should say "Hi <you>/fri!"
 
-Now download and run deploy.sh — it'll prompt for the repo URL:
-
-```bash
 git clone github-fri:<you>/fri.git /tmp/fri-init
 bash /tmp/fri-init/deployments/deploy.sh
-# When it asks for "Git repo URL", give: github-fri:<you>/fri.git
+# When asked for repo URL: github-fri:<you>/fri.git
 ```
+
+The script:
+1. Hardens SSH server-side (PasswordAuthentication off in sshd_config)
+2. Sets up UFW firewall (allow 22, 80; everything else denied)
+3. Installs Docker + Compose plugin
+4. Clones the repo to `/opt/fri`
+5. Generates a strong `POSTGRES_PASSWORD` automatically
+6. **Stops and asks you to fill in the rest of `.env`**
 
 ---
 
 ## Step 4 — Fill in `.env`
 
-The script stops and tells you to edit `/opt/fri/deployments/.env`. Run:
-
 ```bash
 nano /opt/fri/deployments/.env
 ```
 
-Fill in:
+Paste in:
 
 ```bash
-PUBLIC_HOSTNAME=fri.your-domain.com    # or just <IP> for IP-only deploy
-ACME_EMAIL=you@gmail.com               # for Let's Encrypt warnings
-POSTGRES_PASSWORD=<auto-generated>      # script already filled this
-API_FOOTBALL_KEY=...                    # paste from local .env
+PUBLIC_HOSTNAME=footballreputation.ru
+POSTGRES_PASSWORD=<auto-generated, leave as is>
+API_FOOTBALL_KEY=...      # copy from your local .env
 YOUTUBE_API_KEY=...
 MEDIASTACK_API_KEY=...
 ```
@@ -134,45 +124,32 @@ cd /opt/fri/deployments
 bash deploy.sh
 ```
 
-This time it'll find a complete `.env`, build the images, and start everything. Takes 2-5 minutes for the first build.
+This time it finds a complete `.env`, builds the images, and starts everything (Postgres, Go app, Caddy). First build takes ~3 minutes.
 
 When done you'll see:
 ```
 ✓ Deploy complete.
-Public URL: https://fri.your-domain.com
+Public URL: https://footballreputation.ru
 ```
 
 ---
 
-## Step 6 — Point your domain at the server (if you have one)
-
-In your DNS provider (Cloudflare, reg.ru, etc.):
-
-| Type | Name | Value |
-|---|---|---|
-| A | fri (or @) | `<your-server-IP>` |
-
-DNS propagation: 5 min — 1 hour. Verify:
+## Step 6 — First sync + smoke check
 
 ```bash
-# from your laptop:
-dig +short fri.your-domain.com
+# Wait ~10s for Caddy and the app to register with each other:
+sleep 10
+
+# Hit the API directly on the server (bypassing Cloudflare):
+curl -s http://localhost/api/players | head -c 200
+
+# Trigger initial data sync:
+curl -X POST http://localhost/api/sync/all
 ```
 
-When it returns your server IP, Caddy will auto-issue a Let's Encrypt cert within ~30 seconds of the first HTTPS request.
+You should see real player data. If yes — everything's wired up.
 
----
-
-## Step 7 — Trigger first sync
-
-The scheduler runs automatically (every 6h media, 24h social/perf, 12h character), but for the demo you want fresh data right now:
-
-```bash
-# on the server:
-curl -X POST http://localhost:8080/api/sync/all
-```
-
-Or open `https://fri.your-domain.com` and use the dev-button at the footer.
+Now open `https://footballreputation.ru` in a browser. Cloudflare should serve it over HTTPS with a green padlock.
 
 ---
 
@@ -192,7 +169,6 @@ cd deployments
 docker compose -f docker-compose.prod.yml --env-file .env build app
 docker compose -f docker-compose.prod.yml --env-file .env up -d app
 ```
-Caddy and Postgres don't restart unless their config changed.
 
 ### Database backup (manual)
 ```bash
@@ -207,44 +183,63 @@ zcat /root/fri-2026-05-09.sql.gz | \
   psql -U fri -d fri
 ```
 
-### Server health
+### Health check
 ```bash
 docker compose -f /opt/fri/deployments/docker-compose.prod.yml ps
-free -h          # RAM usage
-df -h /          # disk usage
+free -h          # RAM
+df -h /          # disk
 ```
 
 ---
 
 ## Troubleshooting
 
-### `ssh: connect to host ... port 22: Connection refused`
-Server hasn't finished booting. Wait 60s and retry.
+### `ssh: connect to host ... port 22: No route to host`
+Your network doesn't have IPv6. Use Timeweb web console instead.
 
-### Caddy: "no certificate found"
-DNS hasn't propagated yet. Wait, then `docker compose restart caddy`.
+### `502 Bad Gateway` from Cloudflare
+Caddy or the Go app is down on origin. Check `docker compose logs app caddy`.
 
-### `502 Bad Gateway` from Caddy
-The Go app crashed or didn't start. Check `docker compose logs app`.
+### Cloudflare shows "Error 522: connection timed out"
+- UFW firewall not allowing 80? Check: `ufw status`
+- Caddy not running? Check: `docker compose ps caddy`
 
-### `pq: SSL is not enabled on the server` from app
-Postgres restarted without the password. Recreate: `docker compose down && docker compose up -d`.
+### Cloudflare shows "Too many redirects"
+SSL/TLS mode is wrong. In Cloudflare dashboard → SSL/TLS → Overview → set to **Flexible** (NOT Full or Strict).
+
+### `pq: SSL is not enabled on the server` in app logs
+Postgres started without the password. Recreate: `docker compose down && docker compose up -d`.
 
 ### Out of memory
-Postgres + app + Caddy fits in 2GB but only with the `shared_buffers=256MB` cap in the compose. If you swapped to a bigger box, you can raise it.
+Postgres + app + Caddy fits in 2GB only with `shared_buffers=256MB` (already set in compose). If swap kicks in heavily, scale up to a 4GB tier.
 
 ### Forgot the postgres password
 ```bash
 grep POSTGRES_PASSWORD /opt/fri/deployments/.env
 ```
 
+### Real client IPs all show as Cloudflare's
+Caddy is reading `CF-Connecting-IP` and forwarding it — but verify with:
+```bash
+docker compose logs app --tail=50 | grep -i 'X-Real-IP'
+```
+If they look like `162.158.x.x` (CF range), the header forwarding broke — re-check Caddyfile.
+
 ---
 
 ## Security notes
 
-- SSH password disabled at both Timeweb level AND server level (`/etc/ssh/sshd_config`)
-- UFW firewall: only 22/80/443 reachable from outside
-- Postgres NOT exposed to internet (only on docker network)
-- Go app NOT exposed directly (only via Caddy)
-- HSTS header tells browsers to always use HTTPS
+- SSH password disabled at both Timeweb level AND server-side `/etc/ssh/sshd_config`
+- UFW firewall: only 22 + 80 reachable from outside
+- Postgres NOT exposed to internet (docker network only)
+- Go app NOT exposed to internet (only Caddy proxies)
+- Cloudflare: free DDoS protection, free WAF rules
 - IP-hashed votes (no raw IPs in DB) — already in code
+
+## Future hardening (out of scope for demo)
+
+- Switch CF SSL/TLS mode to "Full (Strict)" + install Cloudflare Origin Certificate in Caddy
+- Enable Cloudflare WAF managed rules
+- Set up off-server DB backups (rclone → S3-compatible)
+- Add structured logs + metrics endpoint
+- Migrate to a domain with DNSSEC enabled at the registrar

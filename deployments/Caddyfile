@@ -1,46 +1,54 @@
-# Caddy reverse-proxy config. Two paths depending on what you set as
-# PUBLIC_HOSTNAME in the .env:
+# Caddy reverse-proxy config for the FRI demo deployment.
 #
-#   1. A real domain (e.g. fri.example.com):
-#      Caddy auto-fetches a Let's Encrypt cert via ACME and serves HTTPS.
-#      ACME_EMAIL is used for renewal notifications. Plain HTTP redirects
-#      to HTTPS automatically.
+# Topology:
 #
-#   2. A bare IP address (e.g. 89.111.222.33):
-#      ACME challenge can't issue a cert for IP, so we serve HTTP only on
-#      port 80. Use this for the very first deploy before the domain points
-#      at the server. Switch to a real domain after DNS propagates.
+#   Visitor (IPv4) ──HTTPS──► Cloudflare ──HTTP──► Caddy ──► Go app
+#                              │ Universal SSL    │ this   :8080
+#                              │ DDoS shield      │ file
+#                              └ IPv4↔IPv6 bridge
+#
+# Cloudflare terminates TLS at the edge with their free Universal SSL cert,
+# so Caddy here only listens on plain HTTP :80. The CF Free plan also
+# bridges IPv4 visitors to our IPv6-only origin — the whole reason CF is
+# in this stack.
+#
+# Why HTTP at the origin (not HTTPS):
+#   - CF SSL/TLS mode "Flexible" → CF talks HTTP to origin.
+#   - No ACME challenge to manage, no cert renewal, no port 443.
+#   - Trade-off: traffic between CF and origin is not encrypted. For this
+#     demo the threat model is acceptable. Upgrade path: switch CF to
+#     "Full (Strict)" + install a CF Origin Certificate later.
 
-{$PUBLIC_HOSTNAME} {
-	# Email for Let's Encrypt cert renewal warnings. Empty = anonymous.
-	tls {$ACME_EMAIL}
-
-	# Reverse-proxy everything to the Go app over the docker network.
-	# `app` resolves via docker DNS, port 8080 is the internal expose.
+# Listen on port 80 only. Hostname is bound to PUBLIC_HOSTNAME from .env so
+# the same config works for any domain. The `http://` prefix tells Caddy
+# to NOT auto-issue a Let's Encrypt cert (default behaviour for bare names).
+http://{$PUBLIC_HOSTNAME}, http://www.{$PUBLIC_HOSTNAME} {
+	# Reverse-proxy to the Go app. `app` resolves via docker DNS.
 	reverse_proxy app:8080 {
-		# Pass real client IP for our IP-hash voting rate-limiter.
-		header_up X-Real-IP {remote_host}
-		header_up X-Forwarded-For {remote_host}
+		# CF passes the real visitor IP in `CF-Connecting-IP`. Forward it
+		# as X-Real-IP / X-Forwarded-For so the Go app's voting rate-
+		# limiter (which already reads those headers via gin) sees unique
+		# visitor IPs instead of CF's edge PoP IP.
+		header_up X-Real-IP {http.request.header.CF-Connecting-IP}
+		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
 	}
 
-	# Standard security headers — cheap defaults.
+	# Cheap security headers. Nothing breaks the demo.
 	header {
-		# HSTS: tell browsers to always use HTTPS for the next year.
-		Strict-Transport-Security "max-age=31536000; includeSubDomains"
-		# Prevent the page from being framed (clickjacking defense).
-		X-Frame-Options "DENY"
-		# Tell browsers not to MIME-sniff away from declared content type.
+		# Don't allow MIME sniffing.
 		X-Content-Type-Options "nosniff"
-		# Don't leak referrer to third-party news article links.
+		# Block clickjacking via iframe.
+		X-Frame-Options "DENY"
+		# Don't leak referer when users click out to news article links.
 		Referrer-Policy "strict-origin-when-cross-origin"
-		# Remove the default `Server: Caddy` banner.
+		# Hide default `Server: Caddy` banner.
 		-Server
 	}
 
-	# Compress text responses on the fly.
+	# Compress text responses. CF will cache the gzipped copy.
 	encode zstd gzip
 
-	# Access log — small, rotated by Caddy automatically.
+	# Access log to stdout — captured by docker logs.
 	log {
 		output stdout
 		format console

@@ -43,14 +43,14 @@ if ! command -v ufw >/dev/null; then
   apt-get update -qq
   apt-get install -y -qq ufw
 fi
-log "Configuring firewall (allow 22, 80, 443; deny everything else)..."
+log "Configuring firewall (allow 22, 80; deny everything else)..."
 ufw --force reset >/dev/null
 ufw default deny incoming
 ufw default allow outgoing
 ufw allow 22/tcp comment 'SSH'
-ufw allow 80/tcp comment 'HTTP (Lets Encrypt + redirect)'
-ufw allow 443/tcp comment 'HTTPS'
-ufw allow 443/udp comment 'HTTP/3'
+# Port 80 only — Cloudflare terminates HTTPS at the edge and talks HTTP
+# to the origin, so we don't need 443 open here.
+ufw allow 80/tcp comment 'HTTP (behind Cloudflare proxy)'
 ufw --force enable
 ufw status verbose
 
@@ -93,8 +93,7 @@ cd "$REPO_DIR/deployments"
 if [[ ! -f .env ]]; then
   cp .env.prod.example .env
   warn ".env created from template. You MUST fill in the secrets:"
-  warn "  - PUBLIC_HOSTNAME (your domain or IP)"
-  warn "  - ACME_EMAIL (for Let's Encrypt)"
+  warn "  - PUBLIC_HOSTNAME (your domain, e.g. footballreputation.ru)"
   warn "  - POSTGRES_PASSWORD (auto-generated below if you accept)"
   warn "  - API_FOOTBALL_KEY / YOUTUBE_API_KEY / MEDIASTACK_API_KEY"
   echo
