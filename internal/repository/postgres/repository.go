@@ -577,6 +577,18 @@ func (r *Repository) UpsertExternalIDs(ctx context.Context, ids domain.PlayerExt
 //
 // Returns one PlayerSyncDelta per player whose Character actually moved —
 // players where every event was a duplicate are silently skipped.
+// ApplyCharacterSync inserts new rating events (idempotently — see uniqueness
+// indexes on character_events) and applies per-player aggregated deltas to
+// the target component column on fri_scores. Despite the legacy name, the
+// function routes deltas to either `character` or `performance` based on
+// each candidate's TargetComponent (defaults to "character").
+//
+// Capping is applied per (player, target_component) — so a player getting
+// hit on both Character and Performance in the same sync can move up to
+// perPlayerCap on each, not in aggregate.
+//
+// Returns one PlayerSyncDelta per (player, component) pair that actually
+// moved; players whose events were all duplicates are silently skipped.
 func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error) {
 	if len(candidates) == 0 {
 		return nil, nil
@@ -588,48 +600,80 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 	}
 	defer tx.Rollback(ctx)
 
-	// Group fired (newly-inserted) candidates by player so we can apply one
-	// capped delta per player.
-	perPlayerDelta := make(map[int64]float64)
+	// (playerID, component) -> summed delta from newly-inserted candidates.
+	type bucketKey struct {
+		playerID  int64
+		component string
+	}
+	buckets := make(map[bucketKey]float64)
 
 	for _, c := range candidates {
-		// Idempotent insert; ON CONFLICT skips duplicates already on file.
-		var inserted int
-		if err := tx.QueryRow(ctx, `
-			INSERT INTO character_events (player_id, news_item_id, trigger_word, delta, status)
-			VALUES ($1, $2, $3, $4, 'auto')
-			ON CONFLICT (player_id, news_item_id, trigger_word) WHERE news_item_id IS NOT NULL
-			DO NOTHING
-			RETURNING 1
-		`, c.PlayerID, c.NewsItemID, c.TriggerWord, c.Delta).Scan(&inserted); err != nil {
-			if !errors.Is(err, pgx.ErrNoRows) {
+		component := normalizeTargetComponent(c.TargetComponent)
+		newsRef := nullableInt64(c.NewsItemID)
+		sourceRef := nullableString(c.SourceRef)
+
+		// Idempotent insert. We don't rely on the unique index alone (it only
+		// covers news-derived rows); a SELECT pre-check catches dups for
+		// source_ref-keyed rows on engines that don't support partial unique
+		// well, while ON CONFLICT keeps the news-derived path fast.
+		var existing int
+		if c.NewsItemID > 0 {
+			err := tx.QueryRow(ctx, `
+				SELECT 1 FROM character_events
+				WHERE player_id = $1 AND news_item_id = $2 AND trigger_word = $3
+				LIMIT 1
+			`, c.PlayerID, c.NewsItemID, c.TriggerWord).Scan(&existing)
+			if err == nil {
+				continue // already counted in a previous sync
+			} else if !errors.Is(err, pgx.ErrNoRows) {
 				return nil, err
 			}
-			continue // duplicate — already counted in a previous sync
+		} else if c.SourceRef != "" {
+			err := tx.QueryRow(ctx, `
+				SELECT 1 FROM character_events
+				WHERE player_id = $1 AND trigger_word = $2 AND source_ref = $3
+				LIMIT 1
+			`, c.PlayerID, c.TriggerWord, c.SourceRef).Scan(&existing)
+			if err == nil {
+				continue
+			} else if !errors.Is(err, pgx.ErrNoRows) {
+				return nil, err
+			}
 		}
-		perPlayerDelta[c.PlayerID] += c.Delta
+
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO character_events
+				(player_id, news_item_id, trigger_word, delta, status, target_component, source_ref)
+			VALUES ($1, $2, $3, $4, 'auto', $5, $6)
+		`, c.PlayerID, newsRef, c.TriggerWord, c.Delta, component, sourceRef); err != nil {
+			return nil, err
+		}
+		buckets[bucketKey{c.PlayerID, component}] += c.Delta
 	}
 
-	if len(perPlayerDelta) == 0 {
-		// All events were dedupes; nothing to do but still commit (no inserts).
+	if len(buckets) == 0 {
+		// Everything was a duplicate; nothing changed.
 		return nil, tx.Commit(ctx)
 	}
 
-	// Preload player names so the resulting deltas carry a human-readable
-	// label without an extra round-trip per player.
-	names := make(map[int64]string, len(perPlayerDelta))
-	for playerID := range perPlayerDelta {
+	// Preload player names once per unique playerID for the response payload.
+	uniquePlayers := make(map[int64]struct{})
+	for key := range buckets {
+		uniquePlayers[key.playerID] = struct{}{}
+	}
+	names := make(map[int64]string, len(uniquePlayers))
+	for playerID := range uniquePlayers {
 		var name string
 		if err := tx.QueryRow(ctx, `SELECT name FROM players WHERE id = $1`, playerID).Scan(&name); err == nil {
 			names[playerID] = name
 		}
 	}
 
-	deltas := make([]domain.PlayerSyncDelta, 0, len(perPlayerDelta))
+	deltas := make([]domain.PlayerSyncDelta, 0, len(buckets))
 	now := time.Now().UTC()
-	for playerID, delta := range perPlayerDelta {
-		// Cap aggregated delta so one sync can't move Character by more than
-		// `perPlayerCap` points either direction.
+	for key, delta := range buckets {
+		// Cap per (player, component) bucket so a single sync can't move
+		// one score by more than perPlayerCap in either direction.
 		applied := delta
 		if applied > perPlayerCap {
 			applied = perPlayerCap
@@ -638,34 +682,46 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 			applied = -perPlayerCap
 		}
 
-		current, err := lockScore(ctx, tx, playerID)
+		current, err := lockScore(ctx, tx, key.playerID)
 		if err != nil {
 			return nil, err
 		}
 		oldFRI := current.FRI
-		oldChar := current.Character
-		newChar := round1(oldChar + applied)
-		if newChar < 0 {
-			newChar = 0
-		}
-		if newChar > 100 {
-			newChar = 100
-		}
 
-		current.Character = newChar
-		current.CharacterUpdatedAt = now
+		var oldValue, newValue float64
+		switch key.component {
+		case "performance":
+			oldValue = current.Performance
+			newValue = clamp0to100(round1(oldValue + applied))
+			current.Performance = newValue
+			current.PerformanceUpdatedAt = now
+		default: // "character"
+			oldValue = current.Character
+			newValue = clamp0to100(round1(oldValue + applied))
+			current.Character = newValue
+			current.CharacterUpdatedAt = now
+		}
 		applyFriFormula(current)
 
+		// Single UPDATE that always writes performance + character + their
+		// timestamps. Cheap and avoids branching the SQL on component.
 		if _, err := tx.Exec(ctx, `
 			UPDATE fri_scores
-			SET character = $2,
-			    fri = $3,
-			    trend_value = $4,
-			    trend_direction = $5,
-			    calculated_at = $6,
-			    character_updated_at = $7
+			SET performance = $2,
+			    character = $3,
+			    fri = $4,
+			    trend_value = $5,
+			    trend_direction = $6,
+			    calculated_at = $7,
+			    performance_updated_at = $8,
+			    character_updated_at = $9
 			WHERE player_id = $1
-		`, playerID, current.Character, current.FRI, current.TrendValue, current.TrendDirection, current.CalculatedAt, current.CharacterUpdatedAt); err != nil {
+		`,
+			key.playerID,
+			current.Performance, current.Character,
+			current.FRI, current.TrendValue, current.TrendDirection, current.CalculatedAt,
+			current.PerformanceUpdatedAt, current.CharacterUpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 
@@ -673,17 +729,17 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 			if _, err := tx.Exec(ctx, `
 				INSERT INTO fri_history (player_id, fri, delta, calculated_at)
 				VALUES ($1,$2,$3,$4)
-			`, playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
+			`, key.playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
 				return nil, err
 			}
 		}
 
 		deltas = append(deltas, domain.PlayerSyncDelta{
-			PlayerID:    playerID,
-			PlayerName:  names[playerID],
-			Component:   "character",
-			OldValue:    oldChar,
-			NewValue:    newChar,
+			PlayerID:    key.playerID,
+			PlayerName:  names[key.playerID],
+			Component:   key.component,
+			OldValue:    oldValue,
+			NewValue:    newValue,
 			OldFRI:      oldFRI,
 			NewFRI:      current.FRI,
 			ImpactDelta: round1(current.FRI - oldFRI),
@@ -694,6 +750,44 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 		return nil, err
 	}
 	return deltas, nil
+}
+
+// normalizeTargetComponent maps empty/legacy values to the default and
+// rejects unknown components.
+func normalizeTargetComponent(target string) string {
+	switch strings.TrimSpace(strings.ToLower(target)) {
+	case "performance":
+		return "performance"
+	default:
+		return "character"
+	}
+}
+
+// nullableInt64 turns a zero-valued ID into NULL so the partial index on
+// (player_id, news_item_id, trigger_word) WHERE news_item_id IS NOT NULL
+// only sees rows that actually have a news linkage.
+func nullableInt64(v int64) any {
+	if v == 0 {
+		return nil
+	}
+	return v
+}
+
+func nullableString(v string) any {
+	if strings.TrimSpace(v) == "" {
+		return nil
+	}
+	return v
+}
+
+func clamp0to100(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 100 {
+		return 100
+	}
+	return v
 }
 
 // HasRecentVote returns true when a vote exists for (playerID, ipHash) with
@@ -716,6 +810,64 @@ func (r *Repository) DeleteExternalIDs(ctx context.Context, playerID int64, prov
 		DELETE FROM player_external_ids
 		WHERE player_id = $1 AND provider = $2
 	`, playerID, provider)
+	return err
+}
+
+// GetCareerBaseline returns the persisted baseline row for a player, or
+// (nil, nil) when none has been computed yet. The performance sync uses this
+// to blend long-term career data with the current season — see
+// blendBaselineIntoPerformance in phase2_sync.go.
+func (r *Repository) GetCareerBaseline(ctx context.Context, playerID int64) (*domain.PlayerCareerBaseline, error) {
+	var b domain.PlayerCareerBaseline
+	err := r.pool.QueryRow(ctx, `
+		SELECT player_id, seasons_played, seasons_lookback,
+		       career_appearances, career_minutes, career_goals, career_assists,
+		       career_avg_rating, career_trophies_count,
+		       baseline_score, computed_at
+		FROM player_career_baseline
+		WHERE player_id = $1
+	`, playerID).Scan(
+		&b.PlayerID,
+		&b.SeasonsPlayed, &b.SeasonsLookback,
+		&b.CareerAppearances, &b.CareerMinutes, &b.CareerGoals, &b.CareerAssists,
+		&b.CareerAvgRating, &b.CareerTrophiesCount,
+		&b.BaselineScore, &b.ComputedAt,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &b, nil
+}
+
+// UpsertCareerBaseline writes (or refreshes) a player's career snapshot.
+// computed_at is always set to "now" server-side so concurrent writers
+// can't fight over the timestamp.
+func (r *Repository) UpsertCareerBaseline(ctx context.Context, b domain.PlayerCareerBaseline) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO player_career_baseline (
+			player_id, seasons_played, seasons_lookback,
+			career_appearances, career_minutes, career_goals, career_assists,
+			career_avg_rating, career_trophies_count, baseline_score, computed_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10, now())
+		ON CONFLICT (player_id) DO UPDATE SET
+			seasons_played = EXCLUDED.seasons_played,
+			seasons_lookback = EXCLUDED.seasons_lookback,
+			career_appearances = EXCLUDED.career_appearances,
+			career_minutes = EXCLUDED.career_minutes,
+			career_goals = EXCLUDED.career_goals,
+			career_assists = EXCLUDED.career_assists,
+			career_avg_rating = EXCLUDED.career_avg_rating,
+			career_trophies_count = EXCLUDED.career_trophies_count,
+			baseline_score = EXCLUDED.baseline_score,
+			computed_at = now()
+	`,
+		b.PlayerID, b.SeasonsPlayed, b.SeasonsLookback,
+		b.CareerAppearances, b.CareerMinutes, b.CareerGoals, b.CareerAssists,
+		b.CareerAvgRating, b.CareerTrophiesCount, b.BaselineScore,
+	)
 	return err
 }
 

@@ -189,7 +189,12 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 	rankPos, rankTotal := p.topNRankFor(ctx, info.LeagueID, info.Season, positionGroup(player.Position), externalPlayerID)
 	form, _ := p.formFor(ctx, externalPlayerID, currentTeamID)
 
-	return buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form), nil
+	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	// Phase 4.3 MVP: stats-derived performance events. Right now this only
+	// catches goal droughts for attacking positions — full per-fixture
+	// hat-trick / brace detection lands once we expose per-fixture data.
+	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
+	return snapshot, nil
 }
 
 func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, player domain.PlayerSyncTarget) (domain.PerformanceSnapshot, error) {
@@ -245,7 +250,9 @@ func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, 
 	rankPos, rankTotal := p.topNRankFor(ctx, info.LeagueID, info.Season, positionGroup(player.Position), apiPlayer.Player.ID)
 	form, _ := p.formFor(ctx, apiPlayer.Player.ID, team.ID)
 
-	return buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form), nil
+	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
+	return snapshot, nil
 }
 
 func (p *apiFootballPerformanceProvider) fetchPlayerByID(ctx context.Context, externalPlayerID, season int) (apiFootballPlayerEntry, error) {
@@ -994,6 +1001,53 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballSt
 	}
 }
 
+// detectPerformanceEvents emits stats-derived rating events from a form
+// snapshot. Phase 4.3 MVP: only goal droughts (the cheap signal we already
+// have aggregated). Hat-trick / brace detection needs per-fixture goal counts
+// — that lands in Phase 4.3 full, alongside a dedicated per-fixture pull.
+//
+// Idempotency strategy: source_ref bakes in season + ISO week so the same
+// drought across re-runs of the same week is one event. When the player
+// finally scores or the week rolls over, the source_ref changes and a fresh
+// detection can fire.
+func detectPerformanceEvents(player domain.PlayerSyncTarget, form formSnapshot, season int) []domain.CharacterEventCandidate {
+	// Only attacking positions get drought-flagged. A 5-match scoreless run
+	// from a centre-back isn't a story.
+	if !isAttackingPosition(player.Position) {
+		return nil
+	}
+	// Need a full 5-game window with zero goals AND zero assists. A
+	// dry-on-goals creator who's still racking up assists isn't in a drought.
+	if form.Games < formMatches || form.Goals != 0 || form.Assists != 0 {
+		return nil
+	}
+
+	now := time.Now().UTC()
+	isoYear, isoWeek := now.ISOWeek()
+	sourceRef := fmt.Sprintf("drought:%d:%d-W%02d", season, isoYear, isoWeek)
+
+	return []domain.CharacterEventCandidate{
+		{
+			PlayerID:        player.ID,
+			TriggerWord:     "goal_drought_5_stats",
+			Delta:           -1.0, // half the keyword-detected drought_5 — stats is precise, fires reliably
+			TargetComponent: "performance",
+			SourceRef:       sourceRef,
+		},
+	}
+}
+
+// isAttackingPosition returns true for the player positions where a 5-match
+// goalless run is newsworthy. Defenders and goalkeepers aren't expected to
+// score, so we don't flag droughts for them.
+func isAttackingPosition(position string) bool {
+	switch strings.ToUpper(strings.TrimSpace(position)) {
+	case "FWD", "FW", "ST", "CF", "LW", "RW", "ATT", "MID", "AM", "CAM":
+		return true
+	}
+	return false
+}
+
 // buildFormScore turns the last-N aggregate into a 0..100 normalized form
 // indicator. When we have no usable form data (start of season, lower-tier
 // leagues without ratings), fall back to a neutral 50.
@@ -1363,4 +1417,184 @@ type apiFootballFixturePlayerEntry struct {
 func hasAPIFootballErrors(raw json.RawMessage) bool {
 	trimmed := strings.TrimSpace(string(raw))
 	return trimmed != "" && trimmed != "[]" && trimmed != "{}" && trimmed != "null"
+}
+
+// ────────────────────────────────────────────────────────────────────────
+//  Phase 4.2 — career baseline via api-football historical data
+// ────────────────────────────────────────────────────────────────────────
+
+// FetchCareerBaseline aggregates a player's stats over the last `lookback`
+// completed seasons. The provider reuses the parent provider's external-ID
+// mapping (so we don't pay a /players?search= call per season), HTTP client,
+// and API key.
+//
+// Returns a zero-value baseline (SeasonsPlayed=0) on "no data found" — the
+// caller treats that as "skip this player" rather than an error, since a new
+// player legitimately has no career data on file.
+func (p *apiFootballPerformanceProvider) FetchCareerBaseline(ctx context.Context, player domain.PlayerSyncTarget, lookback int) (domain.PlayerCareerBaseline, error) {
+	if lookback <= 0 {
+		lookback = careerBaselineDefaultLookback
+	}
+
+	// We need the api-football player ID to query historical seasons. Without
+	// a mapping we'd have to do a text-search per season (5x cost), so we
+	// just skip players whose mapping isn't built yet — the live performance
+	// sync will populate it on its next run.
+	if p.store == nil {
+		return domain.PlayerCareerBaseline{}, fmt.Errorf("career-baseline: no external-id store configured")
+	}
+	ids, err := p.store.GetExternalIDs(ctx, player.ID, apiFootballProviderName)
+	if err != nil {
+		return domain.PlayerCareerBaseline{}, fmt.Errorf("career-baseline: external-id lookup: %w", err)
+	}
+	if ids == nil || strings.TrimSpace(ids.ExternalID) == "" {
+		return domain.PlayerCareerBaseline{}, nil // not mapped yet
+	}
+	externalID, parseErr := strconv.Atoi(strings.TrimSpace(ids.ExternalID))
+	if parseErr != nil {
+		return domain.PlayerCareerBaseline{}, fmt.Errorf("career-baseline: bad external_id %q: %w", ids.ExternalID, parseErr)
+	}
+
+	// Skip the current season — that's already the live performance signal.
+	// We want PAST seasons only to anchor a long-term baseline.
+	currentSeason := defaultCurrentSeason()
+	startSeason := currentSeason - 1
+	endSeason := currentSeason - lookback // inclusive
+
+	agg := domain.PlayerCareerBaseline{
+		SeasonsLookback: lookback,
+	}
+
+	// Minute-weighted rating aggregation: sum(rating × minutes_in_season)
+	// then divide by total_minutes at the end. Avoids the bias from short
+	// seasons (10-game cameo with 9.0 rating shouldn't outweigh a full
+	// 38-match season at 7.5).
+	weightedRatingSum := 0.0
+	totalMinutes := 0
+
+	for season := startSeason; season >= endSeason; season-- {
+		params := url.Values{
+			"id":     []string{strconv.Itoa(externalID)},
+			"season": []string{strconv.Itoa(season)},
+		}
+		var resp apiFootballPlayersResponse
+		if err := p.get(ctx, "/players", params, &resp); err != nil {
+			// One bad season shouldn't kill the whole baseline — log and continue.
+			log.Printf("career-baseline: season %d fetch failed for player %d: %v", season, player.ID, err)
+			continue
+		}
+		if hasAPIFootballErrors(resp.Errors) || len(resp.Response) == 0 {
+			continue
+		}
+
+		// A player can have multiple statistics rows per season (loan + parent
+		// club, transfer mid-season, national team). We want the SUM of club
+		// stats — exclude national-team entries to avoid double-counting
+		// minutes (a player who played all club + every international has
+		// crazy inflated totals otherwise).
+		seasonMinutes := 0
+		seasonAppearances := 0
+		seasonGoals := 0
+		seasonAssists := 0
+		seasonWeightedRating := 0.0
+		seasonRatingDenominator := 0
+
+		for _, stat := range resp.Response[0].Statistics {
+			if stat.Team.National {
+				continue
+			}
+			if stat.Games.Minutes <= 0 {
+				continue
+			}
+			seasonMinutes += stat.Games.Minutes
+			seasonAppearances += stat.Games.Appearances
+			seasonGoals += stat.Goals.Total
+			seasonAssists += stat.Goals.Assists
+
+			if rating := parseAPIFootballRating(stat.Games.Rating); rating > 0 {
+				seasonWeightedRating += rating * float64(stat.Games.Minutes)
+				seasonRatingDenominator += stat.Games.Minutes
+			}
+		}
+
+		if seasonMinutes == 0 {
+			continue // player didn't play at the club level this season
+		}
+
+		agg.SeasonsPlayed++
+		agg.CareerAppearances += seasonAppearances
+		agg.CareerMinutes += seasonMinutes
+		agg.CareerGoals += seasonGoals
+		agg.CareerAssists += seasonAssists
+
+		// Roll the season into the running weighted-rating sum. We only use
+		// minutes that actually had a rating attached (some lower-tier
+		// fixtures don't have one); falling back to all minutes would
+		// underweight ratings for full-rated seasons.
+		if seasonRatingDenominator > 0 {
+			weightedRatingSum += seasonWeightedRating
+			totalMinutes += seasonRatingDenominator
+		}
+	}
+
+	if agg.SeasonsPlayed == 0 {
+		// No usable historical data — emit a zero-value baseline so the
+		// caller leaves any existing row untouched.
+		return domain.PlayerCareerBaseline{}, nil
+	}
+
+	if totalMinutes > 0 {
+		agg.CareerAvgRating = round1(weightedRatingSum / float64(totalMinutes))
+	}
+
+	// Trophies: best-effort. The Pro plan exposes /trophies?player={id}; the
+	// older free plan doesn't. We just count entries with a tier of "Winner".
+	trophiesAvailable := false
+	trophiesCount, trophyErr := p.fetchTrophyCount(ctx, externalID)
+	if trophyErr == nil {
+		agg.CareerTrophiesCount = trophiesCount
+		trophiesAvailable = true
+	} else {
+		log.Printf("career-baseline: trophy fetch failed for player %d: %v — re-normalizing without trophy weight", player.ID, trophyErr)
+	}
+
+	agg.BaselineScore = computeBaselineScore(agg, player.Position, trophiesAvailable)
+	return agg, nil
+}
+
+// fetchTrophyCount calls /trophies?player={id} and counts entries marked as
+// won. Pro plan only; gracefully fails on free plan ("not subscribed" comes
+// back as a 200 with `errors`).
+func (p *apiFootballPerformanceProvider) fetchTrophyCount(ctx context.Context, externalID int) (int, error) {
+	params := url.Values{"player": []string{strconv.Itoa(externalID)}}
+	var resp apiFootballTrophiesResponse
+	if err := p.get(ctx, "/trophies", params, &resp); err != nil {
+		return 0, err
+	}
+	if hasAPIFootballErrors(resp.Errors) {
+		return 0, fmt.Errorf("api-football /trophies returned errors")
+	}
+	won := 0
+	for _, t := range resp.Response {
+		// Place == "1st" or Place == "Winner" both mean "won". The API isn't
+		// totally consistent — older entries use the localized place,
+		// newer ones use "Winner". Accept both.
+		switch strings.ToLower(strings.TrimSpace(t.Place)) {
+		case "winner", "1st", "champion", "champions":
+			won++
+		}
+	}
+	return won, nil
+}
+
+type apiFootballTrophiesResponse struct {
+	Errors   json.RawMessage          `json:"errors"`
+	Response []apiFootballTrophyEntry `json:"response"`
+}
+
+type apiFootballTrophyEntry struct {
+	League  string `json:"league"`
+	Country string `json:"country"`
+	Season  string `json:"season"`
+	Place   string `json:"place"`
 }

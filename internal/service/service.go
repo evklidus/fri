@@ -36,6 +36,8 @@ type repository interface {
 	DeleteExternalIDs(ctx context.Context, playerID int64, provider string) error
 	HasRecentVote(ctx context.Context, playerID int64, ipHash string, since time.Time) (bool, error)
 	ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error)
+	GetCareerBaseline(ctx context.Context, playerID int64) (*domain.PlayerCareerBaseline, error)
+	UpsertCareerBaseline(ctx context.Context, baseline domain.PlayerCareerBaseline) error
 }
 
 // voteCooldown bounds how often a single IP can vote for the same player.
@@ -43,18 +45,20 @@ type repository interface {
 const voteCooldown = 24 * time.Hour
 
 type Service struct {
-	repo                repository
-	mediaProvider       mediaProvider
-	socialProvider      socialProvider
-	performanceProvider performanceProvider
+	repo                   repository
+	mediaProvider          mediaProvider
+	socialProvider         socialProvider
+	performanceProvider    performanceProvider
+	careerBaselineProvider careerBaselineProvider // optional; may be nil if no API-Football key
 
 	// Per-component sync locks prevent overlapping scheduled and ad-hoc HTTP
 	// runs of the same component. We use TryLock so a concurrent caller
 	// returns immediately with status=skipped instead of queueing.
-	performanceSyncMu sync.Mutex
-	socialSyncMu      sync.Mutex
-	mediaSyncMu       sync.Mutex
-	characterSyncMu   sync.Mutex
+	performanceSyncMu    sync.Mutex
+	socialSyncMu         sync.Mutex
+	mediaSyncMu          sync.Mutex
+	characterSyncMu      sync.Mutex
+	careerBaselineSyncMu sync.Mutex
 }
 
 func New(repo repository, mediaProvider mediaProvider, socialProvider socialProvider, performanceProvider performanceProvider) *Service {
@@ -64,6 +68,17 @@ func New(repo repository, mediaProvider mediaProvider, socialProvider socialProv
 		socialProvider:      socialProvider,
 		performanceProvider: performanceProvider,
 	}
+}
+
+// WithCareerBaselineProvider wires an optional career-baseline source. Pass
+// the api-football provider here when an API key is available — without one
+// the SyncCareerBaseline call no-ops and the Performance score falls back to
+// current-season-only.
+//
+// Returns the service for fluent chaining at construction time.
+func (s *Service) WithCareerBaselineProvider(p careerBaselineProvider) *Service {
+	s.careerBaselineProvider = p
+	return s
 }
 
 func (s *Service) SeedIfEmpty(ctx context.Context, sourceHTMLPath string) error {

@@ -142,14 +142,44 @@ type CharacterEvent struct {
 	DetectedAt  time.Time `json:"detected_at"`
 }
 
-// CharacterEventCandidate is what the keyword scanner emits before the
-// repository deduplicates it against the unique index. PlayerID + NewsItemID
-// + TriggerWord forms the natural key.
+// CharacterEventCandidate is what an event scanner emits before the repository
+// deduplicates it against the unique index. Despite the name, candidates can
+// target any score component — set TargetComponent to "performance" for
+// performance-targeting triggers (hat-trick, drought, awards). Empty
+// TargetComponent defaults to "character" for backward compatibility.
+//
+// The natural key depends on the source:
+//   - news-derived: (PlayerID, NewsItemID, TriggerWord)
+//   - other (fixture/etc.): (PlayerID, TriggerWord, SourceRef)
+//
+// SourceRef is a free-form fingerprint like "fixture:9482:hat_trick" used to
+// keep stats-based detectors idempotent across reruns. For news events leave
+// SourceRef empty — the news_item_id already provides idempotency.
 type CharacterEventCandidate struct {
-	PlayerID    int64
-	NewsItemID  int64
-	TriggerWord string
-	Delta       float64
+	PlayerID        int64
+	NewsItemID      int64 // 0 = no associated news article
+	TriggerWord     string
+	Delta           float64
+	TargetComponent string // "character" (default) or "performance"
+	SourceRef       string // optional idempotency key for non-news events
+}
+
+// PlayerCareerBaseline holds an aggregated snapshot of a player's career
+// across the last N seasons. Used as a 40% anchor in the Performance score so
+// stars don't crater during an off year. Refreshed monthly — career numbers
+// move slowly.
+type PlayerCareerBaseline struct {
+	PlayerID            int64     `json:"player_id"`
+	SeasonsPlayed       int       `json:"seasons_played"`
+	SeasonsLookback     int       `json:"seasons_lookback"`
+	CareerAppearances   int       `json:"career_appearances"`
+	CareerMinutes       int       `json:"career_minutes"`
+	CareerGoals         int       `json:"career_goals"`
+	CareerAssists       int       `json:"career_assists"`
+	CareerAvgRating     float64   `json:"career_avg_rating"`
+	CareerTrophiesCount int       `json:"career_trophies_count"`
+	BaselineScore       float64   `json:"baseline_score"`
+	ComputedAt          time.Time `json:"computed_at"`
 }
 
 type ComponentUpdate struct {
@@ -200,6 +230,14 @@ type PerformanceSnapshot struct {
 	Last5Rating       float64   `json:"last5_rating"`
 	NormalizedScore   float64   `json:"normalized_score"`
 	SnapshotAt        time.Time `json:"snapshot_at"`
+
+	// PerformanceEvents are stats-derived rating events the provider chose
+	// to emit alongside the snapshot — e.g. "5-match scoring drought" for an
+	// attacker. The sync orchestrator forwards them to ApplyCharacterSync
+	// (with TargetComponent="performance") so they show up in the same
+	// events feed as keyword-detected ones. Empty for providers that don't
+	// implement stats-based detection.
+	PerformanceEvents []CharacterEventCandidate `json:"-"`
 }
 
 type MediaArticleCandidate struct {

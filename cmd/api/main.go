@@ -35,7 +35,12 @@ func main() {
 	mediaProvider := service.NewMediaProvider(cfg.SyncHTTPTimeout, cfg.MediaArticlesPerRun, cfg.MediaStackAPIKey, cfg.MediaStackBaseURL)
 	socialProvider := service.NewSocialProvider(cfg.YouTubeAPIKey, cfg.YouTubeBaseURL, cfg.SyncHTTPTimeout)
 	performanceProvider := service.NewPerformanceProvider(cfg.APIFootballKey, cfg.APIFootballBaseURL, repo, cfg.SyncHTTPTimeout)
-	svc := service.New(repo, mediaProvider, socialProvider, performanceProvider)
+	// Career-baseline provider shares state with performanceProvider (HTTP
+	// client, external-id store, season cache). When API-Football isn't
+	// configured this returns nil and SyncCareerBaseline no-ops.
+	careerBaselineProvider := service.NewCareerBaselineProvider(performanceProvider)
+	svc := service.New(repo, mediaProvider, socialProvider, performanceProvider).
+		WithCareerBaselineProvider(careerBaselineProvider)
 
 	if err := svc.SeedIfEmpty(ctx, cfg.SourceHTMLPath); err != nil {
 		log.Fatalf("seed database: %v", err)
@@ -43,11 +48,12 @@ func main() {
 
 	if cfg.AutoSyncEnabled {
 		svc.StartScheduler(ctx, service.ScheduleConfig{
-			MediaInterval:       cfg.MediaSyncInterval,
-			SocialInterval:      cfg.SocialSyncInterval,
-			PerformanceInterval: cfg.PerformanceInterval,
-			CharacterInterval:   cfg.CharacterInterval,
-			RunOnStartup:        cfg.SyncOnStartup,
+			MediaInterval:          cfg.MediaSyncInterval,
+			SocialInterval:         cfg.SocialSyncInterval,
+			PerformanceInterval:    cfg.PerformanceInterval,
+			CharacterInterval:      cfg.CharacterInterval,
+			CareerBaselineInterval: cfg.CareerBaselineInterval,
+			RunOnStartup:           cfg.SyncOnStartup,
 		})
 	}
 

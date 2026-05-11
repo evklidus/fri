@@ -29,6 +29,7 @@ type fakeService struct {
 	syncSocialFn           func(context.Context) (*domain.ComponentSyncResult, error)
 	syncPerformanceFn      func(context.Context) (*domain.ComponentSyncResult, error)
 	syncCharacterFn        func(context.Context) (*domain.ComponentSyncResult, error)
+	syncCareerBaselineFn   func(context.Context) (*domain.ComponentSyncResult, error)
 	syncAllFn              func(context.Context) ([]domain.ComponentSyncResult, error)
 }
 
@@ -52,6 +53,22 @@ func (f *fakeService) ListComponentUpdates(ctx context.Context, limit int) ([]do
 }
 func (f *fakeService) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, error) {
 	return f.syncMediaFn(ctx)
+}
+func (f *fakeService) SyncCareerBaseline(ctx context.Context) (*domain.ComponentSyncResult, error) {
+	if f.syncCareerBaselineFn != nil {
+		return f.syncCareerBaselineFn(ctx)
+	}
+	// Default to a benign "skipped" so existing tests that don't care about
+	// the new endpoint don't have to wire up a stub.
+	now := time.Now().UTC()
+	return &domain.ComponentSyncResult{
+		Component:  "career-baseline",
+		Provider:   "career-baseline",
+		Status:     "skipped",
+		Message:    "no fake configured",
+		StartedAt:  now,
+		FinishedAt: now,
+	}, nil
 }
 func (f *fakeService) SyncSocial(ctx context.Context) (*domain.ComponentSyncResult, error) {
 	return f.syncSocialFn(ctx)

@@ -22,6 +22,7 @@ type Service interface {
 	ListNews(ctx context.Context, playerID *int64) ([]domain.NewsItem, error)
 	SubmitVote(ctx context.Context, playerID int64, input domain.VoteInput, rawIP string) (*domain.Score, error)
 	ListComponentUpdates(ctx context.Context, limit int) ([]domain.ComponentUpdate, error)
+	SyncCareerBaseline(ctx context.Context) (*domain.ComponentSyncResult, error)
 	SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, error)
 	SyncSocial(ctx context.Context) (*domain.ComponentSyncResult, error)
 	SyncPerformance(ctx context.Context) (*domain.ComponentSyncResult, error)
@@ -54,6 +55,7 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		api.GET("/leaderboard", handler.listPlayers)
 		api.GET("/news/feed", handler.listNewsFeed)
 		api.GET("/sync/updates", handler.listComponentUpdates)
+		api.POST("/sync/career-baseline", handler.runCareerBaselineSync)
 		api.POST("/sync/media", handler.runMediaSync)
 		api.POST("/sync/social", handler.runSocialSync)
 		api.POST("/sync/performance", handler.runPerformanceSync)
@@ -171,6 +173,15 @@ func (r *Router) listComponentUpdates(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": updates})
+}
+
+func (r *Router) runCareerBaselineSync(c *gin.Context) {
+	result, err := r.svc.SyncCareerBaseline(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "data": result})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
 }
 
 func (r *Router) runMediaSync(c *gin.Context) {

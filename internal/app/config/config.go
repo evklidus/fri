@@ -15,8 +15,9 @@ type Config struct {
 	SyncOnStartup       bool
 	MediaSyncInterval   time.Duration
 	SocialSyncInterval  time.Duration
-	PerformanceInterval time.Duration
-	CharacterInterval   time.Duration
+	PerformanceInterval    time.Duration
+	CharacterInterval      time.Duration
+	CareerBaselineInterval time.Duration
 	SyncHTTPTimeout     time.Duration
 	MediaArticlesPerRun int
 	APIFootballKey      string
@@ -38,8 +39,9 @@ func MustLoad() Config {
 		SyncOnStartup:       getEnvBool("SYNC_ON_STARTUP", false),
 		MediaSyncInterval:   time.Duration(getEnvInt("MEDIA_SYNC_INTERVAL_MINUTES", 360)) * time.Minute,
 		SocialSyncInterval:  time.Duration(getEnvInt("SOCIAL_SYNC_INTERVAL_MINUTES", 1440)) * time.Minute,
-		PerformanceInterval: time.Duration(getEnvInt("PERFORMANCE_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
-		CharacterInterval:   time.Duration(getEnvInt("CHARACTER_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
+		PerformanceInterval:    time.Duration(getEnvInt("PERFORMANCE_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
+		CharacterInterval:      time.Duration(getEnvInt("CHARACTER_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
+		CareerBaselineInterval: time.Duration(getEnvInt("CAREER_BASELINE_SYNC_INTERVAL_MINUTES", 43200)) * time.Minute,
 		SyncHTTPTimeout:     time.Duration(getEnvInt("SYNC_HTTP_TIMEOUT_SECONDS", 15)) * time.Second,
 		MediaArticlesPerRun: getEnvInt("MEDIA_ARTICLES_PER_PLAYER", 3),
 		APIFootballKey:      getEnv("API_FOOTBALL_KEY", ""),

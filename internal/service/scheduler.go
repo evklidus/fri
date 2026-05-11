@@ -9,18 +9,23 @@ import (
 )
 
 type ScheduleConfig struct {
-	MediaInterval       time.Duration
-	SocialInterval      time.Duration
-	PerformanceInterval time.Duration
-	CharacterInterval   time.Duration
-	RunOnStartup        bool
+	MediaInterval          time.Duration
+	SocialInterval         time.Duration
+	PerformanceInterval    time.Duration
+	CharacterInterval      time.Duration
+	CareerBaselineInterval time.Duration
+	RunOnStartup           bool
 }
 
 func (s *Service) StartScheduler(ctx context.Context, cfg ScheduleConfig) {
-	if cfg.MediaInterval <= 0 && cfg.SocialInterval <= 0 && cfg.PerformanceInterval <= 0 && cfg.CharacterInterval <= 0 {
+	if cfg.MediaInterval <= 0 && cfg.SocialInterval <= 0 && cfg.PerformanceInterval <= 0 && cfg.CharacterInterval <= 0 && cfg.CareerBaselineInterval <= 0 {
 		return
 	}
 
+	// Career baseline ticks first because the initial run populates the
+	// baseline table that SyncPerformance reads. The 1s startup delay is
+	// well before the 15s performance delay below.
+	s.startScheduledJob(ctx, "career-baseline", cfg.CareerBaselineInterval, 1*time.Second, cfg.RunOnStartup, s.SyncCareerBaseline)
 	s.startScheduledJob(ctx, "media", cfg.MediaInterval, 5*time.Second, cfg.RunOnStartup, s.SyncMedia)
 	s.startScheduledJob(ctx, "social", cfg.SocialInterval, 10*time.Second, cfg.RunOnStartup, s.SyncSocial)
 	s.startScheduledJob(ctx, "performance", cfg.PerformanceInterval, 15*time.Second, cfg.RunOnStartup, s.SyncPerformance)

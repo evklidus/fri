@@ -15,35 +15,60 @@ const (
 	characterScanLookbackDay = 30
 )
 
-// characterTrigger encodes a single keyword pattern that can shift the
-// character score. Multiple language variants for the same concept get the
-// same delta — we count one trigger per (article × concept), not per word.
+// characterTrigger encodes a single keyword pattern that can shift a score
+// component. Multiple language variants for the same concept get the same
+// delta — we count one trigger per (article × concept), not per word.
+//
+// `target` routes the delta to a specific FRI component. Empty == "character"
+// for backward compat with the original Phase 3 triggers.
 type characterTrigger struct {
 	concept string  // grouping key for de-dup within an article
-	delta   float64 // points added/subtracted from Character
+	delta   float64 // points added/subtracted from the target component
+	target  string  // "character" (default) or "performance"
 	words   []string
 }
 
-// characterTriggers is intentionally short and conservative. False positives
-// permanently corrupt a player's reputation in this minimal MVP pipeline (no
-// moderation), so we only ship triggers with high precision in football
-// headlines.
+// characterTriggers covers two flavours of reputation event:
+//
+//   - Character-targeting: behaviour/integrity (doping, racism, fair play).
+//     The original Phase 3 list. delta applies to fri_scores.character.
+//   - Performance-targeting: sporting outcomes (hat-trick, drought, awards).
+//     Added in Phase 4.1. delta applies to fri_scores.performance.
+//
+// Triggers are conservative — false positives permanently shift a player's
+// score without moderation. We only ship phrases with high precision in
+// football headlines.
 var characterTriggers = []characterTrigger{
-	// Negative — severe
+	// ── Character: severe negatives ────────────────────────────────────
 	{concept: "doping", delta: -8, words: []string{"doping", "failed drug test", "banned for doping", "допинг", "провалил тест на допинг"}},
 	{concept: "racism", delta: -6, words: []string{"racism", "racist abuse", "racist remark", "расизм", "расистск"}},
 	{concept: "criminal", delta: -7, words: []string{" arrested", "criminal charges", "criminal probe", "арестован", "уголовн"}},
 	{concept: "scandal", delta: -3, words: []string{"scandal", "controversy erupt", "скандал"}},
 
-	// Negative — moderate
+	// ── Character: moderate negatives ──────────────────────────────────
 	{concept: "red_card", delta: -1.5, words: []string{"red card", "sent off", "красная карточка", "удалён с поля"}},
 	{concept: "ban", delta: -2.5, words: []string{"two-match ban", "three-match ban", "match ban", "дисквалифицирован"}},
 	{concept: "fine", delta: -0.5, words: []string{"fined", "штраф"}},
 
-	// Positive
+	// ── Character: positives ───────────────────────────────────────────
 	{concept: "fair_play", delta: 1.5, words: []string{"fair play award", "награда за fair play"}},
 	{concept: "charity", delta: 0.8, words: []string{"charity donation", "philanthrop", "благотворительн"}},
 	{concept: "captain", delta: 0.5, words: []string{"named captain", "captaincy", "назначен капитаном"}},
+
+	// ── Performance: positives (sporting achievements) ─────────────────
+	{concept: "hat_trick", delta: 2.0, target: "performance", words: []string{"hat-trick", "hat trick", "хет-трик"}},
+	{concept: "brace", delta: 1.0, target: "performance", words: []string{"brace against", "scored a brace", "scored twice", "two goals against", "дубль"}},
+	{concept: "player_of_month", delta: 3.0, target: "performance", words: []string{"player of the month", "игрок месяца", "лучший игрок месяца"}},
+	{concept: "player_of_year", delta: 5.0, target: "performance", words: []string{"player of the year", "игрок года", "лучший игрок года"}},
+	{concept: "ballon_dor", delta: 8.0, target: "performance", words: []string{"ballon d'or", "ballon d or", "золотой мяч"}},
+	{concept: "goal_of_season", delta: 2.5, target: "performance", words: []string{"goal of the season", "goal of the year", "гол сезона", "гол года"}},
+	{concept: "trophy_won", delta: 4.0, target: "performance", words: []string{"won the champions league", "champions league trophy", "league title clinched", "won the league", "выиграл лигу чемпионов", "выиграл чемпионат"}},
+
+	// ── Performance: negatives (sporting setbacks) ─────────────────────
+	{concept: "goal_drought_5", delta: -1.5, target: "performance", words: []string{"five games without scoring", "5 games without scoring", "5-game scoring drought", "scoring drought", "fifth game without", "5 матчей без гола", "пять матчей без гола"}},
+	{concept: "goal_drought_10", delta: -3.0, target: "performance", words: []string{"ten games without scoring", "10 games without scoring", "10-game drought", "tenth game without", "10 матчей без гола", "десять матчей без гола"}},
+	{concept: "injury_serious", delta: -1.5, target: "performance", words: []string{"long-term injury", "season-ending injury", "out for the season", "out for several months", "тяжёлая травма", "выбыл до конца сезона"}},
+	{concept: "penalty_miss_key", delta: -1.0, target: "performance", words: []string{"missed crucial penalty", "missed a penalty in the", "penalty miss costs", "промазал решающий пенальти"}},
 }
 
 // negators block trigger detection when one of these phrases appears in the
@@ -159,10 +184,11 @@ func scanNewsForCharacterTriggers(news []domain.NewsItem, cutoff time.Time) []do
 			}
 			seenConcepts[trig.concept] = struct{}{}
 			out = append(out, domain.CharacterEventCandidate{
-				PlayerID:    *item.PlayerID,
-				NewsItemID:  item.ID,
-				TriggerWord: trig.concept,
-				Delta:       trig.delta,
+				PlayerID:        *item.PlayerID,
+				NewsItemID:      item.ID,
+				TriggerWord:     trig.concept,
+				Delta:           trig.delta,
+				TargetComponent: trig.target, // "" defaults to "character" in repo
 			})
 		}
 	}

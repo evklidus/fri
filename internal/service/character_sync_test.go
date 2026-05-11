@@ -184,3 +184,44 @@ func TestSyncCharacterPropagatesListNewsError(t *testing.T) {
 type fakeErr struct{ msg string }
 
 func (e *fakeErr) Error() string { return e.msg }
+
+// TestScanRoutesPerformanceTriggersToPerformance is the Phase 4.1 contract:
+// performance-flavoured triggers must tag the candidate with
+// TargetComponent="performance" so the repository routes the delta to
+// fri_scores.performance instead of fri_scores.character.
+func TestScanRoutesPerformanceTriggersToPerformance(t *testing.T) {
+	cases := []struct {
+		title  string
+		want   string
+		expect string
+	}{
+		{"Player nets hat-trick in Champions League opener", "hat_trick", "performance"},
+		{"Player named Player of the Month for October", "player_of_month", "performance"},
+		{"Player wins Ballon d'Or for the second time", "ballon_dor", "performance"},
+		{"Player suffers season-ending injury", "injury_serious", "performance"},
+		{"Player goes on five games without scoring", "goal_drought_5", "performance"},
+		// Sanity check — character-flavoured trigger still routes to character.
+		{"Player wins fair play award at FIFA gala", "fair_play", "character"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.want, func(t *testing.T) {
+			news := []domain.NewsItem{makeNews(1, 7, tc.title, "", time.Now().UTC())}
+			got := scanNewsForCharacterTriggers(news, time.Time{})
+			if len(got) != 1 {
+				t.Fatalf("expected 1 candidate, got %d for %q", len(got), tc.title)
+			}
+			if got[0].TriggerWord != tc.want {
+				t.Errorf("trigger = %q, want %q", got[0].TriggerWord, tc.want)
+			}
+			// "" is the legacy "character" default — accept either.
+			actual := got[0].TargetComponent
+			if actual == "" {
+				actual = "character"
+			}
+			if actual != tc.expect {
+				t.Errorf("target = %q, want %q", actual, tc.expect)
+			}
+		})
+	}
+}

@@ -26,6 +26,8 @@ type mockRepo struct {
 	finishComponentUpdateFn func(ctx context.Context, updateID int64, status, message string, recordsSeen int) error
 	applyMediaSyncFn        func(ctx context.Context, results []domain.MediaSyncPlayerResult, provider string) ([]domain.PlayerSyncDelta, error)
 	applyCharacterSyncFn    func(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error)
+	getCareerBaselineFn     func(ctx context.Context, playerID int64) (*domain.PlayerCareerBaseline, error)
+	upsertCareerBaselineFn  func(ctx context.Context, baseline domain.PlayerCareerBaseline) error
 	listNewsFn              func(ctx context.Context, playerID *int64) ([]domain.NewsItem, error)
 
 	// captures
@@ -113,6 +115,18 @@ func (m *mockRepo) ApplyCharacterSync(ctx context.Context, candidates []domain.C
 		return m.applyCharacterSyncFn(ctx, candidates, perPlayerCap)
 	}
 	return nil, nil
+}
+func (m *mockRepo) GetCareerBaseline(ctx context.Context, playerID int64) (*domain.PlayerCareerBaseline, error) {
+	if m.getCareerBaselineFn != nil {
+		return m.getCareerBaselineFn(ctx, playerID)
+	}
+	return nil, nil
+}
+func (m *mockRepo) UpsertCareerBaseline(ctx context.Context, baseline domain.PlayerCareerBaseline) error {
+	if m.upsertCareerBaselineFn != nil {
+		return m.upsertCareerBaselineFn(ctx, baseline)
+	}
+	return nil
 }
 
 func newServiceWithRepo(repo *mockRepo) *Service {

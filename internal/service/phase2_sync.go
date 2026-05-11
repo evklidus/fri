@@ -45,6 +45,22 @@ func NewPerformanceProvider(apiFootballKey, apiFootballBaseURL string, store ext
 	return demoPerformanceProvider{}
 }
 
+// NewCareerBaselineProvider returns the api-football career-baseline provider
+// when a key is available, or nil otherwise (career baseline is optional —
+// the rest of the system runs fine without it, just without the long-term
+// anchor on Performance).
+//
+// The returned value type-asserts the api-football performance provider that
+// would have been created by NewPerformanceProvider — they share state
+// (external-id store, HTTP client, season cache), so we accept that
+// provider as input rather than rebuilding from scratch.
+func NewCareerBaselineProvider(perf performanceProvider) careerBaselineProvider {
+	if p, ok := perf.(*apiFootballPerformanceProvider); ok {
+		return p
+	}
+	return nil
+}
+
 func (demoSocialProvider) Name() string {
 	return socialProviderName
 }
@@ -272,10 +288,23 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 	}
 
 	snapshots := make([]domain.PerformanceSnapshot, 0, len(targets))
+	var statsEvents []domain.CharacterEventCandidate
 	for _, player := range targets {
 		snapshot, fetchErr := s.performanceProvider.FetchPerformanceSnapshot(ctx, player)
 		if fetchErr != nil {
 			continue
+		}
+		// Anchor with career baseline (Phase 4.2). If no baseline exists yet
+		// the snapshot is left unchanged — the very first run before the
+		// baseline sync has populated the table.
+		snapshot = s.blendBaselineIntoPerformance(ctx, snapshot)
+		// Phase 4.3: harvest stats-derived events (e.g. goal drought). We
+		// store them off to the side and apply them after the main
+		// performance snapshot so the drought-driven delta sits on top of
+		// the freshly-written current-season score.
+		if len(snapshot.PerformanceEvents) > 0 {
+			statsEvents = append(statsEvents, snapshot.PerformanceEvents...)
+			snapshot.PerformanceEvents = nil // don't persist via PerformanceSnapshot path
 		}
 		snapshots = append(snapshots, snapshot)
 	}
@@ -285,6 +314,17 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 	}
 
 	deltas, err := s.repo.ApplyPerformanceSync(ctx, snapshots, providerName)
+	if err == nil && len(statsEvents) > 0 {
+		// Stats events ride through the same event-routing path as
+		// keyword-detected ones — ApplyCharacterSync routes by
+		// TargetComponent="performance" to fri_scores.performance. The
+		// per-component cap (±15) bounds runaway penalties.
+		if _, applyErr := s.repo.ApplyCharacterSync(ctx, statsEvents, characterPerSyncCap); applyErr != nil {
+			// Log but don't fail the whole sync — performance scores were
+			// already written; missing stats events isn't critical.
+			result.Message += fmt.Sprintf(" (stats events failed: %v)", applyErr)
+		}
+	}
 	if err != nil {
 		return finish("failed", err.Error(), len(snapshots), nil, err)
 	}
@@ -294,11 +334,16 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 
 func (s *Service) SyncAll(ctx context.Context) ([]domain.ComponentSyncResult, error) {
 	var firstErr error
-	results := make([]domain.ComponentSyncResult, 0, 3)
+	results := make([]domain.ComponentSyncResult, 0, 5)
 
-	// Order matters: SyncCharacter scans news_items, so it has to run after
-	// SyncMedia ingests fresh articles.
+	// Order matters:
+	//  - SyncCareerBaseline runs FIRST so the table is populated before
+	//    SyncPerformance does its blend lookup. On reruns this is a no-op
+	//    (idempotent upsert), so no extra cost.
+	//  - SyncCharacter runs LAST because it scans news_items written by
+	//    SyncMedia.
 	for _, syncFn := range []func(context.Context) (*domain.ComponentSyncResult, error){
+		s.SyncCareerBaseline,
 		s.SyncPerformance,
 		s.SyncSocial,
 		s.SyncMedia,
