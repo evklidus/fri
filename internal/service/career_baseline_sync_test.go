@@ -102,3 +102,52 @@ func TestComputeBaselineScorePositionAwareGoalMax(t *testing.T) {
 			cbScore, fwdScore)
 	}
 }
+
+// TestComputeBaselineScoreElitedGKNotPenalisedForZeroGoals is the regression
+// for the prod bug we hit on 2026-05-11: Courtois (32y, 5 seasons, rating
+// 7.1, 0 goals/assists by definition) got baseline 28.9 because the formula
+// treated his 0 goals as a 0-score on a 0.35 combined weight. The
+// position-aware fix gives GKs no goals/assists channels at all — score
+// flows through rating + minutes + trophies, which is the right signal for
+// a shotstopper.
+func TestComputeBaselineScoreElitedGKNotPenalisedForZeroGoals(t *testing.T) {
+	courtoisLike := domain.PlayerCareerBaseline{
+		SeasonsPlayed:     5,
+		CareerAppearances: 150,
+		CareerMinutes:     13_500,
+		CareerGoals:       0,
+		CareerAssists:     0,
+		CareerAvgRating:   7.4,
+	}
+	gkScore := computeBaselineScore(courtoisLike, "GK", false)
+	fwdScore := computeBaselineScore(courtoisLike, "FWD", false)
+
+	// Same stats — but for a GK they're elite, for an FWD they're terrible
+	// (no goals, no assists). The GK score must be substantially higher.
+	if gkScore-fwdScore < 15 {
+		t.Errorf("GK with rating 7.4 and 0 goals should score much higher than an FWD with same stats; gk=%.1f fwd=%.1f", gkScore, fwdScore)
+	}
+	// And the GK score itself should land in the "this is a good player"
+	// range — at least 50 for a top keeper. Before the fix it was ~28.
+	if gkScore < 50 {
+		t.Errorf("elite GK baseline %.1f too low — formula still penalising for goals/assists", gkScore)
+	}
+}
+
+// TestComputeBaselineScorePureDefenderAlsoNotPenalised — same regression as
+// above but for centre-backs. A CB who plays every game with a solid rating
+// shouldn't drop below baseline 40 just because they have 2 career goals.
+func TestComputeBaselineScorePureDefenderAlsoNotPenalised(t *testing.T) {
+	vanDijkLike := domain.PlayerCareerBaseline{
+		SeasonsPlayed:     5,
+		CareerAppearances: 175,
+		CareerMinutes:     15_400,
+		CareerGoals:       8,
+		CareerAssists:     3,
+		CareerAvgRating:   7.5,
+	}
+	defScore := computeBaselineScore(vanDijkLike, "DEF", false)
+	if defScore < 50 {
+		t.Errorf("solid defender baseline %.1f too low — rating + minutes weight may be insufficient", defScore)
+	}
+}

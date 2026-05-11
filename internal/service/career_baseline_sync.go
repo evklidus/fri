@@ -166,28 +166,65 @@ func (s *Service) blendBaselineIntoPerformance(ctx context.Context, snapshot dom
 	return snapshot
 }
 
-// computeBaselineScore turns raw career aggregates into a 0–100 score using
-// the same normalization helpers the live performance pipeline uses. Pulled
-// out as a free function so api-football implementation and tests share it.
+// baselineWeights groups the per-position weights for the five baseline
+// signals. Sum must equal 1.0. The weights are heavier on rating + minutes
+// for positions where goals/assists are not the main job (GK, DEF), so a
+// rock-solid centre-back or shotstopper isn't penalised against a striker.
+type baselineWeights struct {
+	rating   float64
+	goals    float64
+	assists  float64
+	minutes  float64
+	trophies float64
+}
+
+// weightsFor returns position-tuned weights. A GK with rating 7.5 and lots of
+// minutes should land around the same baseline as an FWD with rating 7.5 and
+// matching goals — both are top-of-position performers.
 //
-// Weights (sum 1.0):
+//	FWD: emphasise output (goals + assists)
+//	MID: balance creativity (assists) and rating
+//	DEF: defenders rarely score; weight rating + minutes hardest
+//	GK:  no goal/assist channels at all; rating + minutes carry the score
 //
-//	rating × 0.45       — the single best signal of "is this a good player"
-//	goals/90 × 0.20     — attacking output, capped at position max
-//	assists/90 × 0.15   — creative output, same cap
-//	minutes log × 0.10  — anti-fluke filter; rewards consistently-selected
-//	                      players over those with a few cameo seasons
-//	trophies × 0.10     — résumé length; 0 when /trophies returned nothing
+// All four sets sum to 1.0 before trophy re-normalization.
+func weightsFor(position string) baselineWeights {
+	// positionGroup returns "ATT" for forwards, "MID", "DEF", or "GK".
+	switch positionGroup(position) {
+	case "ATT":
+		return baselineWeights{rating: 0.45, goals: 0.20, assists: 0.15, minutes: 0.10, trophies: 0.10}
+	case "MID":
+		return baselineWeights{rating: 0.50, goals: 0.10, assists: 0.20, minutes: 0.10, trophies: 0.10}
+	case "DEF":
+		return baselineWeights{rating: 0.55, goals: 0.05, assists: 0.05, minutes: 0.25, trophies: 0.10}
+	case "GK":
+		// No goals/assists channels — a 0 there is the norm, not a penalty.
+		// Heavy weight on rating (which API-Football derives from saves +
+		// distribution + clean sheets) and minutes (consistent #1 keeper).
+		return baselineWeights{rating: 0.60, goals: 0, assists: 0, minutes: 0.30, trophies: 0.10}
+	default:
+		// Unknown position — fall back to the FWD weighting so we don't
+		// accidentally zero-out an unmapped player.
+		return baselineWeights{rating: 0.45, goals: 0.20, assists: 0.15, minutes: 0.10, trophies: 0.10}
+	}
+}
+
+// computeBaselineScore turns raw career aggregates into a 0–100 score, scoped
+// by player position. The position-aware weighting is critical: a GK with 0
+// goals over 5 seasons should still score in the 60s if their rating and
+// minutes are elite — without per-position weights, the formula punished
+// them down to ~28.
 //
-// When trophy data is missing (trophiesCount = 0 and the provider couldn't
-// reach /trophies), the trophy weight is reallocated proportionally to the
-// other four signals — we don't want to under-rank everyone just because the
-// API call timed out.
+// When trophy data is missing (trophiesCount = 0 and the /trophies endpoint
+// failed or returned nothing), the trophy weight is reallocated proportionally
+// to the other signals — we don't want to under-rank everyone just because
+// the API call timed out.
 func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophiesAvailable bool) float64 {
 	if b.SeasonsPlayed == 0 || b.CareerMinutes == 0 {
 		return 0
 	}
 
+	w := weightsFor(position)
 	minutes := float64(b.CareerMinutes)
 	goalsPer90 := per90(float64(b.CareerGoals), minutes)
 	assistsPer90 := per90(float64(b.CareerAssists), minutes)
@@ -202,18 +239,22 @@ func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophi
 	assistsScore := normalizeLinear(assistsPer90, 0, gaMax)
 	minutesScore := normalizeLog(minutes, 5_000, 50_000)
 
-	score := ratingScore*0.45 +
-		goalsScore*0.20 +
-		assistsScore*0.15 +
-		minutesScore*0.10
+	score := ratingScore*w.rating +
+		goalsScore*w.goals +
+		assistsScore*w.assists +
+		minutesScore*w.minutes
 
 	if trophiesAvailable {
 		trophiesScore := normalizeLinear(float64(b.CareerTrophiesCount), 0, 10)
-		score += trophiesScore * 0.10
+		score += trophiesScore * w.trophies
 	} else {
-		// Reallocate the 0.10 trophy weight proportionally to the other
-		// signals (they sum to 0.90, so multiply by 1/0.90).
-		score = score / 0.90
+		// Reallocate the trophies weight proportionally to the remaining
+		// signals. Without re-norm the score would be artificially capped at
+		// (1 - w.trophies) of its real max for every player.
+		denominator := 1.0 - w.trophies
+		if denominator > 0 {
+			score = score / denominator
+		}
 	}
 
 	return clampScore(round1(score))
