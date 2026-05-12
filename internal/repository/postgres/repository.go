@@ -570,25 +570,25 @@ func (r *Repository) UpsertExternalIDs(ctx context.Context, ids domain.PlayerExt
 	return err
 }
 
-// ApplyCharacterSync inserts new character events (idempotently via the
-// unique index on (player_id, news_item_id, trigger_word)) and applies a
-// per-player aggregated delta to fri_scores.character. The delta is clamped
-// per call so a single sync can't tank a score below 0 or above 100.
-//
-// Returns one PlayerSyncDelta per player whose Character actually moved —
-// players where every event was a duplicate are silently skipped.
 // ApplyCharacterSync inserts new rating events (idempotently — see uniqueness
-// indexes on character_events) and applies per-player aggregated deltas to
-// the target component column on fri_scores. Despite the legacy name, the
-// function routes deltas to either `character` or `performance` based on
-// each candidate's TargetComponent (defaults to "character").
+// indexes on character_events) and updates per-player component scores.
+// Routing by candidate.TargetComponent:
 //
-// Capping is applied per (player, target_component) — so a player getting
-// hit on both Character and Performance in the same sync can move up to
-// perPlayerCap on each, not in aggregate.
+//   - "character"  → score is RECOMPUTED from scratch as
+//                    clamp(characterBaseline + Σ(all character events), 0, 100).
+//                    This makes character fully data-driven: no inherited seed
+//                    value, no "stuck" historical state. Per the partner's
+//                    "baseline + grows/falls" vision (2026-05-09 chat).
+//
+//   - "performance" → score gets the per-sync capped Δ added on top of its
+//                     current value. Performance has its own snapshot source
+//                     (api-football) which overwrites the column on every
+//                     performance sync, so events here are intentionally
+//                     ephemeral — they get re-fired by the stats detector
+//                     next sync if the condition still holds.
 //
 // Returns one PlayerSyncDelta per (player, component) pair that actually
-// moved; players whose events were all duplicates are silently skipped.
+// moved.
 func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error) {
 	if len(candidates) == 0 {
 		return nil, nil
@@ -672,16 +672,6 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 	deltas := make([]domain.PlayerSyncDelta, 0, len(buckets))
 	now := time.Now().UTC()
 	for key, delta := range buckets {
-		// Cap per (player, component) bucket so a single sync can't move
-		// one score by more than perPlayerCap in either direction.
-		applied := delta
-		if applied > perPlayerCap {
-			applied = perPlayerCap
-		}
-		if applied < -perPlayerCap {
-			applied = -perPlayerCap
-		}
-
 		current, err := lockScore(ctx, tx, key.playerID)
 		if err != nil {
 			return nil, err
@@ -691,13 +681,28 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 		var oldValue, newValue float64
 		switch key.component {
 		case "performance":
+			// Performance events are additive on top of the live snapshot;
+			// per-sync cap prevents one batch of fixtures from swinging
+			// Performance by more than perPlayerCap.
+			applied := delta
+			if applied > perPlayerCap {
+				applied = perPlayerCap
+			}
+			if applied < -perPlayerCap {
+				applied = -perPlayerCap
+			}
 			oldValue = current.Performance
 			newValue = clamp0to100(round1(oldValue + applied))
 			current.Performance = newValue
 			current.PerformanceUpdatedAt = now
-		default: // "character"
+
+		default: // "character" — full recompute from event history
+			totalDelta, err := sumCharacterEventsForPlayer(ctx, tx, key.playerID)
+			if err != nil {
+				return nil, err
+			}
 			oldValue = current.Character
-			newValue = clamp0to100(round1(oldValue + applied))
+			newValue = clamp0to100(round1(characterBaseline + totalDelta))
 			current.Character = newValue
 			current.CharacterUpdatedAt = now
 		}
@@ -788,6 +793,34 @@ func clamp0to100(v float64) float64 {
 		return 100
 	}
 	return v
+}
+
+// characterBaseline is the neutral starting point for every player's
+// Character score before any events have fired. Picked at 80 so:
+//   - A player with no incidents lands at 80 (good citizen, not perfect)
+//   - Most positive triggers (+0.5 ... +1.5) push them up to 85–95
+//   - Severe negative triggers (doping -8, racism -6) bring them below 70
+//   - The 0–100 clamp at the boundaries handles extreme accumulations
+//
+// Aligns with the partner's "baseline + grows/falls" model (chat 2026-05-09).
+// No more inherited seed values — Character is fully events-driven.
+const characterBaseline = 80.0
+
+// sumCharacterEventsForPlayer returns the algebraic sum of delta across all
+// character-targeted events for a player. Used to recompute the Character
+// score from scratch on every sync — no inherited state, no per-sync drift.
+//
+// Performance-targeted events are excluded (they live in their own column
+// and are intentionally ephemeral; see ApplyCharacterSync doc).
+func sumCharacterEventsForPlayer(ctx context.Context, tx pgx.Tx, playerID int64) (float64, error) {
+	var sum float64
+	err := tx.QueryRow(ctx, `
+		SELECT COALESCE(SUM(delta), 0)
+		FROM character_events
+		WHERE player_id = $1
+		  AND COALESCE(target_component, 'character') = 'character'
+	`, playerID).Scan(&sum)
+	return sum, err
 }
 
 // HasRecentVote returns true when a vote exists for (playerID, ipHash) with
