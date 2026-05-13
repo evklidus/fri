@@ -31,6 +31,20 @@ err() { printf '\033[1;31m[deploy]\033[0m %s\n' "$*" >&2; exit 1; }
 . /etc/os-release
 [[ "$ID" == "ubuntu" ]] || warn "Tested on Ubuntu only. You're on $PRETTY_NAME — proceed at your own risk."
 
+# ─── 0.5. Swap (so `go build` doesn't OOM on a 2GB VPS) ──────────────────
+# Linking the Gin / ugorji codec dependency peaks above 1.5GB during
+# compilation. On a 2GB VPS without swap that triggers the OOM killer and
+# the build fails with `signal: killed`. A 2GB swapfile soaks the peak.
+# It's only touched during builds — no runtime cost.
+if ! swapon --show | grep -q '/swapfile'; then
+  log "Creating 2GB swapfile so Go builds don't OOM on a 2GB VPS..."
+  fallocate -l 2G /swapfile
+  chmod 600 /swapfile
+  mkswap /swapfile >/dev/null
+  swapon /swapfile
+  grep -q '/swapfile' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
 # ─── 1. Harden SSH ───────────────────────────────────────────────────────
 log "Hardening SSH (PasswordAuthentication no)..."
 sed -i.bak 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
