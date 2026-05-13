@@ -155,6 +155,11 @@ type CharacterEvent struct {
 // SourceRef is a free-form fingerprint like "fixture:9482:hat_trick" used to
 // keep stats-based detectors idempotent across reruns. For news events leave
 // SourceRef empty — the news_item_id already provides idempotency.
+//
+// AutoApply (Phase 5): when true the event skips fan voting and the proposed
+// delta is locked in as the final delta at insert time. Used for definitive
+// triggers (doping, racism, official year awards). When false, the event
+// enters voting_status='pending_vote' for a 24h window before finalization.
 type CharacterEventCandidate struct {
 	PlayerID        int64
 	NewsItemID      int64 // 0 = no associated news article
@@ -162,6 +167,33 @@ type CharacterEventCandidate struct {
 	Delta           float64
 	TargetComponent string // "character" (default) or "performance"
 	SourceRef       string // optional idempotency key for non-news events
+	AutoApply       bool   // skip voting; finalize at insert
+}
+
+// PendingEvent is a denormalized view of one character_events row that's
+// currently accepting fan votes, plus the running median + total vote count.
+// Returned by the /api/events/pending endpoint so the UI can render a slider
+// per event without round-tripping to fetch vote details separately.
+type PendingEvent struct {
+	ID              int64     `json:"id"`
+	PlayerID        int64     `json:"player_id"`
+	PlayerName      string    `json:"player_name"`
+	TriggerWord     string    `json:"trigger_word"`
+	TargetComponent string    `json:"target_component"`
+	ProposedDelta   float64   `json:"proposed_delta"`
+	NewsItemID      *int64    `json:"news_item_id,omitempty"`
+	NewsTitle       string    `json:"news_title,omitempty"`
+	VotesCount      int       `json:"votes_count"`
+	VotesMedian     *float64  `json:"votes_median,omitempty"` // nil when no votes yet
+	DetectedAt      time.Time `json:"detected_at"`
+	VotingClosesAt  time.Time `json:"voting_closes_at"`
+}
+
+// EventVoteInput is the request body for POST /api/events/{id}/vote.
+// SuggestedDelta is clamped to [-5, +5] at the handler before reaching the
+// repository, so a griefer can't write extreme values that drag the median.
+type EventVoteInput struct {
+	SuggestedDelta float64 `json:"suggested_delta"`
 }
 
 // PlayerCareerBaseline holds an aggregated snapshot of a player's career

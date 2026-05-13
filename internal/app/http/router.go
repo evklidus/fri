@@ -28,6 +28,11 @@ type Service interface {
 	SyncPerformance(ctx context.Context) (*domain.ComponentSyncResult, error)
 	SyncCharacter(ctx context.Context) (*domain.ComponentSyncResult, error)
 	SyncAll(ctx context.Context) ([]domain.ComponentSyncResult, error)
+	// Phase 5: per-event fan voting
+	ListPendingEvents(ctx context.Context, playerID int64, limit int) ([]domain.PendingEvent, error)
+	GetPendingEvent(ctx context.Context, eventID int64) (*domain.PendingEvent, error)
+	SubmitEventVote(ctx context.Context, eventID int64, suggestedDelta float64, rawIP string) error
+	FinalizePendingEvents(ctx context.Context) (*domain.ComponentSyncResult, error)
 }
 
 type Router struct {
@@ -51,10 +56,15 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		api.GET("/players/:id", handler.getPlayer)
 		api.GET("/players/:id/history", handler.getPlayerHistory)
 		api.GET("/players/:id/news", handler.getPlayerNews)
-		api.POST("/players/:id/vote", handler.submitVote)
+		api.POST("/players/:id/vote", handler.submitVote) // legacy — kept for compat, see handler
 		api.GET("/leaderboard", handler.listPlayers)
 		api.GET("/news/feed", handler.listNewsFeed)
 		api.GET("/sync/updates", handler.listComponentUpdates)
+		// Phase 5: per-event fan voting
+		api.GET("/events/pending", handler.listPendingEvents)
+		api.GET("/events/:id", handler.getPendingEvent)
+		api.POST("/events/:id/vote", handler.submitEventVote)
+		api.POST("/sync/finalize-events", handler.runFinalizeEvents)
 		api.POST("/sync/career-baseline", handler.runCareerBaselineSync)
 		api.POST("/sync/media", handler.runMediaSync)
 		api.POST("/sync/social", handler.runSocialSync)
@@ -236,4 +246,110 @@ func parseID(c *gin.Context) (int64, bool) {
 		return 0, false
 	}
 	return playerID, true
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Phase 5 — per-event fan voting endpoints
+// ────────────────────────────────────────────────────────────────────────
+
+// listPendingEvents serves the event voting queue. Optional ?player_id=X
+// scopes to one player; otherwise returns the site-wide feed. ?limit=N
+// caps the number of rows.
+func (r *Router) listPendingEvents(c *gin.Context) {
+	var playerID int64
+	if raw := strings.TrimSpace(c.Query("player_id")); raw != "" {
+		v, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player_id"})
+			return
+		}
+		playerID = v
+	}
+	limit := 50
+	if raw := strings.TrimSpace(c.Query("limit")); raw != "" {
+		if v, err := strconv.Atoi(raw); err == nil && v > 0 && v <= 200 {
+			limit = v
+		}
+	}
+	events, err := r.svc.ListPendingEvents(c.Request.Context(), playerID, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if events == nil {
+		events = []domain.PendingEvent{}
+	}
+	c.JSON(http.StatusOK, gin.H{"data": events})
+}
+
+// getPendingEvent serves one event's vote state. Returns 404 if the event
+// is finalized or doesn't exist — the UI shouldn't try to vote on it.
+func (r *Router) getPendingEvent(c *gin.Context) {
+	eventID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event id"})
+		return
+	}
+	event, err := r.svc.GetPendingEvent(c.Request.Context(), eventID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if event == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "event not pending"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": event})
+}
+
+// submitEventVote records one fan's slider value on an event. Returns:
+//
+//	201 — vote recorded (new or updated; UI doesn't distinguish)
+//	400 — bad input
+//	410 — event no longer accepting votes (finalized, closed, or unknown)
+//	500 — server-side failure
+//
+// The handler reads X-Real-IP (set by Caddy in front of the app) and falls
+// back to the connection IP; the service hashes it before storage.
+func (r *Router) submitEventVote(c *gin.Context) {
+	eventID, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid event id"})
+		return
+	}
+	var input domain.EventVoteInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "body must be JSON {\"suggested_delta\": <float>}"})
+		return
+	}
+
+	rawIP := strings.TrimSpace(c.GetHeader("X-Real-IP"))
+	if rawIP == "" {
+		rawIP = c.ClientIP()
+	}
+
+	if err := r.svc.SubmitEventVote(c.Request.Context(), eventID, input.SuggestedDelta, rawIP); err != nil {
+		// service.ErrEventGone maps to HTTP 410. We test via string-match to
+		// avoid an import cycle with the service package — the error is
+		// stable and exported as a sentinel value.
+		if strings.Contains(err.Error(), "no longer accepting votes") {
+			c.JSON(http.StatusGone, gin.H{"error": "event no longer accepts votes"})
+			return
+		}
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"event_id": eventID, "status": "recorded"}})
+}
+
+// runFinalizeEvents is the manual trigger for the hourly finalize cron.
+// Useful for QA — the user can press a button to immediately apply pending
+// events without waiting an hour.
+func (r *Router) runFinalizeEvents(c *gin.Context) {
+	result, err := r.svc.FinalizePendingEvents(c.Request.Context())
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error(), "data": result})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": result})
 }

@@ -38,6 +38,11 @@ type repository interface {
 	ApplyCharacterSync(ctx context.Context, candidates []domain.CharacterEventCandidate, perPlayerCap float64) ([]domain.PlayerSyncDelta, error)
 	GetCareerBaseline(ctx context.Context, playerID int64) (*domain.PlayerCareerBaseline, error)
 	UpsertCareerBaseline(ctx context.Context, baseline domain.PlayerCareerBaseline) error
+	ListPendingEvents(ctx context.Context, limit int) ([]domain.PendingEvent, error)
+	ListPendingEventsForPlayer(ctx context.Context, playerID int64, limit int) ([]domain.PendingEvent, error)
+	GetPendingEvent(ctx context.Context, eventID int64) (*domain.PendingEvent, error)
+	SubmitEventVote(ctx context.Context, eventID int64, ipHash string, suggestedDelta float64) (bool, error)
+	FinalizePendingEvents(ctx context.Context) (int, error)
 }
 
 // voteCooldown bounds how often a single IP can vote for the same player.
@@ -59,6 +64,7 @@ type Service struct {
 	mediaSyncMu          sync.Mutex
 	characterSyncMu      sync.Mutex
 	careerBaselineSyncMu sync.Mutex
+	finalizeEventsMu     sync.Mutex
 }
 
 func New(repo repository, mediaProvider mediaProvider, socialProvider socialProvider, performanceProvider performanceProvider) *Service {
@@ -207,8 +213,7 @@ func (s *Service) SubmitVote(ctx context.Context, playerID int64, input domain.V
 			(float64(input.BehaviorScore) * 0.10),
 	)
 
-	sum := sha256.Sum256([]byte(rawIP))
-	ipHash := hex.EncodeToString(sum[:])
+	ipHash := hashIP(rawIP)
 
 	// Anti-abuse: one vote per (player, IP) per 24h window. Empty/blank rawIP
 	// is treated as "no IP available" and skipped to keep tests/CLI happy.
@@ -411,4 +416,13 @@ func clampScore(value float64) float64 {
 		return 100
 	}
 	return round1(value)
+}
+
+// hashIP returns the SHA-256 hex digest of an IP address. We never store
+// raw IPs — only their hashes — so the system stays PII-compliant under
+// GDPR / Russian data laws. The hash is enough to correlate repeat votes
+// from the same source for anti-abuse.
+func hashIP(rawIP string) string {
+	sum := sha256.Sum256([]byte(rawIP))
+	return hex.EncodeToString(sum[:])
 }

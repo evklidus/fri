@@ -641,14 +641,37 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 			}
 		}
 
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO character_events
-				(player_id, news_item_id, trigger_word, delta, status, target_component, source_ref)
-			VALUES ($1, $2, $3, $4, 'auto', $5, $6)
-		`, c.PlayerID, newsRef, c.TriggerWord, c.Delta, component, sourceRef); err != nil {
-			return nil, err
+		// Phase 5: bifurcate by autoApply.
+		//
+		//   autoApply=true   → final_delta set immediately; voting_status='auto_applied'.
+		//                      Bucket the delta so the component score updates in
+		//                      this same transaction.
+		//
+		//   autoApply=false  → final_delta=NULL; voting_status='pending_vote';
+		//                      voting_closes_at = NOW() + 24h. Do NOT bucket — the
+		//                      component score will move only after the finalize
+		//                      cron picks the event up and writes final_delta.
+		if c.AutoApply {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO character_events
+					(player_id, news_item_id, trigger_word, delta, status, target_component,
+					 source_ref, proposed_delta, final_delta, voting_status, auto_apply)
+				VALUES ($1, $2, $3, $4, 'auto', $5, $6, $4, $4, 'auto_applied', TRUE)
+			`, c.PlayerID, newsRef, c.TriggerWord, c.Delta, component, sourceRef); err != nil {
+				return nil, err
+			}
+			buckets[bucketKey{c.PlayerID, component}] += c.Delta
+		} else {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO character_events
+					(player_id, news_item_id, trigger_word, delta, status, target_component,
+					 source_ref, proposed_delta, final_delta, voting_status, voting_closes_at, auto_apply)
+				VALUES ($1, $2, $3, $4, 'auto', $5, $6, $4, NULL, 'pending_vote', NOW() + INTERVAL '24 hours', FALSE)
+			`, c.PlayerID, newsRef, c.TriggerWord, c.Delta, component, sourceRef); err != nil {
+				return nil, err
+			}
+			// Intentionally NOT bucketed — score moves later, via finalize.
 		}
-		buckets[bucketKey{c.PlayerID, component}] += c.Delta
 	}
 
 	if len(buckets) == 0 {
@@ -806,19 +829,26 @@ func clamp0to100(v float64) float64 {
 // No more inherited seed values — Character is fully events-driven.
 const characterBaseline = 80.0
 
-// sumCharacterEventsForPlayer returns the algebraic sum of delta across all
-// character-targeted events for a player. Used to recompute the Character
-// score from scratch on every sync — no inherited state, no per-sync drift.
+// sumCharacterEventsForPlayer returns the algebraic sum of *final* delta
+// across all character-targeted events for a player. Pending-vote events
+// don't contribute until they're finalized — that's the whole point of
+// Phase 5 voting: the community gets a 24h window to override the proposed
+// delta before it actually moves the score.
 //
 // Performance-targeted events are excluded (they live in their own column
 // and are intentionally ephemeral; see ApplyCharacterSync doc).
+//
+// COALESCE(final_delta, delta) handles legacy rows from before migration 012
+// where final_delta is NULL — those rows had `delta` applied directly under
+// the old model, so we keep using that value to preserve historical state.
 func sumCharacterEventsForPlayer(ctx context.Context, tx pgx.Tx, playerID int64) (float64, error) {
 	var sum float64
 	err := tx.QueryRow(ctx, `
-		SELECT COALESCE(SUM(delta), 0)
+		SELECT COALESCE(SUM(COALESCE(final_delta, delta)), 0)
 		FROM character_events
 		WHERE player_id = $1
 		  AND COALESCE(target_component, 'character') = 'character'
+		  AND COALESCE(voting_status, 'auto_applied') IN ('auto_applied', 'finalized')
 	`, playerID).Scan(&sum)
 	return sum, err
 }
@@ -903,6 +933,360 @@ func (r *Repository) UpsertCareerBaseline(ctx context.Context, b domain.PlayerCa
 	)
 	return err
 }
+
+// ────────────────────────────────────────────────────────────────────────
+// Phase 5 — per-event fan voting
+// ────────────────────────────────────────────────────────────────────────
+
+// ListPendingEventsForPlayer returns events still accepting votes for a
+// given player. The caller renders each as a vote-slider card. `limit`
+// caps the number returned; pass 0 for the default (50).
+func (r *Repository) ListPendingEventsForPlayer(ctx context.Context, playerID int64, limit int) ([]domain.PendingEvent, error) {
+	if limit <= 0 {
+		limit = 50
+	}
+	return r.listPendingEvents(ctx, &playerID, limit)
+}
+
+// ListPendingEvents returns ALL pending events across the system. Used by
+// the site-wide "Vote on today's events" page.
+func (r *Repository) ListPendingEvents(ctx context.Context, limit int) ([]domain.PendingEvent, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	return r.listPendingEvents(ctx, nil, limit)
+}
+
+// listPendingEvents is the shared implementation. playerID == nil → fetch
+// all players; non-nil → scope to that player. The vote-count and median
+// are computed by a left-joined subquery to avoid the N+1 trap.
+func (r *Repository) listPendingEvents(ctx context.Context, playerID *int64, limit int) ([]domain.PendingEvent, error) {
+	args := []any{limit}
+	scope := ""
+	if playerID != nil {
+		args = append(args, *playerID)
+		scope = "AND ce.player_id = $2"
+	}
+
+	// PostgreSQL has no median aggregate built-in, but PERCENTILE_CONT(0.5)
+	// over the suggested_delta returns it. We compute it per event in a
+	// LATERAL subquery rather than as a window — clearer plan + same cost.
+	q := fmt.Sprintf(`
+		SELECT
+			ce.id,
+			ce.player_id,
+			p.name,
+			ce.trigger_word,
+			COALESCE(ce.target_component, 'character'),
+			COALESCE(ce.proposed_delta, ce.delta),
+			ce.news_item_id,
+			COALESCE(n.title_en, ''),
+			ce.detected_at,
+			ce.voting_closes_at,
+			COALESCE(v.cnt, 0)        AS votes_count,
+			v.median                  AS votes_median
+		FROM character_events ce
+		JOIN players p ON p.id = ce.player_id
+		LEFT JOIN news_items n ON n.id = ce.news_item_id
+		LEFT JOIN LATERAL (
+			SELECT
+				COUNT(*) AS cnt,
+				PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY suggested_delta) AS median
+			FROM event_votes
+			WHERE event_id = ce.id
+		) v ON TRUE
+		WHERE ce.voting_status = 'pending_vote'
+		  AND (ce.voting_closes_at IS NULL OR ce.voting_closes_at > NOW())
+		  %s
+		ORDER BY ce.detected_at DESC
+		LIMIT $1
+	`, scope)
+
+	rows, err := r.pool.Query(ctx, q, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make([]domain.PendingEvent, 0)
+	for rows.Next() {
+		var e domain.PendingEvent
+		var newsID *int64
+		var median *float64
+		if err := rows.Scan(
+			&e.ID, &e.PlayerID, &e.PlayerName, &e.TriggerWord, &e.TargetComponent,
+			&e.ProposedDelta, &newsID, &e.NewsTitle,
+			&e.DetectedAt, &e.VotingClosesAt, &e.VotesCount, &median,
+		); err != nil {
+			return nil, err
+		}
+		e.NewsItemID = newsID
+		e.VotesMedian = median
+		out = append(out, e)
+	}
+	return out, rows.Err()
+}
+
+// GetPendingEvent returns one pending event with its vote stats, or
+// (nil, nil) if no such event exists or it's no longer pending.
+func (r *Repository) GetPendingEvent(ctx context.Context, eventID int64) (*domain.PendingEvent, error) {
+	var e domain.PendingEvent
+	var newsID *int64
+	var median *float64
+	err := r.pool.QueryRow(ctx, `
+		SELECT
+			ce.id, ce.player_id, p.name, ce.trigger_word,
+			COALESCE(ce.target_component, 'character'),
+			COALESCE(ce.proposed_delta, ce.delta),
+			ce.news_item_id, COALESCE(n.title_en, ''),
+			ce.detected_at, ce.voting_closes_at,
+			COALESCE((SELECT COUNT(*) FROM event_votes WHERE event_id = ce.id), 0),
+			(SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY suggested_delta)
+			 FROM event_votes WHERE event_id = ce.id)
+		FROM character_events ce
+		JOIN players p ON p.id = ce.player_id
+		LEFT JOIN news_items n ON n.id = ce.news_item_id
+		WHERE ce.id = $1 AND ce.voting_status = 'pending_vote'
+	`, eventID).Scan(
+		&e.ID, &e.PlayerID, &e.PlayerName, &e.TriggerWord, &e.TargetComponent,
+		&e.ProposedDelta, &newsID, &e.NewsTitle,
+		&e.DetectedAt, &e.VotingClosesAt, &e.VotesCount, &median,
+	)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	e.NewsItemID = newsID
+	e.VotesMedian = median
+	return &e, nil
+}
+
+// SubmitEventVote records (or updates) a fan's slider vote on one pending
+// event. Returns:
+//   - inserted=true: brand-new vote from this IP
+//   - inserted=false: existing vote updated (idempotent re-vote)
+//   - error == errEventNotVotable: event is finalized / closed / doesn't exist
+//
+// The handler clamps suggested_delta to [-5, +5] before calling here.
+func (r *Repository) SubmitEventVote(ctx context.Context, eventID int64, ipHash string, suggestedDelta float64) (bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var status string
+	var closesAt *time.Time
+	if err := tx.QueryRow(ctx, `
+		SELECT voting_status, voting_closes_at
+		FROM character_events
+		WHERE id = $1
+	`, eventID).Scan(&status, &closesAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrEventNotVotable
+		}
+		return false, err
+	}
+	if status != "pending_vote" || closesAt == nil || time.Now().UTC().After(*closesAt) {
+		return false, ErrEventNotVotable
+	}
+
+	// UPSERT — same (event_id, ip_hash) replaces the suggested_delta. This
+	// lets a fan change their mind during the voting window without us
+	// stuffing the median with multiple votes from one IP.
+	tag, err := tx.Exec(ctx, `
+		INSERT INTO event_votes (event_id, ip_hash, suggested_delta)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (event_id, ip_hash)
+		DO UPDATE SET suggested_delta = EXCLUDED.suggested_delta,
+		              created_at = NOW()
+	`, eventID, ipHash, suggestedDelta)
+	if err != nil {
+		return false, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	// tag.RowsAffected() is 1 for both INSERT and UPDATE under ON CONFLICT.
+	// To distinguish them we'd need RETURNING — for now the caller treats
+	// both as "ok". Keeping this for future extensibility.
+	_ = tag
+	return true, nil
+}
+
+// FinalizePendingEvents picks all events past their voting_closes_at,
+// computes the median vote (or falls back to proposed_delta if no votes),
+// writes final_delta and voting_status='finalized', then refreshes the
+// affected component scores. Designed to be idempotent — a partial run can
+// safely re-fire.
+//
+// Returns the number of events finalized.
+func (r *Repository) FinalizePendingEvents(ctx context.Context) (int, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return 0, err
+	}
+	defer tx.Rollback(ctx)
+
+	// Pull the expired pending events with their median in one shot. We
+	// also pick up the proposed_delta as a fallback for zero-vote events.
+	rows, err := tx.Query(ctx, `
+		SELECT
+			ce.id,
+			ce.player_id,
+			COALESCE(ce.target_component, 'character'),
+			COALESCE(ce.proposed_delta, ce.delta),
+			(SELECT PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY suggested_delta)
+			 FROM event_votes WHERE event_id = ce.id) AS median,
+			(SELECT COUNT(*) FROM event_votes WHERE event_id = ce.id) AS votes
+		FROM character_events ce
+		WHERE ce.voting_status = 'pending_vote'
+		  AND ce.voting_closes_at IS NOT NULL
+		  AND ce.voting_closes_at <= NOW()
+		FOR UPDATE OF ce
+	`)
+	if err != nil {
+		return 0, err
+	}
+
+	type finalizeRow struct {
+		eventID   int64
+		playerID  int64
+		component string
+		fallback  float64
+		median    *float64
+		votes     int
+	}
+	var batch []finalizeRow
+	for rows.Next() {
+		var r finalizeRow
+		if err := rows.Scan(&r.eventID, &r.playerID, &r.component, &r.fallback, &r.median, &r.votes); err != nil {
+			rows.Close()
+			return 0, err
+		}
+		batch = append(batch, r)
+	}
+	rows.Close()
+
+	if len(batch) == 0 {
+		return 0, tx.Commit(ctx)
+	}
+
+	// Set final_delta + voting_status='finalized' for each event.
+	affectedPlayers := make(map[int64]map[string]struct{})
+	for _, r := range batch {
+		final := r.fallback
+		if r.median != nil {
+			final = round1(*r.median)
+		}
+		if _, err := tx.Exec(ctx, `
+			UPDATE character_events
+			SET final_delta = $2,
+			    voting_status = 'finalized'
+			WHERE id = $1
+		`, r.eventID, final); err != nil {
+			return 0, err
+		}
+		if affectedPlayers[r.playerID] == nil {
+			affectedPlayers[r.playerID] = make(map[string]struct{})
+		}
+		affectedPlayers[r.playerID][r.component] = struct{}{}
+	}
+
+	// Refresh each affected (player, component) score from scratch — same
+	// model as the post-Phase-4 character recompute. For performance-target
+	// events we apply the cumulative final_delta on top of the live snapshot.
+	now := time.Now().UTC()
+	for playerID, comps := range affectedPlayers {
+		current, err := lockScore(ctx, tx, playerID)
+		if err != nil {
+			return 0, err
+		}
+		oldFRI := current.FRI
+		for component := range comps {
+			switch component {
+			case "performance":
+				// Sum all finalized performance event deltas for this player
+				// and ADD them to the live snapshot value. Performance is
+				// snapshot-driven; events shift it.
+				var sumPerf float64
+				if err := tx.QueryRow(ctx, `
+					SELECT COALESCE(SUM(COALESCE(final_delta, delta)), 0)
+					FROM character_events
+					WHERE player_id = $1
+					  AND target_component = 'performance'
+					  AND voting_status IN ('auto_applied', 'finalized')
+				`, playerID).Scan(&sumPerf); err != nil {
+					return 0, err
+				}
+				// Get the latest performance snapshot's normalized score —
+				// that's our true "current season" baseline before events.
+				var baseSnapshot float64
+				if err := tx.QueryRow(ctx, `
+					SELECT COALESCE(MAX(normalized_score), $2)
+					FROM performance_snapshots
+					WHERE player_id = $1
+					ORDER BY snapshot_at DESC
+					LIMIT 1
+				`, playerID, current.Performance).Scan(&baseSnapshot); err != nil {
+					// No snapshot history — keep current value
+					baseSnapshot = current.Performance
+				}
+				current.Performance = clamp0to100(round1(baseSnapshot + sumPerf))
+				current.PerformanceUpdatedAt = now
+
+			default: // character
+				totalDelta, err := sumCharacterEventsForPlayer(ctx, tx, playerID)
+				if err != nil {
+					return 0, err
+				}
+				current.Character = clamp0to100(round1(characterBaseline + totalDelta))
+				current.CharacterUpdatedAt = now
+			}
+		}
+		applyFriFormula(current)
+
+		if _, err := tx.Exec(ctx, `
+			UPDATE fri_scores
+			SET performance = $2,
+			    character = $3,
+			    fri = $4,
+			    trend_value = $5,
+			    trend_direction = $6,
+			    calculated_at = $7,
+			    performance_updated_at = $8,
+			    character_updated_at = $9
+			WHERE player_id = $1
+		`,
+			playerID, current.Performance, current.Character,
+			current.FRI, current.TrendValue, current.TrendDirection, current.CalculatedAt,
+			current.PerformanceUpdatedAt, current.CharacterUpdatedAt,
+		); err != nil {
+			return 0, err
+		}
+		if historyDelta := round1(current.FRI - oldFRI); historyDelta != 0 {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO fri_history (player_id, fri, delta, calculated_at)
+				VALUES ($1,$2,$3,$4)
+			`, playerID, current.FRI, historyDelta, current.CalculatedAt); err != nil {
+				return 0, err
+			}
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return 0, err
+	}
+	return len(batch), nil
+}
+
+// ErrEventNotVotable is returned when the caller tries to vote on a finalized
+// event, a non-existent event, or one whose voting window has closed. The
+// HTTP layer maps it to 410 Gone.
+var ErrEventNotVotable = errors.New("event is not accepting votes")
 
 func (r *Repository) ApplyMediaSync(ctx context.Context, results []domain.MediaSyncPlayerResult, provider string) ([]domain.PlayerSyncDelta, error) {
 	tx, err := r.pool.Begin(ctx)
@@ -1178,9 +1562,23 @@ type scoreDelta struct {
 	OldComponentValue float64
 }
 
+// applyFriFormula computes the overall FRI from the four component scores.
+// Phase 5 (2026-05-13): Fan is no longer a component — fans now contribute
+// via per-event voting. The 0.20 previously held by Fan is redistributed
+// across the four remaining signals.
+//
+//	Performance × 0.40    (was 0.35)
+//	Social      × 0.25    (was 0.20)
+//	Media       × 0.20    (was 0.15)
+//	Character   × 0.15    (was 0.10)
+//	──────────────────────────────────
+//	                1.00   (Fan = 0)
+//
+// `score.Fan` is intentionally NOT read — the column is kept for back-compat
+// with API consumers that still read it but it doesn't influence FRI.
 func applyFriFormula(score *domain.Score) {
 	previousFRI := score.FRI
-	score.FRI = round1((score.Performance * 0.35) + (score.Social * 0.20) + (score.Fan * 0.20) + (score.Media * 0.15) + (score.Character * 0.10))
+	score.FRI = round1((score.Performance * 0.40) + (score.Social * 0.25) + (score.Media * 0.20) + (score.Character * 0.15))
 	delta := round1(score.FRI - previousFRI)
 	score.TrendValue = round1(math.Abs(delta))
 	score.TrendDirection = trendDirection(delta)

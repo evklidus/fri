@@ -18,6 +18,7 @@ type Config struct {
 	PerformanceInterval    time.Duration
 	CharacterInterval      time.Duration
 	CareerBaselineInterval time.Duration
+	FinalizeEventsInterval time.Duration
 	SyncHTTPTimeout     time.Duration
 	MediaArticlesPerRun int
 	APIFootballKey      string
@@ -42,6 +43,7 @@ func MustLoad() Config {
 		PerformanceInterval:    time.Duration(getEnvInt("PERFORMANCE_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
 		CharacterInterval:      time.Duration(getEnvInt("CHARACTER_SYNC_INTERVAL_MINUTES", 720)) * time.Minute,
 		CareerBaselineInterval: time.Duration(getEnvInt("CAREER_BASELINE_SYNC_INTERVAL_MINUTES", 43200)) * time.Minute,
+		FinalizeEventsInterval: time.Duration(getEnvInt("FINALIZE_EVENTS_INTERVAL_MINUTES", 60)) * time.Minute,
 		SyncHTTPTimeout:     time.Duration(getEnvInt("SYNC_HTTP_TIMEOUT_SECONDS", 15)) * time.Second,
 		MediaArticlesPerRun: getEnvInt("MEDIA_ARTICLES_PER_PLAYER", 3),
 		APIFootballKey:      getEnv("API_FOOTBALL_KEY", ""),

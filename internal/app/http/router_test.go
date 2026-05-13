@@ -70,6 +70,28 @@ func (f *fakeService) SyncCareerBaseline(ctx context.Context) (*domain.Component
 		FinishedAt: now,
 	}, nil
 }
+
+// Phase 5 stubs — default to empty/no-op so existing tests stay passing.
+func (f *fakeService) ListPendingEvents(ctx context.Context, playerID int64, limit int) ([]domain.PendingEvent, error) {
+	return nil, nil
+}
+func (f *fakeService) GetPendingEvent(ctx context.Context, eventID int64) (*domain.PendingEvent, error) {
+	return nil, nil
+}
+func (f *fakeService) SubmitEventVote(ctx context.Context, eventID int64, suggestedDelta float64, rawIP string) error {
+	return nil
+}
+func (f *fakeService) FinalizePendingEvents(ctx context.Context) (*domain.ComponentSyncResult, error) {
+	now := time.Now().UTC()
+	return &domain.ComponentSyncResult{
+		Component:  "event-finalize",
+		Provider:   "event-voting",
+		Status:     "completed",
+		Message:    "no events",
+		StartedAt:  now,
+		FinishedAt: now,
+	}, nil
+}
 func (f *fakeService) SyncSocial(ctx context.Context) (*domain.ComponentSyncResult, error) {
 	return f.syncSocialFn(ctx)
 }

@@ -53,6 +53,7 @@ func main() {
 			PerformanceInterval:    cfg.PerformanceInterval,
 			CharacterInterval:      cfg.CharacterInterval,
 			CareerBaselineInterval: cfg.CareerBaselineInterval,
+			FinalizeEventsInterval: cfg.FinalizeEventsInterval,
 			RunOnStartup:           cfg.SyncOnStartup,
 		})
 	}

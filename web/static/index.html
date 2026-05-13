@@ -118,7 +118,35 @@
   .trend-down { color:var(--red); font-size:12px; font-family:'Space Mono',monospace; }
   .trend-stable { color:var(--muted); font-size:12px; font-family:'Space Mono',monospace; }
 
-  /* POLL */
+  /* EVENTS FEED (Phase 5 voting) */
+  .events-feed { display:flex; flex-direction:column; gap:18px; }
+  .events-empty { color:var(--muted); text-align:center; padding:48px 16px; font-size:14px; }
+  .event-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:22px 24px; }
+  .event-card-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:10px; }
+  .event-card-meta { display:flex; align-items:center; gap:10px; font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1px; color:var(--muted); text-transform:uppercase; }
+  .event-card-tag { padding:3px 10px; border-radius:4px; background:rgba(245,200,66,0.12); color:var(--gold); }
+  .event-card-tag.performance { background:rgba(245,200,66,0.12); color:var(--gold); }
+  .event-card-tag.character { background:rgba(168,85,247,0.12); color:#A855F7; }
+  .event-card-player { font-size:16px; font-weight:600; margin-bottom:4px; }
+  .event-card-trigger { font-size:14px; color:var(--text); margin-bottom:8px; }
+  .event-card-source { font-size:12px; color:var(--muted); line-height:1.5; margin-bottom:14px; }
+  .event-card-source a { color:var(--gold); text-decoration:none; }
+  .event-card-source a:hover { text-decoration:underline; }
+  .event-card-row { display:flex; align-items:center; gap:14px; padding:10px 0; border-top:1px solid var(--border); font-size:12px; color:var(--muted); }
+  .event-card-row .lbl { width:130px; font-family:'Space Mono',monospace; letter-spacing:1px; text-transform:uppercase; }
+  .event-card-row .val { font-family:'Bebas Neue',sans-serif; font-size:18px; }
+  .event-card-row .val.proposed { color:var(--gold); }
+  .event-card-row .val.community { color:#22C55E; }
+  .event-card-vote { display:flex; align-items:center; gap:14px; padding-top:14px; border-top:1px solid var(--border); }
+  .event-card-vote input[type=range] { flex:1; -webkit-appearance:none; height:5px; border-radius:10px; background:linear-gradient(to right,#EF4444 0%,#888 50%,#22C55E 100%); outline:none; }
+  .event-card-vote input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:18px; height:18px; border-radius:50%; background:var(--gold); cursor:pointer; border:3px solid var(--black); }
+  .event-card-vote .vote-val { font-family:'Bebas Neue',sans-serif; font-size:22px; color:var(--gold); width:50px; text-align:right; }
+  .event-card-vote .vote-btn { padding:8px 16px; border-radius:6px; border:1px solid var(--gold); background:var(--gold); color:#000; font-weight:600; cursor:pointer; font-size:13px; transition:transform 0.2s,opacity 0.2s; }
+  .event-card-vote .vote-btn:hover { transform:translateY(-1px); }
+  .event-card-vote .vote-btn:disabled { opacity:0.5; cursor:default; transform:none; }
+  .event-card-time { font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; margin-top:8px; }
+
+  /* POLL — legacy class name retained for the reused .poll-section padding */
   .poll-section { padding:100px 48px; max-width:900px; margin:0 auto; }
   .poll-card { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:40px; }
   .poll-player-select { display:flex; align-items:center; gap:16px; margin-bottom:32px; padding-bottom:32px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
@@ -281,7 +309,7 @@
   <div class="nav-logo">FRI</div>
   <ul class="nav-links">
     <li><a href="#leaderboard" data-i18n="nav_rankings">Rankings</a></li>
-    <li><a href="#polls" data-i18n="nav_polls">Fan Polls</a></li>
+    <li><a href="#events" data-i18n="nav_events">Vote on Events</a></li>
     <li><a href="#news" data-i18n="nav_news">Live News</a></li>
     <li><a href="#formula" data-i18n="nav_formula">Formula</a></li>
     <li><a href="#personas" data-i18n="nav_for_you">For You</a></li>
@@ -353,7 +381,8 @@
       <th data-i18n="th_fri">FRI Score</th>
       <th data-i18n="th_perf">Performance</th>
       <th data-i18n="th_social">Social</th>
-      <th data-i18n="th_fan">Fan Poll</th>
+      <th data-i18n="th_media">Media</th>
+      <th data-i18n="th_char">Character</th>
       <th data-i18n="th_trend">Trend</th>
     </tr></thead>
     <tbody id="table-body"></tbody>
@@ -363,57 +392,14 @@
 <div class="section-divider"></div>
 
 <!-- FAN POLL -->
-<section id="polls" class="poll-section">
+<section id="events" class="poll-section">
   <div class="section-header">
-    <div class="section-eyebrow" data-i18n="poll_eye">Community Voice</div>
-    <h2 class="section-title" data-i18n="poll_title">Fan Poll</h2>
-    <p class="section-sub" data-i18n="poll_sub">Your rating directly impacts a player's FRI. 20% of the score comes from you — the fans.</p>
+    <div class="section-eyebrow" data-i18n="events_eye">Community Voice</div>
+    <h2 class="section-title" data-i18n="events_title">Vote on Events</h2>
+    <p class="section-sub" data-i18n="events_sub">Each rating event has a proposed delta. Drag the slider to suggest a fairer value. The median of community votes becomes the final change to the player's score.</p>
   </div>
-  <div class="poll-card">
-    <div class="poll-player-select">
-      <div class="player-avatar" style="width:60px;height:60px;font-size:26px;background:linear-gradient(135deg,#1a3a6a,#2a5a9a)">⚽</div>
-      <div>
-        <h3 id="poll-rate-label" data-i18n="poll_rate">Rate K. Mbappé</h3>
-        <p data-i18n="poll_match">Real Madrid · Forward · Last match: vs. Barcelona (UCL)</p>
-      </div>
-      <select style="margin-left:auto;background:var(--card2);border:1px solid var(--border);color:var(--text);padding:10px 16px;border-radius:6px;font-family:'DM Sans',sans-serif;font-size:14px;outline:none;cursor:pointer" onchange="updatePollPlayer(this.value)">
-        <option>K. Mbappé</option><option>E. Haaland</option><option>J. Bellingham</option><option>M. Salah</option><option>V. van Dijk</option>
-      </select>
-    </div>
-    <div class="poll-question">
-      <h4 data-i18n="poll_q1">Overall performance this season</h4>
-      <div class="rating-stars">
-        <span class="star" onclick="rateStar(1)">★</span><span class="star" onclick="rateStar(2)">★</span><span class="star" onclick="rateStar(3)">★</span><span class="star" onclick="rateStar(4)">★</span><span class="star" onclick="rateStar(5)">★</span>
-      </div>
-    </div>
-    <div class="poll-question">
-      <h4 data-i18n="poll_q2">Fan engagement score (1–10)</h4>
-      <div class="slider-wrap">
-        <input type="range" min="1" max="10" value="7" id="engagement-slider" oninput="updateSlider(this.value)" />
-        <div class="slider-val" id="slider-val">7</div>
-      </div>
-    </div>
-    <div class="poll-question">
-      <h4 data-i18n="poll_q3">How do you see this player?</h4>
-      <div class="opinion-btns">
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="op_goat">🏆 GOAT Candidate</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="op_wc">🌟 World Class</button>
-        <button class="opinion-btn selected" onclick="selectOpinion(this)" data-i18n="op_elite">⚡ Elite</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="op_improv">📈 Improving</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="op_over">😐 Overrated</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="op_below">📉 Below Hype</button>
-      </div>
-    </div>
-    <div class="poll-question">
-      <h4 data-i18n="poll_q4">Off-field behavior</h4>
-      <div class="opinion-btns">
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="beh_role">✅ Role Model</button>
-        <button class="opinion-btn selected" onclick="selectOpinion(this)" data-i18n="beh_neu">😶 Neutral</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="beh_con">⚠️ Controversial</button>
-        <button class="opinion-btn" onclick="selectOpinion(this)" data-i18n="beh_prob">❌ Problematic</button>
-      </div>
-    </div>
-    <button class="poll-submit" id="poll-submit-btn" onclick="submitPoll()" data-i18n="poll_submit">Submit My Rating → Impact FRI</button>
+  <div id="events-feed" class="events-feed">
+    <div class="events-empty" data-i18n="events_empty">No events pending votes right now. Check back after the next sync.</div>
   </div>
 </section>
 
@@ -439,15 +425,14 @@
     <p class="section-sub" data-i18n="form_sub">Fair, transparent, and position-neutral. Every component is publicly auditable.</p>
   </div>
   <div class="formula-box">
-    <span class="formula-main">FRI = (P × 0.35) + (S × 0.20) + (F × 0.20) + (M × 0.15) + (C × 0.10)</span>
+    <span class="formula-main">FRI = (P × 0.40) + (S × 0.25) + (M × 0.20) + (C × 0.15)</span>
     <span class="formula-note" data-i18n="form_note">All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation</span>
   </div>
   <div class="pillars-detail">
-    <div class="pillar-detail-card"><h4>🏟️ <span data-i18n="pil1_t">Field Performance</span></h4><div class="pillar-weight" data-i18n="pil1_w">Weight: 35%</div><p data-i18n="pil1_d">Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Age-adjusted for veterans.</p></div>
-    <div class="pillar-detail-card"><h4>📱 <span data-i18n="pil2_t">Social Influence</span></h4><div class="pillar-weight" data-i18n="pil2_w">Weight: 20%</div><p data-i18n="pil2_d">Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.</p></div>
-    <div class="pillar-detail-card"><h4>🗳️ <span data-i18n="pil3_t">Fan Sentiment</span></h4><div class="pillar-weight" data-i18n="pil3_w">Weight: 20%</div><p data-i18n="pil3_d">Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.</p></div>
-    <div class="pillar-detail-card"><h4>📰 <span data-i18n="pil4_t">Media Score</span></h4><div class="pillar-weight" data-i18n="pil4_w">Weight: 15%</div><p data-i18n="pil4_d">NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.</p></div>
-    <div class="pillar-detail-card"><h4>⚖️ <span data-i18n="pil5_t">Character Index</span></h4><div class="pillar-weight" data-i18n="pil5_w">Weight: 10%</div><p data-i18n="pil5_d">Yellow/red cards, confirmed scandals, fan conflicts, referee disputes subtract points. Charity work and fair play awards add. Older incidents decay 20% weight per year.</p></div>
+    <div class="pillar-detail-card"><h4>🏟️ <span data-i18n="pil1_t">Field Performance</span></h4><div class="pillar-weight" data-i18n="pil1_w">Weight: 40%</div><p data-i18n="pil1_d">Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Blended 60/40 with a career baseline so stars don't crater during an off year.</p></div>
+    <div class="pillar-detail-card"><h4>📱 <span data-i18n="pil2_t">Social Influence</span></h4><div class="pillar-weight" data-i18n="pil2_w">Weight: 25%</div><p data-i18n="pil2_d">Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.</p></div>
+    <div class="pillar-detail-card"><h4>📰 <span data-i18n="pil4_t">Media Score</span></h4><div class="pillar-weight" data-i18n="pil4_w">Weight: 20%</div><p data-i18n="pil4_d">NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.</p></div>
+    <div class="pillar-detail-card"><h4>⚖️ <span data-i18n="pil5_t">Character Index</span></h4><div class="pillar-weight" data-i18n="pil5_w">Weight: 15%</div><p data-i18n="pil5_d">Yellow/red cards, scandals, referee disputes subtract points. Charity work, fair play awards, captaincy add. Each event runs through community voting (see "Vote on Events") so obvious cases auto-apply and grey-area ones are validated by fans.</p></div>
   </div>
 </section>
 
@@ -530,7 +515,6 @@
         <div class="pillar-grid">
           <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_perf">Performance</div><div class="pillar-card-score" id="m-perf" style="color:#F5C842"></div><div class="pillar-track"><div class="pillar-fill" id="m-perf-bar" style="background:linear-gradient(90deg,#F5C842,#E8A820)"></div></div></div>
           <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_social">Social</div><div class="pillar-card-score" id="m-social" style="color:#3B82F6"></div><div class="pillar-track"><div class="pillar-fill" id="m-social-bar" style="background:#3B82F6"></div></div></div>
-          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_fan">Fan Poll</div><div class="pillar-card-score" id="m-fan" style="color:#22C55E"></div><div class="pillar-track"><div class="pillar-fill" id="m-fan-bar" style="background:#22C55E"></div></div></div>
           <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_media">Media</div><div class="pillar-card-score" id="m-media" style="color:#06B6D4"></div><div class="pillar-track"><div class="pillar-fill" id="m-media-bar" style="background:#06B6D4"></div></div></div>
           <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_char">Character</div><div class="pillar-card-score" id="m-char" style="color:#A855F7"></div><div class="pillar-track"><div class="pillar-fill" id="m-char-bar" style="background:#A855F7"></div></div></div>
         </div>
@@ -564,7 +548,9 @@
 // ── TRANSLATIONS ──────────────────────────────────────────
 const T = {
   en: {
-    nav_rankings:'Rankings', nav_polls:'Fan Polls', nav_news:'Live News', nav_formula:'Formula', nav_for_you:'For You', nav_explore:'Explore',
+    nav_rankings:'Rankings', nav_events:'Vote on Events', nav_news:'Live News', nav_formula:'Formula', nav_for_you:'For You', nav_explore:'Explore',
+    events_eye:'Community Voice', events_title:'Vote on Events', events_sub:'Each rating event has a proposed delta. Drag the slider to suggest a fairer value. The median of community votes becomes the final change to the player\'s score.', events_empty:'No events pending votes right now. Check back after the next sync.',
+    th_media:'Media', th_char:'Character',
     hero_eyebrow:'The Global Standard for Player Reputation', hero_line1:'FOOTBALL', hero_line2:'REPUTATION', hero_line3:'INDEX',
     hero_subtitle:'FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, fan sentiment, media coverage, and character into one transparent number.',
     hero_btn1:'View Rankings', hero_btn2:'How It Works',
@@ -599,7 +585,9 @@ const T = {
     age_label:'Age',
   },
   ru: {
-    nav_rankings:'Рейтинг', nav_polls:'Опросы', nav_news:'Новости', nav_formula:'Формула', nav_for_you:'Для вас', nav_explore:'Смотреть',
+    nav_rankings:'Рейтинг', nav_events:'Голосование', nav_news:'Новости', nav_formula:'Формула', nav_for_you:'Для вас', nav_explore:'Смотреть',
+    events_eye:'Голос болельщиков', events_title:'Голосование за события', events_sub:'У каждого события есть предложенная дельта. Двигайте ползунок, чтобы предложить более справедливое значение. Медиана голосов сообщества становится финальным изменением рейтинга игрока.', events_empty:'Сейчас нет событий, ожидающих голосования. Загляните после следующего sync.',
+    th_media:'Медиа', th_char:'Характер',
     hero_eyebrow:'Мировой стандарт репутации футболистов', hero_line1:'ФУТБОЛ', hero_line2:'РЕПУТАЦИЯ', hero_line3:'ИНДЕКС',
     hero_subtitle:'FRI — первый в мире универсальный индекс репутации футболистов на основе данных: игровые показатели, соцсети, мнение болельщиков, медиаосвещение и характер — в одной прозрачной цифре.',
     hero_btn1:'Смотреть рейтинг', hero_btn2:'Как это работает',
@@ -712,7 +700,8 @@ function renderTable() {
         <td><span class="fri-badge ${friClass(p.fri)}">${p.fri}</span></td>
         <td><div style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${p.perf}%;background:${c}"></div></div><span style="font-size:12px;font-family:'Space Mono',monospace">${p.perf}</span></div></td>
         <td><div style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${p.social}%;background:#3B82F6"></div></div><span style="font-size:12px;font-family:'Space Mono',monospace">${p.social}</span></div></td>
-        <td><div style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${p.fan}%;background:#22C55E"></div></div><span style="font-size:12px;font-family:'Space Mono',monospace">${p.fan}</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${p.media}%;background:#06B6D4"></div></div><span style="font-size:12px;font-family:'Space Mono',monospace">${p.media}</span></div></td>
+        <td><div style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:${p.char}%;background:#A855F7"></div></div><span style="font-size:12px;font-family:'Space Mono',monospace">${p.char}</span></div></td>
         <td>${trend}</td>`;
       tb.appendChild(tr);
     });
@@ -734,7 +723,7 @@ function openModal(p) {
   document.getElementById('modal-meta').textContent = `${p.pos} · ${p.club} · ${t.age_label} ${p.age}`;
   document.getElementById('modal-score').textContent = p.fri;
   document.getElementById('modal-summary').textContent = lang==='ru' ? p.sum_ru : p.sum_en;
-  [['m-perf',p.perf],['m-social',p.social],['m-fan',p.fan],['m-media',p.media],['m-char',p.char]].forEach(([id,v]) => {
+  [['m-perf',p.perf],['m-social',p.social],['m-media',p.media],['m-char',p.char]].forEach(([id,v]) => {
     document.getElementById(id).textContent = v;
     document.getElementById(id+'-bar').style.width = v+'%';
   });
@@ -851,7 +840,6 @@ renderTable();
     const bars = [
       {label:'Performance', val:top.perf, color:'linear-gradient(90deg,#F5C842,#E8A820)'},
       {label:'Social', val:top.social, color:'#3B82F6'},
-      {label:'Fan Poll', val:top.fan, color:'#22C55E'},
       {label:'Media', val:top.media, color:'#06B6D4'},
       {label:'Character', val:top.char, color:'#A855F7'},
     ];

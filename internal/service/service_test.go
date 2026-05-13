@@ -128,6 +128,21 @@ func (m *mockRepo) UpsertCareerBaseline(ctx context.Context, baseline domain.Pla
 	}
 	return nil
 }
+func (m *mockRepo) ListPendingEvents(ctx context.Context, limit int) ([]domain.PendingEvent, error) {
+	return nil, nil
+}
+func (m *mockRepo) ListPendingEventsForPlayer(ctx context.Context, playerID int64, limit int) ([]domain.PendingEvent, error) {
+	return nil, nil
+}
+func (m *mockRepo) GetPendingEvent(ctx context.Context, eventID int64) (*domain.PendingEvent, error) {
+	return nil, nil
+}
+func (m *mockRepo) SubmitEventVote(ctx context.Context, eventID int64, ipHash string, suggestedDelta float64) (bool, error) {
+	return true, nil
+}
+func (m *mockRepo) FinalizePendingEvents(ctx context.Context) (int, error) {
+	return 0, nil
+}
 
 func newServiceWithRepo(repo *mockRepo) *Service {
 	return New(repo, nil, nil, nil)

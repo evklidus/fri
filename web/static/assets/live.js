@@ -255,8 +255,149 @@
     renderTable();
     renderNews();
     updateHeroCard();
-    populatePollPlayers();
+    populatePollPlayers(); // legacy — no-op now that the poll widget is gone
+    loadEventsFeed();      // Phase 5: load pending events for voting
   }
+
+  // ── Phase 5: Events Feed ─────────────────────────────────────────────
+  // Loads pending-vote events from the API and renders one card per event
+  // with a slider for the fan to suggest a different delta. Submits via
+  // POST /api/events/{id}/vote.
+
+  async function loadEventsFeed() {
+    const container = document.getElementById("events-feed");
+    if (!container) return;
+    try {
+      const payload = await fetchJSON("/api/events/pending?limit=20");
+      const events = Array.isArray(payload.data) ? payload.data : [];
+      renderEventsFeed(events);
+    } catch (err) {
+      console.warn("events feed fetch failed:", err);
+      container.innerHTML = `<div class="events-empty">Couldn't load events: ${err.message}</div>`;
+    }
+  }
+
+  function renderEventsFeed(events) {
+    const container = document.getElementById("events-feed");
+    if (!container) return;
+    if (!events.length) {
+      const langKey = typeof lang === "string" ? lang : "en";
+      const msg = langKey === "ru"
+        ? "Сейчас нет событий, ожидающих голосования. Загляните после следующего sync."
+        : "No events pending votes right now. Check back after the next sync.";
+      container.innerHTML = `<div class="events-empty">${msg}</div>`;
+      return;
+    }
+    container.innerHTML = "";
+    events.forEach((event) => container.appendChild(buildEventCard(event)));
+  }
+
+  function buildEventCard(event) {
+    const card = document.createElement("div");
+    card.className = "event-card";
+    card.dataset.eventId = event.id;
+
+    const componentTag = event.target_component === "performance" ? "performance" : "character";
+    const timeLeft = humanTimeLeft(event.voting_closes_at);
+    const proposed = Number(event.proposed_delta || 0);
+    const proposedSign = proposed > 0 ? "+" : "";
+    const median = event.votes_median != null ? Number(event.votes_median) : null;
+    const medianRow = median != null
+      ? `<div class="event-card-row">
+           <span class="lbl">Community vote</span>
+           <span class="val community">${median > 0 ? "+" : ""}${median.toFixed(1)}</span>
+           <span style="font-size:11px;color:var(--muted)">${event.votes_count} ${event.votes_count === 1 ? "vote" : "votes"}</span>
+         </div>`
+      : `<div class="event-card-row">
+           <span class="lbl">Community vote</span>
+           <span style="color:var(--muted);font-size:13px">No votes yet — be the first</span>
+         </div>`;
+
+    const sourceLine = event.news_title
+      ? `<div class="event-card-source">News: ${escapeHtml(event.news_title)}</div>`
+      : `<div class="event-card-source">Stats-derived event</div>`;
+
+    card.innerHTML = `
+      <div class="event-card-top">
+        <div>
+          <div class="event-card-player">${escapeHtml(event.player_name)}</div>
+          <div class="event-card-trigger">Trigger: <strong>${escapeHtml(event.trigger_word.replace(/_/g, " "))}</strong></div>
+        </div>
+        <div class="event-card-meta">
+          <span class="event-card-tag ${componentTag}">${componentTag}</span>
+        </div>
+      </div>
+      ${sourceLine}
+      <div class="event-card-row">
+        <span class="lbl">FRI proposes</span>
+        <span class="val proposed">${proposedSign}${proposed.toFixed(1)}</span>
+      </div>
+      ${medianRow}
+      <div class="event-card-vote">
+        <input type="range" min="-5" max="5" step="0.5" value="${proposed}" />
+        <div class="vote-val">${proposedSign}${proposed.toFixed(1)}</div>
+        <button class="vote-btn">Vote</button>
+      </div>
+      <div class="event-card-time">Voting ends in ${timeLeft}</div>
+    `;
+
+    // Wire the slider + button
+    const slider = card.querySelector("input[type=range]");
+    const valDisplay = card.querySelector(".vote-val");
+    const btn = card.querySelector(".vote-btn");
+
+    slider.addEventListener("input", () => {
+      const v = Number(slider.value);
+      valDisplay.textContent = (v > 0 ? "+" : "") + v.toFixed(1);
+    });
+
+    btn.addEventListener("click", async () => {
+      const v = Number(slider.value);
+      btn.disabled = true;
+      btn.textContent = "...";
+      try {
+        const resp = await fetch(`/api/events/${event.id}/vote`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ suggested_delta: v }),
+        });
+        if (resp.status === 410) {
+          btn.textContent = "Closed";
+          return;
+        }
+        if (!resp.ok) {
+          const payload = await resp.json().catch(() => ({}));
+          throw new Error(payload.error || `HTTP ${resp.status}`);
+        }
+        btn.textContent = "✓ Voted";
+        btn.style.background = "#22C55E";
+        btn.style.borderColor = "#22C55E";
+        btn.style.color = "#fff";
+        // Refresh the feed shortly so the user sees their vote in the median
+        setTimeout(loadEventsFeed, 600);
+      } catch (err) {
+        btn.textContent = "Try again";
+        btn.disabled = false;
+        console.warn("vote submit failed:", err);
+      }
+    });
+
+    return card;
+  }
+
+  function humanTimeLeft(isoString) {
+    const target = new Date(isoString);
+    const diffMs = target.getTime() - Date.now();
+    if (diffMs <= 0) return "any moment";
+    const hours = Math.floor(diffMs / 3_600_000);
+    const minutes = Math.floor((diffMs % 3_600_000) / 60_000);
+    if (hours > 0) return `${hours}h ${minutes}m`;
+    return `${minutes}m`;
+  }
+
+  // Refresh the events feed every 60s so live votes / new events surface
+  // without a page reload. Lightweight — 1 GET per minute.
+  setInterval(loadEventsFeed, 60_000);
 
   function getPollSelect() {
     return document.querySelector(".poll-player-select select");

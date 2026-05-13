@@ -21,11 +21,17 @@ const (
 //
 // `target` routes the delta to a specific FRI component. Empty == "character"
 // for backward compat with the original Phase 3 triggers.
+//
+// `autoApply` (Phase 5 — 2026-05-13) controls whether the event skips fan
+// voting. Set to true for definitive, non-controversial cases (doping,
+// official awards) where community override would be inappropriate.
+// Defaults to false: most triggers go through the 24h voting window.
 type characterTrigger struct {
-	concept string  // grouping key for de-dup within an article
-	delta   float64 // points added/subtracted from the target component
-	target  string  // "character" (default) or "performance"
-	words   []string
+	concept   string  // grouping key for de-dup within an article
+	delta     float64 // points added/subtracted from the target component
+	target    string  // "character" (default) or "performance"
+	autoApply bool    // skip fan voting; finalize at insert time
+	words     []string
 }
 
 // characterTriggers covers two flavours of reputation event:
@@ -39,35 +45,38 @@ type characterTrigger struct {
 // score without moderation. We only ship phrases with high precision in
 // football headlines.
 var characterTriggers = []characterTrigger{
-	// ── Character: severe negatives ────────────────────────────────────
-	{concept: "doping", delta: -8, words: []string{"doping", "failed drug test", "banned for doping", "допинг", "провалил тест на допинг"}},
-	{concept: "racism", delta: -6, words: []string{"racism", "racist abuse", "racist remark", "расизм", "расистск"}},
-	{concept: "criminal", delta: -7, words: []string{" arrested", "criminal charges", "criminal probe", "арестован", "уголовн"}},
+	// ── Character: severe negatives — DEFINITIVE, NO FAN OVERRIDE ──────
+	{concept: "doping", delta: -8, autoApply: true, words: []string{"doping", "failed drug test", "banned for doping", "допинг", "провалил тест на допинг"}},
+	{concept: "racism", delta: -6, autoApply: true, words: []string{"racism", "racist abuse", "racist remark", "расизм", "расистск"}},
+	{concept: "criminal", delta: -7, autoApply: true, words: []string{" arrested", "criminal charges", "criminal probe", "арестован", "уголовн"}},
+	// Scandal severity varies — community decides.
 	{concept: "scandal", delta: -3, words: []string{"scandal", "controversy erupt", "скандал"}},
 
-	// ── Character: moderate negatives ──────────────────────────────────
+	// ── Character: moderate negatives — fans decide if it's fair ───────
 	{concept: "red_card", delta: -1.5, words: []string{"red card", "sent off", "красная карточка", "удалён с поля"}},
 	{concept: "ban", delta: -2.5, words: []string{"two-match ban", "three-match ban", "match ban", "дисквалифицирован"}},
 	{concept: "fine", delta: -0.5, words: []string{"fined", "штраф"}},
 
-	// ── Character: positives ───────────────────────────────────────────
+	// ── Character: positives — context matters, fans vote ──────────────
 	{concept: "fair_play", delta: 1.5, words: []string{"fair play award", "награда за fair play"}},
 	{concept: "charity", delta: 0.8, words: []string{"charity donation", "philanthrop", "благотворительн"}},
 	{concept: "captain", delta: 0.5, words: []string{"named captain", "captaincy", "назначен капитаном"}},
 
-	// ── Performance: positives (sporting achievements) ─────────────────
+	// ── Performance: positives — context (stakes, opponent) matters ────
 	{concept: "hat_trick", delta: 2.0, target: "performance", words: []string{"hat-trick", "hat trick", "хет-трик"}},
 	{concept: "brace", delta: 1.0, target: "performance", words: []string{"brace against", "scored a brace", "scored twice", "two goals against", "дубль"}},
 	{concept: "player_of_month", delta: 3.0, target: "performance", words: []string{"player of the month", "игрок месяца", "лучший игрок месяца"}},
-	{concept: "player_of_year", delta: 5.0, target: "performance", words: []string{"player of the year", "игрок года", "лучший игрок года"}},
-	{concept: "ballon_dor", delta: 8.0, target: "performance", words: []string{"ballon d'or", "ballon d or", "золотой мяч"}},
+	// Official year awards — definitive, no community override needed.
+	{concept: "player_of_year", delta: 5.0, target: "performance", autoApply: true, words: []string{"player of the year", "игрок года", "лучший игрок года"}},
+	{concept: "ballon_dor", delta: 8.0, target: "performance", autoApply: true, words: []string{"ballon d'or", "ballon d or", "золотой мяч"}},
 	{concept: "goal_of_season", delta: 2.5, target: "performance", words: []string{"goal of the season", "goal of the year", "гол сезона", "гол года"}},
 	{concept: "trophy_won", delta: 4.0, target: "performance", words: []string{"won the champions league", "champions league trophy", "league title clinched", "won the league", "выиграл лигу чемпионов", "выиграл чемпионат"}},
 
-	// ── Performance: negatives (sporting setbacks) ─────────────────────
+	// ── Performance: negatives — press framing varies, fans vote ───────
 	{concept: "goal_drought_5", delta: -1.5, target: "performance", words: []string{"five games without scoring", "5 games without scoring", "5-game scoring drought", "scoring drought", "fifth game without", "5 матчей без гола", "пять матчей без гола"}},
 	{concept: "goal_drought_10", delta: -3.0, target: "performance", words: []string{"ten games without scoring", "10 games without scoring", "10-game drought", "tenth game without", "10 матчей без гола", "десять матчей без гола"}},
-	{concept: "injury_serious", delta: -1.5, target: "performance", words: []string{"long-term injury", "season-ending injury", "out for the season", "out for several months", "тяжёлая травма", "выбыл до конца сезона"}},
+	// Injury is objective (player can't perform). Auto-apply.
+	{concept: "injury_serious", delta: -1.5, target: "performance", autoApply: true, words: []string{"long-term injury", "season-ending injury", "out for the season", "out for several months", "тяжёлая травма", "выбыл до конца сезона"}},
 	{concept: "penalty_miss_key", delta: -1.0, target: "performance", words: []string{"missed crucial penalty", "missed a penalty in the", "penalty miss costs", "промазал решающий пенальти"}},
 }
 
@@ -189,6 +198,7 @@ func scanNewsForCharacterTriggers(news []domain.NewsItem, cutoff time.Time) []do
 				TriggerWord:     trig.concept,
 				Delta:           trig.delta,
 				TargetComponent: trig.target, // "" defaults to "character" in repo
+				AutoApply:       trig.autoApply,
 			})
 		}
 	}
