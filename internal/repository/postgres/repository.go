@@ -974,6 +974,13 @@ func (r *Repository) ApplyMediaSync(ctx context.Context, results []domain.MediaS
 	return deltas, nil
 }
 
+// fanBaseline is the neutral starting Fan Poll score every player has before
+// any verified votes accumulate. Same philosophy as characterBaseline (Phase
+// 4 ext-A): "baseline + grows/falls" per partner's vision (2026-05-09).
+// fan_base column is kept around for back-compat but is no longer the
+// driver — votes are.
+const fanBaseline = 50.0
+
 func refreshFanScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Score, *scoreDelta, error) {
 	var current domain.Score
 	if err := tx.QueryRow(ctx, `
@@ -1003,12 +1010,26 @@ func refreshFanScore(ctx context.Context, tx pgx.Tx, playerID int64) (*domain.Sc
 		return nil, nil, err
 	}
 
+	var voteCount int
 	var avgInternal float64
-	if err := tx.QueryRow(ctx, `SELECT COALESCE(AVG(internal_score), 0) FROM fan_votes WHERE player_id = $1`, playerID).Scan(&avgInternal); err != nil {
+	if err := tx.QueryRow(ctx, `
+		SELECT COUNT(*), COALESCE(AVG(internal_score), 0)
+		FROM fan_votes
+		WHERE player_id = $1
+	`, playerID).Scan(&voteCount, &avgInternal); err != nil {
 		return nil, nil, err
 	}
 
-	newFan := round1((current.FanBase * 0.7) + (avgInternal * 0.3))
+	// New event-driven semantics: with zero votes the score sits at the
+	// neutral baseline (50). When votes arrive the score is the
+	// vote-average, clamped to 0..100. No seeded fan_base influence — that
+	// was the bias that put Bellingham at 95 even after his form fell off.
+	var newFan float64
+	if voteCount == 0 {
+		newFan = fanBaseline
+	} else {
+		newFan = round1(clamp0to100(avgInternal))
+	}
 	oldFRI := current.FRI
 	oldFan := current.Fan
 

@@ -938,6 +938,48 @@ func (p *apiFootballPerformanceProvider) get(ctx context.Context, path string, p
 	return json.NewDecoder(resp.Body).Decode(target)
 }
 
+// performanceWeights groups the six signals that go into a player's
+// Performance score, with one weight per signal. Weights must sum to 1.0
+// within a position; see performanceWeightsFor for the actual values.
+type performanceWeights struct {
+	rating       float64 // match-rating from api-football
+	goalsAssists float64 // (G + A) / 90, capped at position max
+	xgxa         float64 // proxy from key passes + shots on target
+	posRank      float64 // 1-based rank in position group within league
+	minutes      float64 // minutes share over the season
+	form         float64 // last-5 fixtures aggregate
+}
+
+// performanceWeightsFor returns the per-position weighting used to combine
+// raw signals into the Performance score (0–100).
+//
+//	FWD: legacy default — goal/assist output is genuinely the job.
+//	MID: heavier rating + assists, lighter goals. Creative midfielders
+//	     (Pedri, Vitinha) shouldn't be punished for sub-10-goal seasons.
+//	DEF: rating + minutes dominate; goal output ~5% only as a tie-breaker.
+//	GK:  no goals/assists/xG channels at all; rating + minutes carry it.
+//	     The goal/assist weight (normally 0.18+0.18=0.36) is reallocated
+//	     to rating + minutes + form.
+//
+// These are the same shape as career-baseline weights (Phase 4.2); reusing
+// the philosophy keeps the system consistent end-to-end.
+func performanceWeightsFor(position string) performanceWeights {
+	switch positionGroup(position) {
+	case "ATT":
+		return performanceWeights{rating: 0.30, goalsAssists: 0.18, xgxa: 0.18, posRank: 0.14, minutes: 0.10, form: 0.10}
+	case "MID":
+		return performanceWeights{rating: 0.40, goalsAssists: 0.10, xgxa: 0.14, posRank: 0.16, minutes: 0.10, form: 0.10}
+	case "DEF":
+		return performanceWeights{rating: 0.50, goalsAssists: 0.05, xgxa: 0.05, posRank: 0.15, minutes: 0.15, form: 0.10}
+	case "GK":
+		return performanceWeights{rating: 0.55, goalsAssists: 0.00, xgxa: 0.00, posRank: 0.15, minutes: 0.20, form: 0.10}
+	default:
+		// Unknown position — fall back to FWD weights so we don't accidentally
+		// zero-out an unmapped player.
+		return performanceWeights{rating: 0.30, goalsAssists: 0.18, xgxa: 0.18, posRank: 0.14, minutes: 0.10, form: 0.10}
+	}
+}
+
 func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballStatistic, rankPos, rankTotal int, form formSnapshot) domain.PerformanceSnapshot {
 	minutes := float64(stat.Games.Minutes)
 	appearances := float64(stat.Games.Appearances)
@@ -974,13 +1016,25 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballSt
 
 	formScore := buildFormScore(player.Position, form)
 
+	// Position-aware weights (Phase 4 ext-B, 2026-05-13).
+	//
+	// The original single weight-set treated rating + goals/assists + xG/xA as
+	// the dominant signals, which made sense for forwards but punished
+	// game-controlling midfielders (Pedri, Vitinha) and defenders. Web
+	// reality-check against May 2026 Ballon d'Or rankings showed our system
+	// had Pedri at #14 while consensus puts him as "best midfielder on the
+	// planet". Per-position weights fix the bias.
+	//
+	// Sum must equal 1.0 within each row.
+	w := performanceWeightsFor(player.Position)
+
 	normalizedScore := clampScore(
-		(normalizeLinear(averageRating, 5.5, 9.5) * 0.30) +
-			(normalizeLinear(goalsAssistsPer90, 0, positionGAMax(player.Position)) * 0.18) +
-			(normalizeLinear(xgXaProxyPer90, 0, positionXGXAMax(player.Position)) * 0.18) +
-			(positionRankScore * 0.14) +
-			(minutesShare * 0.10) +
-			(formScore * 0.10),
+		(normalizeLinear(averageRating, 5.5, 9.5) * w.rating) +
+			(normalizeLinear(goalsAssistsPer90, 0, positionGAMax(player.Position)) * w.goalsAssists) +
+			(normalizeLinear(xgXaProxyPer90, 0, positionXGXAMax(player.Position)) * w.xgxa) +
+			(positionRankScore * w.posRank) +
+			(minutesShare * w.minutes) +
+			(formScore * w.form),
 	)
 
 	return domain.PerformanceSnapshot{
