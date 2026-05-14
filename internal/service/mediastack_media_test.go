@@ -74,6 +74,11 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 		if got := q.Get("keywords"); got != `"lionel messi"` {
 			t.Errorf("keywords = %q, want quoted phrase", got)
 		}
+		// Server-side category filter (2026-05-14): non-sports verticals
+		// must never come back. Regression guard against accidental removal.
+		if got := q.Get("categories"); got != "sports" {
+			t.Errorf("categories = %q, want sports", got)
+		}
 	}
 	if !hasEN || !hasRU {
 		t.Errorf("expected both EN and RU calls, got %v", calls)

@@ -246,6 +246,17 @@ func (p *mediaStackMediaProvider) fetch(ctx context.Context, playerName, languag
 		"date":       []string{fromDate + "," + toDate},
 		"limit":      []string{strconv.Itoa(mediaStackPageSize)},
 		"sort":       []string{"published_desc"},
+		// Categories filter cuts the non-sports noise on MediaStack's side:
+		// "Kane Biotech presents data", "Anneka Rice TV joke", "Bellingham
+		// Hill Park redesign" and similar namesake matches in entertainment /
+		// politics / health verticals never come back to us. Other sports
+		// (golf, baseball) still pass — those get caught by the downstream
+		// football-context whitelist in filterFootballContext.
+		//
+		// MediaStack accepts a comma-separated category list. We pick only
+		// "sports" since that's what the system is for; expand later if we
+		// ever want general media coverage of a player (e.g. fashion mags).
+		"categories": []string{"sports"},
 	}
 	endpoint := p.baseURL + "/news?" + params.Encode()
 
