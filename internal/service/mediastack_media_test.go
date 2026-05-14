@@ -27,7 +27,7 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 				"pagination":{"limit":25,"offset":0,"count":2,"total":2},
 				"data":[
 					{"title":"Messi scored a brilliant goal","description":"Masterclass display","url":"https://bbc.com/a","source":"BBC","language":"en","published_at":"2026-05-05T10:00:00+00:00"},
-					{"title":"Messi leads Inter Miami to win","description":"Late winner","url":"https://espn.com/b","source":"ESPN","language":"en","published_at":"2026-05-04T18:00:00+00:00"}
+					{"title":"Messi leads Inter Miami to win","description":"Late winner from a midfielder cross","url":"https://espn.com/b","source":"ESPN","language":"en","published_at":"2026-05-04T18:00:00+00:00"}
 				],
 				"error":{}
 			}`))
@@ -281,6 +281,44 @@ func titles(items []domain.MediaArticleCandidate) []string {
 		out[i] = it.Title
 	}
 	return out
+}
+
+// TestFilterFootballContextDropsNonFootballNoise is the partner-driven
+// regression (2026-05-14): "Kane Biotech", "Sergio Garcia's Wife", "Anneka
+// Rice TV joke" and similar off-topic surname matches were leaking through
+// to the news feed even after the title-mention filter. We require at least
+// one football-domain word in title+summary.
+func TestFilterFootballContextDropsNonFootballNoise(t *testing.T) {
+	cases := []struct {
+		title   string
+		summary string
+		keep    bool
+	}{
+		// Drops — no football context anywhere.
+		{"Kane Biotech Presents Data To Global Wound Care Community", "Biotech firm shares Q4 results.", false},
+		{"Country Thunder Florida Delivers Epic Waterfront Weekend With Kane Brown", "Concert headliner announced.", false},
+		{"Who Is Sergio Garcia's Wife? Everything You Need To Know", "Golf legend's wife profiled.", false},
+		{"Anneka Rice makes a very risque joke on Amandaland", "TV personality returns to comedy.", false},
+		{"City Announces Plans to Redesign Bellingham Hill Park", "Local park renovation in Bellingham, WA.", false},
+
+		// Keeps — clear football context.
+		{"Kane scores hat-trick as Bayern destroy Wolfsburg", "Bundesliga top scorer hits 50 goals.", true},
+		{"Sergio Garcia wins Masters", "Garcia clinches green jacket.", false}, // golf — no football word
+		{"Bellingham Real Madrid contract extension talks", "Midfielder linked with new deal.", true},
+		{"Vinicius scores in Champions League quarter-final", "Real Madrid forward decides tie.", true},
+		// Russian football
+		{"Холанд забил гол в матче чемпионата", "Норвежец продлевает голевую серию", true},
+	}
+
+	for _, tc := range cases {
+		out := filterFootballContext([]domain.MediaArticleCandidate{
+			{Title: tc.title, Summary: tc.summary},
+		})
+		got := len(out) > 0
+		if got != tc.keep {
+			t.Errorf("keep=%v for %q (summary %q) want %v", got, tc.title, tc.summary, tc.keep)
+		}
+	}
 }
 
 func TestMediaStackKeywordForExtractsSurname(t *testing.T) {

@@ -90,6 +90,7 @@ func (p *mediaStackMediaProvider) FetchPlayerArticles(ctx context.Context, playe
 
 	candidates = applyDomainDenylist(candidates)
 	candidates = filterTitleMentionsPlayer(candidates, player.Name)
+	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
 	if len(candidates) > p.articlesPerPlayer {
@@ -136,6 +137,64 @@ func filterTitleMentionsPlayer(items []domain.MediaArticleCandidate, playerName 
 		if len(surname) >= 4 && strings.Contains(titleNormalized, surname) {
 			out = append(out, item)
 			continue
+		}
+	}
+	return out
+}
+
+// footballContextWords are terms that virtually never appear in non-football
+// articles. The list is intentionally narrow — broad words like "season" or
+// "team" match too many false positives (TV seasons, baseball teams). We
+// keep canonical league names, position labels, and football-specific
+// vocabulary that doesn't bleed into other domains.
+//
+// Both English and Russian are included so MediaStack's RU feed also passes
+// the check.
+var footballContextWords = []string{
+	// English — football-specific verbs/nouns
+	"football", "soccer", "fc ", " fc", "f.c.",
+	"goal ", " goals", "scored", "scoring", "header", "assist", "hat-trick", "hat trick",
+	"midfielder", "defender", "striker", "winger", "goalkeeper", "forward",
+	"transfer", "signing", " signed for", "loan deal", "contract extension",
+	"manager said", "coach said", "head coach", "boss said",
+	"premier league", "champions league", "europa league", "la liga", "bundesliga",
+	"serie a", "ligue 1", "süper lig", "saudi pro league", "mls",
+	"world cup", "uefa", "fifa", "euros 2", "copa america", "afcon",
+	"red card", "yellow card", "penalty", "free kick", "offside", "stoppage time",
+	"el clasico", "derby", "matchday", "starting xi", "lineup", "squad",
+	"barcelona", "real madrid", "manchester", "liverpool", "arsenal", "chelsea",
+	"bayern", "psg", "juventus", "milan", "atletico",
+	// Russian
+	"футбол", "матч", "клуб", "лига", "лиги чемпионов", "лч",
+	"трансфер", "трансфера", "забил", "гол ", "голы", "голов",
+	"тренер ", "защитник", "полузащит", "нападающ", "вратарь",
+	"премьер-лиг", "ла лига", "бундеслиг", "серия а",
+	"чемпионат мира", "уефа", "фифа",
+	"красная карточк", "жёлтая карточк", "пенальти", "штрафная",
+	"барселон", "реал мадрид", "манчестер", "ливерпул",
+}
+
+// filterFootballContext drops articles that pass the surname check but read
+// like non-football noise. MediaStack search returns headlines for any
+// matching surname, so "Kane Biotech Presents Data", "Sergio Garcia's Wife",
+// or "Bellingham Hill Park" all get through. We require the title OR summary
+// to mention at least one football-context word — a cheap whitelist that
+// catches the obvious off-topic hits without an ML pipeline.
+func filterFootballContext(items []domain.MediaArticleCandidate) []domain.MediaArticleCandidate {
+	out := make([]domain.MediaArticleCandidate, 0, len(items))
+	for _, item := range items {
+		text := strings.ToLower(item.Title + " " + item.Summary)
+		// Cyrillic articles get the cyrillic football vocabulary check below
+		// for free — both sets are in footballContextWords.
+		matched := false
+		for _, w := range footballContextWords {
+			if strings.Contains(text, w) {
+				matched = true
+				break
+			}
+		}
+		if matched {
+			out = append(out, item)
 		}
 	}
 	return out
