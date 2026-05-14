@@ -19,10 +19,16 @@
 #     demo the threat model is acceptable. Upgrade path: switch CF to
 #     "Full (Strict)" + install a CF Origin Certificate later.
 
-# Listen on port 80 only. Hostname is bound to PUBLIC_HOSTNAME from .env so
-# the same config works for any domain. The `http://` prefix tells Caddy
-# to NOT auto-issue a Let's Encrypt cert (default behaviour for bare names).
-http://{$PUBLIC_HOSTNAME}, http://www.{$PUBLIC_HOSTNAME} {
+# Listen on port 80 for ANY hostname. We intentionally don't pin a single
+# domain here — Cloudflare Tunnel already routes only the domains we want
+# (footballreputation.ru, footballreputationindex.online, ...), so anything
+# arriving at Caddy is legitimate traffic for our site. This makes domain
+# migrations a tunnel-only operation: add a Route in CF, the new domain
+# works immediately — no Caddy rebuild needed.
+#
+# The `:80` form (no scheme + no host) tells Caddy: bind plain HTTP on
+# port 80, accept every Host header. No ACME challenge, no cert renewal.
+:80 {
 	# Reverse-proxy to the Go app. `app` resolves via docker DNS.
 	reverse_proxy app:8080 {
 		# CF passes the real visitor IP in `CF-Connecting-IP`. Forward it

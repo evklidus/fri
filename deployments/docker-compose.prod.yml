@@ -102,8 +102,13 @@ services:
     # so we only need port 80 here. No 443, no Let's Encrypt cert.
     ports:
       - "80:80"
+    # Caddyfile now listens on :80 for any hostname (CF Tunnel routes the
+     # specific domains we expose), so PUBLIC_HOSTNAME no longer has to be
+     # threaded into Caddy. We still accept it from the env for any deployer
+     # who has it in their .env file from earlier releases — Caddy ignores
+     # unset variables silently when nothing references them.
     environment:
-      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:?PUBLIC_HOSTNAME is required}
+      PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-footballreputationindex.online}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
