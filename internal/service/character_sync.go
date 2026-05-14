@@ -46,9 +46,16 @@ type characterTrigger struct {
 // football headlines.
 var characterTriggers = []characterTrigger{
 	// ── Character: severe negatives — DEFINITIVE, NO FAN OVERRIDE ──────
-	{concept: "doping", delta: -8, autoApply: true, words: []string{"doping", "failed drug test", "banned for doping", "допинг", "провалил тест на допинг"}},
-	{concept: "racism", delta: -6, autoApply: true, words: []string{"racism", "racist abuse", "racist remark", "расизм", "расистск"}},
-	{concept: "criminal", delta: -7, autoApply: true, words: []string{" arrested", "criminal charges", "criminal probe", "арестован", "уголовн"}},
+	// Doping triggers are kept narrow: only on confirmed-positive phrasing.
+	// "Doping investigation cleared X" was lighting up under "doping".
+	{concept: "doping", delta: -8, autoApply: true, words: []string{"banned for doping", "failed drug test", "tested positive for", "doping ban", "допинг бан", "провалил тест на допинг", "положительный допинг-тест"}},
+	// Racism: only when the player is the perpetrator (the negator list
+	// already blocks "victim of racism", "condemns racism" etc.). Specific
+	// phrasing helps avoid neutral context mentions.
+	{concept: "racism", delta: -6, autoApply: true, words: []string{"racist abuse", "racist remark", "racist slur", "racist gesture", "расистск выходк", "расистск жест"}},
+	// Criminal: action-phrase not the mere word "arrested" which can match
+	// commentary headlines like "X arrested for celebrating early".
+	{concept: "criminal", delta: -7, autoApply: true, words: []string{"arrested for", "facing criminal charges", "criminal investigation against", "criminal probe into", "арестован по обвинению", "возбуждено уголовное дело"}},
 	// Scandal severity varies — community decides.
 	{concept: "scandal", delta: -3, words: []string{"scandal", "controversy erupt", "скандал"}},
 
@@ -67,8 +74,10 @@ var characterTriggers = []characterTrigger{
 	{concept: "brace", delta: 1.0, target: "performance", words: []string{"brace against", "scored a brace", "scored twice", "two goals against", "дубль"}},
 	{concept: "player_of_month", delta: 3.0, target: "performance", words: []string{"player of the month", "игрок месяца", "лучший игрок месяца"}},
 	// Official year awards — definitive, no community override needed.
-	{concept: "player_of_year", delta: 5.0, target: "performance", autoApply: true, words: []string{"player of the year", "игрок года", "лучший игрок года"}},
-	{concept: "ballon_dor", delta: 8.0, target: "performance", autoApply: true, words: []string{"ballon d'or", "ballon d or", "золотой мяч"}},
+	// Strict winning phrases only. "Snubbed in Player of the Year" or
+	// "Where's your Ballon d'Or?" must NOT light these up.
+	{concept: "player_of_year", delta: 5.0, target: "performance", autoApply: true, words: []string{"named player of the year", "won player of the year", "wins player of the year", "won the player of the year award", "признан игроком года", "стал игроком года", "получил награду игрок года"}},
+	{concept: "ballon_dor", delta: 8.0, target: "performance", autoApply: true, words: []string{"wins the ballon d'or", "won the ballon d'or", "wins ballon d'or", "ballon d'or winner", "claimed the ballon d'or", "claims ballon d'or", "lifts the ballon d'or", "выиграл золотой мяч", "обладатель золотого мяча", "стал обладателем золотого мяча"}},
 	{concept: "goal_of_season", delta: 2.5, target: "performance", words: []string{"goal of the season", "goal of the year", "гол сезона", "гол года"}},
 	{concept: "trophy_won", delta: 4.0, target: "performance", words: []string{"won the champions league", "champions league trophy", "league title clinched", "won the league", "выиграл лигу чемпионов", "выиграл чемпионат"}},
 
