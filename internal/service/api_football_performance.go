@@ -1006,7 +1006,11 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballSt
 	if rankPos > 0 && rankTotal > 0 {
 		positionRankScore = round1(float64(rankTotal-rankPos+1) / float64(rankTotal) * 100)
 	} else {
-		positionRankScore = normalizeLinear(averageRating, 5.5, 9.2)
+		// Tightened range 2026-05-15: rating 7.8+ already signifies a top-tier
+		// performer in API-Football's distribution. The previous 9.5 ceiling
+		// was theoretical — almost no full-season player ever hits it, so
+		// elite players were stuck in the 50-65 range. See Performance recal.
+		positionRankScore = normalizeLinear(averageRating, 5.5, 7.8)
 	}
 
 	minutesShare := normalizeLinear(minutes, 0, 3420)
@@ -1028,8 +1032,13 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballSt
 	// Sum must equal 1.0 within each row.
 	w := performanceWeightsFor(player.Position)
 
+	// Rating range tightened from (5.5, 9.5) to (5.5, 7.8) on 2026-05-15:
+	// API-Football season-average ratings cluster 5.5-7.8 in practice. The
+	// old 9.5 ceiling was a theoretical max that no real player ever reached,
+	// so top performers were stuck around 50-65 normalized when they should
+	// be in the 80-100 band. FIFA-style scale was the partner's request.
 	normalizedScore := clampScore(
-		(normalizeLinear(averageRating, 5.5, 9.5) * w.rating) +
+		(normalizeLinear(averageRating, 5.5, 7.8) * w.rating) +
 			(normalizeLinear(goalsAssistsPer90, 0, positionGAMax(player.Position)) * w.goalsAssists) +
 			(normalizeLinear(xgXaProxyPer90, 0, positionXGXAMax(player.Position)) * w.xgxa) +
 			(positionRankScore * w.posRank) +
@@ -1111,7 +1120,9 @@ func buildFormScore(position string, form formSnapshot) float64 {
 	}
 	gaPer90 := per90(float64(form.Goals+form.Assists), form.Minutes*float64(form.Games))
 	gaScore := normalizeLinear(gaPer90, 0, positionGAMax(position))
-	ratingScore := normalizeLinear(form.Rating, 5.5, 9.5)
+	// Same (5.5, 7.8) range as the season aggregate above — keep form on the
+	// same FIFA-style scale so a 7.5-form player reads as elite, not average.
+	ratingScore := normalizeLinear(form.Rating, 5.5, 7.8)
 	if form.Rating <= 0 {
 		// No rating data: lean on goal contribution alone.
 		return clampScore(gaScore)

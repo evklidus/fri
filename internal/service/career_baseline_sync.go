@@ -139,10 +139,15 @@ func (s *Service) SyncCareerBaseline(ctx context.Context) (*domain.ComponentSync
 	)
 }
 
-// blendBaselineIntoPerformance mixes the persistent career baseline (40%)
-// into the snapshot's current-season normalized score (60%). When no
+// blendBaselineIntoPerformance mixes the persistent career baseline (25%)
+// into the snapshot's current-season normalized score (75%). When no
 // baseline exists yet — first run, or a player we just added — the snapshot
 // passes through unchanged.
+//
+// Weight dropped 0.40 → 0.25 on 2026-05-15: the 40% blend was pulling top
+// in-form players down toward their career average, capping FRI scores in
+// the high-60s when partner/investor expectations were 85+. Career remains
+// a meaningful drag against one-hit-wonder seasons but no longer dominates.
 //
 // We intentionally only blend NormalizedScore (the final 0–100 score the
 // repository writes to fri_scores.performance). The raw stat fields are
@@ -160,7 +165,7 @@ func (s *Service) blendBaselineIntoPerformance(ctx context.Context, snapshot dom
 	if baseline == nil || baseline.BaselineScore <= 0 {
 		return snapshot
 	}
-	const baselineWeight = 0.40
+	const baselineWeight = 0.25
 	blended := (1-baselineWeight)*snapshot.NormalizedScore + baselineWeight*baseline.BaselineScore
 	snapshot.NormalizedScore = clampScore(round1(blended))
 	return snapshot
@@ -234,7 +239,9 @@ func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophi
 		gaMax = 0.6
 	}
 
-	ratingScore := normalizeLinear(b.CareerAvgRating, 6.0, 8.5)
+	// Range tightened 8.5 → 7.8 on 2026-05-15 to match the new Performance
+	// scale. Career averages 7.5+ are rare and unambiguously elite.
+	ratingScore := normalizeLinear(b.CareerAvgRating, 6.0, 7.8)
 	goalsScore := normalizeLinear(goalsPer90, 0, gaMax)
 	assistsScore := normalizeLinear(assistsPer90, 0, gaMax)
 	minutesScore := normalizeLog(minutes, 5_000, 50_000)

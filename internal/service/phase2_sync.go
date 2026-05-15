@@ -150,7 +150,9 @@ func (demoPerformanceProvider) FetchPerformanceSnapshot(ctx context.Context, pla
 	positionRankScore := clampScore(55 + (skill * 0.45))
 	minutesShare := round1(55 + (availability / 100 * 43))
 
-	ratingScore := normalizeLinear(averageRating, 5.5, 9.5)
+	// Same FIFA-style range as api_football_performance — kept in sync so the
+	// demo provider produces comparable scores when API_FOOTBALL_KEY is absent.
+	ratingScore := normalizeLinear(averageRating, 5.5, 7.8)
 	gaScore := normalizeLinear(goalsAssistsPer90, 0, gaMax)
 	xgxaScore := normalizeLinear(xgxaPer90, 0, xgxaPositionMax)
 

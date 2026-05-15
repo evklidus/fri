@@ -344,7 +344,7 @@
         <div class="player-info"><h3 id="heroName">—</h3><p id="heroPos">—</p></div>
         <div class="badge-legend" id="heroBadge">—</div>
       </div>
-      <div class="fri-score-big">
+      <div class="fri-score-big" id="heroScoreBlock" style="cursor:help">
         <div class="score-num" id="heroScore">—</div>
         <div class="score-label" data-i18n="fri_label">Football Reputation Index</div>
       </div>
@@ -508,9 +508,10 @@
     </div>
     <div class="modal-body">
       <div class="modal-score-row">
-        <div class="modal-score-main">
+        <div class="modal-score-main" id="modal-score-main" style="cursor:help">
           <div class="big-num" id="modal-score">94</div>
           <div class="big-label" data-i18n="fri_label">FRI Score</div>
+          <div id="modal-tier" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1.5px;margin-top:6px;color:var(--gold)"></div>
         </div>
         <div class="pillar-grid">
           <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_perf">Performance</div><div class="pillar-card-score" id="m-perf" style="color:#F5C842"></div><div class="pillar-track"><div class="pillar-fill" id="m-perf-bar" style="background:linear-gradient(90deg,#F5C842,#E8A820)"></div></div></div>
@@ -652,8 +653,23 @@ const players = [];
 const news = [];
 
 // ── RENDER TABLE ──────────────────────────────────────────
-function friClass(v) { return v>=90?'fri-legendary':v>=75?'fri-elite':v>=60?'fri-pro':'fri-solid'; }
-function friColor(v) { return v>=90?'#F5C842':v>=75?'#C8D8E8':v>=60?'#3B82F6':v>=45?'#22C55E':'#EAB308'; }
+// Tier thresholds recalibrated 2026-05-15. The scale is FIFA-style: a top
+// player lands around 80-92, not 95-100. Anything ≥80 = world-class.
+function friClass(v) { return v>=80?'fri-legendary':v>=70?'fri-elite':v>=60?'fri-pro':'fri-solid'; }
+function friColor(v) { return v>=80?'#F5C842':v>=70?'#C8D8E8':v>=60?'#3B82F6':v>=45?'#22C55E':'#EAB308'; }
+function friTier(v, lang) {
+  const labels = {
+    en: { legendary:'Legendary', elite:'Elite', pro:'Pro', solid:'Solid' },
+    ru: { legendary:'Легенда',  elite:'Элита', pro:'Профи', solid:'Базовый' },
+  };
+  const set = labels[lang] || labels.en;
+  return v>=80 ? set.legendary : v>=70 ? set.elite : v>=60 ? set.pro : set.solid;
+}
+function friScaleHint(lang) {
+  return lang==='ru'
+    ? 'Шкала FRI 0-100. 80+ Легенда · 70+ Элита · 60+ Профи · <60 Базовый'
+    : 'FRI scale 0-100. 80+ Legendary · 70+ Elite · 60+ Pro · <60 Solid';
+}
 let posFilter = 'all';
 let leagueFilter = 'all';
 
@@ -722,6 +738,13 @@ function openModal(p) {
   document.getElementById('modal-name').textContent = p.name;
   document.getElementById('modal-meta').textContent = `${p.pos} · ${p.club} · ${t.age_label} ${p.age}`;
   document.getElementById('modal-score').textContent = p.fri;
+  const modalTier = document.getElementById('modal-tier');
+  if (modalTier) {
+    modalTier.textContent = friTier(p.fri, lang);
+    modalTier.style.color = friColor(p.fri);
+  }
+  const modalScoreMain = document.getElementById('modal-score-main');
+  if (modalScoreMain) modalScoreMain.title = friScaleHint(lang);
   document.getElementById('modal-summary').textContent = lang==='ru' ? p.sum_ru : p.sum_en;
   [['m-perf',p.perf],['m-social',p.social],['m-media',p.media],['m-char',p.char]].forEach(([id,v]) => {
     document.getElementById(id).textContent = v;
@@ -833,10 +856,13 @@ renderTable();
     document.getElementById('heroName').textContent = top.name;
     document.getElementById('heroPos').textContent = `${top.pos} · ${top.club}`;
     document.getElementById('heroScore').textContent = top.fri;
-    const band = top.fri >= 90 ? 'Legendary' : top.fri >= 75 ? 'Elite' : top.fri >= 60 ? 'Pro' : 'Solid';
+    const heroScoreBlock = document.getElementById('heroScoreBlock');
+    if (heroScoreBlock) heroScoreBlock.title = friScaleHint(lang);
     const badgeEl = document.getElementById('heroBadge');
-    badgeEl.textContent = band;
+    badgeEl.textContent = friTier(top.fri, lang);
     badgeEl.className = 'badge-legend';
+    badgeEl.title = friScaleHint(lang);
+    badgeEl.style.cursor = 'help';
     const bars = [
       {label:'Performance', val:top.perf, color:'linear-gradient(90deg,#F5C842,#E8A820)'},
       {label:'Social', val:top.social, color:'#3B82F6'},
