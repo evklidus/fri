@@ -20,9 +20,13 @@
 # cloud) — no proxy, no Tunnel involvement.
 
 {
-	# Email for Let's Encrypt cert renewal alerts. Set in .env on the
-	# server; falls back to a sane default if unset.
-	email {$ACME_EMAIL:admin@footballreputationindex.online}
+	# Email for Let's Encrypt cert renewal alerts. Hardcoded because
+	# Caddy's {$VAR:default} env substitution doesn't fall back when the
+	# variable is explicitly empty (which is what docker-compose passes
+	# when .env doesn't define ACME_EMAIL) — Caddy reads "" as a value and
+	# fails with "wrong argument count after email". Just hardcoding the
+	# default avoids the trap.
+	email admin@footballreputationindex.online
 }
 
 # Primary site — both apex and www get the same cert + same proxy rule.
