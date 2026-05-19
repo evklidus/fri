@@ -69,43 +69,55 @@ func (demoPerformanceProvider) Name() string {
 	return performanceProviderName
 }
 
-// realSocialOverrides bootstraps credible Instagram-follower / engagement
-// numbers for the players we know personally, until a real Instagram /
-// Twitter Graph API integration lands in Phase 6. Numbers are approximate
-// public counts as of May 2026 — verified for the visible top (Yamal,
-// Mbappé, Vinicius, Bellingham, Haaland) via web search, the rest by
-// rough estimation. This keeps the demo's Social pillar from looking
-// random when partner/investor inevitably checks "where's Yamal at?"
+// realSocialOverrides bootstraps real Instagram-follower counts for the
+// 22 players currently in the system, until a real Instagram / Twitter
+// Graph API integration lands in Phase 6. All follower numbers are
+// verified against official @handles as of May 2026 via web search
+// (socialblade / hypeauditor / instagram bio cross-checks). Engagement
+// rates and 7-day mention growth are reasoned estimates based on
+// follower-tier and recent virality (Olise CL run, Cubarsí breakout
+// season, Yamal year-round buzz). They feed three of four Social-score
+// sub-signals; YouTube views (4th) comes from the real YT API.
 //
 // Match is by exact PlayerSyncTarget.Name. Unknown players fall through
-// to the deterministic hash-based placeholder below.
+// to the deterministic hash-based placeholder below — so adding a new
+// roster member doesn't silently break, just gets a stable random.
 var realSocialOverrides = map[string]struct {
-	followers       int64
-	engagementRate  float64
-	mentionsGrowth  float64
+	followers      int64
+	engagementRate float64
+	mentionsGrowth float64
 }{
-	"K. Mbappé":     {followers: 140_000_000, engagementRate: 5.5, mentionsGrowth: 78},
-	"M. Salah":      {followers: 70_000_000, engagementRate: 4.5, mentionsGrowth: 60},
-	"Vinicius Jr":   {followers: 53_000_000, engagementRate: 6.0, mentionsGrowth: 72},
-	"L. Yamal":      {followers: 42_000_000, engagementRate: 7.5, mentionsGrowth: 85},
-	"J. Bellingham": {followers: 40_000_000, engagementRate: 6.2, mentionsGrowth: 65},
-	"E. Haaland":    {followers: 38_000_000, engagementRate: 5.8, mentionsGrowth: 62},
-	"H. Kane":       {followers: 27_000_000, engagementRate: 4.0, mentionsGrowth: 55},
-	"Pedri":         {followers: 22_000_000, engagementRate: 5.2, mentionsGrowth: 50},
-	"V. van Dijk":   {followers: 18_000_000, engagementRate: 3.8, mentionsGrowth: 42},
-	"N'Golo Kanté":  {followers: 14_000_000, engagementRate: 3.5, mentionsGrowth: 35},
-	"Raphinha":      {followers: 12_000_000, engagementRate: 4.8, mentionsGrowth: 55},
-	"T. Courtois":   {followers: 12_000_000, engagementRate: 3.5, mentionsGrowth: 45},
-	"F. Valverde":   {followers: 10_000_000, engagementRate: 4.2, mentionsGrowth: 50},
-	"D. Rice":       {followers: 5_000_000, engagementRate: 3.8, mentionsGrowth: 45},
-	"P. Cubarsí":    {followers: 4_000_000, engagementRate: 6.8, mentionsGrowth: 75},
-	"M. Olise":      {followers: 3_500_000, engagementRate: 4.8, mentionsGrowth: 55},
-	"Vitinha":       {followers: 3_000_000, engagementRate: 3.8, mentionsGrowth: 45},
-	"Rayan Cherki":  {followers: 2_000_000, engagementRate: 5.2, mentionsGrowth: 60},
-	"Fermín López":  {followers: 1_800_000, engagementRate: 5.5, mentionsGrowth: 55},
-	"J. García":     {followers: 1_500_000, engagementRate: 5.0, mentionsGrowth: 50},
-	"H. Ekitike":    {followers: 1_200_000, engagementRate: 4.2, mentionsGrowth: 48},
-	"R. Asencio":    {followers: 800_000, engagementRate: 4.8, mentionsGrowth: 62},
+	// Mega-accounts (50M+). Engagement tends to settle ~3-5% even for
+	// huge stars; only viral 18-year-olds beat that.
+	"K. Mbappé":   {followers: 130_000_000, engagementRate: 3.8, mentionsGrowth: 72},
+	"M. Salah":    {followers: 65_000_000, engagementRate: 3.8, mentionsGrowth: 58},
+	"Vinicius Jr": {followers: 53_000_000, engagementRate: 5.2, mentionsGrowth: 70},
+
+	// Big 20-50M tier — peak-career stars.
+	"L. Yamal":      {followers: 42_000_000, engagementRate: 7.5, mentionsGrowth: 88},
+	"J. Bellingham": {followers: 40_000_000, engagementRate: 5.5, mentionsGrowth: 68},
+	"E. Haaland":    {followers: 38_000_000, engagementRate: 5.2, mentionsGrowth: 62},
+	"Pedri":         {followers: 22_000_000, engagementRate: 5.0, mentionsGrowth: 52},
+	"F. Valverde":   {followers: 22_000_000, engagementRate: 4.2, mentionsGrowth: 50},
+
+	// 10-20M — first-team regulars, established but not stratospheric.
+	"Raphinha":     {followers: 19_000_000, engagementRate: 5.2, mentionsGrowth: 58},
+	"H. Kane":      {followers: 18_000_000, engagementRate: 3.2, mentionsGrowth: 50},
+	"V. van Dijk":  {followers: 17_400_000, engagementRate: 3.8, mentionsGrowth: 42},
+	"N'Golo Kanté": {followers: 16_000_000, engagementRate: 4.5, mentionsGrowth: 38},
+	"T. Courtois":  {followers: 15_000_000, engagementRate: 3.8, mentionsGrowth: 45},
+
+	// 1-10M — emerging stars and young breakouts. Engagement higher
+	// because audiences are more invested in trajectory.
+	"Fermín López": {followers: 7_000_000, engagementRate: 5.5, mentionsGrowth: 55},
+	"P. Cubarsí":   {followers: 6_000_000, engagementRate: 7.0, mentionsGrowth: 78},
+	"R. Asencio":   {followers: 6_000_000, engagementRate: 5.0, mentionsGrowth: 60},
+	"D. Rice":      {followers: 6_000_000, engagementRate: 4.0, mentionsGrowth: 45},
+	"M. Olise":     {followers: 5_000_000, engagementRate: 5.8, mentionsGrowth: 72},
+	"Vitinha":      {followers: 5_000_000, engagementRate: 4.5, mentionsGrowth: 48},
+	"H. Ekitike":   {followers: 4_000_000, engagementRate: 4.8, mentionsGrowth: 50},
+	"J. García":    {followers: 3_000_000, engagementRate: 5.0, mentionsGrowth: 50},
+	"Rayan Cherki": {followers: 3_000_000, engagementRate: 6.0, mentionsGrowth: 62},
 }
 
 func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain.PlayerSyncTarget) (domain.SocialSnapshot, error) {
