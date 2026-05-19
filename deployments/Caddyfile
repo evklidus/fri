@@ -1,45 +1,36 @@
-# Caddy reverse-proxy config for the FRI demo deployment.
+# Caddy reverse-proxy for FRI.
 #
-# Topology:
+# Topology (post-2026-05-16, after RU users started getting throttled
+# when CF Tunnel was in the path):
 #
-#   Visitor (IPv4) ──HTTPS──► Cloudflare ──HTTP──► Caddy ──► Go app
-#                              │ Universal SSL    │ this   :8080
-#                              │ DDoS shield      │ file
-#                              └ IPv4↔IPv6 bridge
+#   Visitor ──HTTPS──► 72.56.240.17 ──► Caddy ──► Go app :8080
+#                     (server's IPv4)
 #
-# Cloudflare terminates TLS at the edge with their free Universal SSL cert,
-# so Caddy here only listens on plain HTTP :80. The CF Free plan also
-# bridges IPv4 visitors to our IPv6-only origin — the whole reason CF is
-# in this stack.
+# Why we dropped Cloudflare proxy:
+#   Russian ISPs (TSPU equipment) throttle HTTPS handshakes to many
+#   Cloudflare edge IPs since 2022. The demo's primary user is in RU,
+#   so an unreliable path to CF blocks the whole investor pitch.
 #
-# Why HTTP at the origin (not HTTPS):
-#   - CF SSL/TLS mode "Flexible" → CF talks HTTP to origin.
-#   - No ACME challenge to manage, no cert renewal, no port 443.
-#   - Trade-off: traffic between CF and origin is not encrypted. For this
-#     demo the threat model is acceptable. Upgrade path: switch CF to
-#     "Full (Strict)" + install a CF Origin Certificate later.
+# Trade-offs vs the old CF Tunnel setup:
+#   - We manage our own TLS cert (Let's Encrypt via Caddy ACME).
+#   - We expose the origin IP publicly (no CF DDoS shield).
+#   - We need port 443 open (compose + ufw).
+#
+# Cloudflare DNS still serves the A record but with "DNS only" (gray
+# cloud) — no proxy, no Tunnel involvement.
 
-# Listen on port 80 for ANY hostname. We intentionally don't pin a single
-# domain here — Cloudflare Tunnel already routes only the domains we want
-# (footballreputation.ru, footballreputationindex.online, ...), so anything
-# arriving at Caddy is legitimate traffic for our site. This makes domain
-# migrations a tunnel-only operation: add a Route in CF, the new domain
-# works immediately — no Caddy rebuild needed.
-#
-# The `:80` form (no scheme + no host) tells Caddy: bind plain HTTP on
-# port 80, accept every Host header. No ACME challenge, no cert renewal.
-:80 {
-	# Reverse-proxy to the Go app. `app` resolves via docker DNS.
-	reverse_proxy app:8080 {
-		# CF passes the real visitor IP in `CF-Connecting-IP`. Forward it
-		# as X-Real-IP / X-Forwarded-For so the Go app's voting rate-
-		# limiter (which already reads those headers via gin) sees unique
-		# visitor IPs instead of CF's edge PoP IP.
-		header_up X-Real-IP {http.request.header.CF-Connecting-IP}
-		header_up X-Forwarded-For {http.request.header.CF-Connecting-IP}
-	}
+{
+	# Email for Let's Encrypt cert renewal alerts. Set in .env on the
+	# server; falls back to a sane default if unset.
+	email {$ACME_EMAIL:admin@footballreputationindex.online}
+}
 
-	# Cheap security headers. Nothing breaks the demo.
+# Primary site — both apex and www get the same cert + same proxy rule.
+# Caddy automatically: gets LE cert, redirects :80 → :443, renews.
+footballreputationindex.online, www.footballreputationindex.online {
+	reverse_proxy app:8080
+
+	# Cheap security headers.
 	header {
 		# Don't allow MIME sniffing.
 		X-Content-Type-Options "nosniff"
@@ -51,7 +42,7 @@
 		-Server
 	}
 
-	# Compress text responses. CF will cache the gzipped copy.
+	# Compress text responses.
 	encode zstd gzip
 
 	# Access log to stdout — captured by docker logs.
@@ -60,4 +51,12 @@
 		format console
 		level INFO
 	}
+}
+
+# Catch-all on :80 for any other host (raw IP access, the old .ru
+# domain still in the wild, etc.). Caddy responds 200 + the app's
+# content so the site is still reachable by IP for debugging. No
+# ACME triggered here because there's no hostname.
+:80 {
+	reverse_proxy app:8080
 }

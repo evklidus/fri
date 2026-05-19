@@ -98,17 +98,18 @@ services:
     image: caddy:2-alpine
     container_name: fri-caddy
     restart: unless-stopped
-    # Cloudflare proxies HTTPS at the edge and talks HTTP to the origin,
-    # so we only need port 80 here. No 443, no Let's Encrypt cert.
+    # We terminate TLS ourselves with Let's Encrypt because Cloudflare in
+    # the path was getting throttled by RU ISPs (TSPU). Port 80 stays
+    # open for ACME HTTP-01 challenges and HTTP → HTTPS redirects;
+    # port 443 is the real visitor entry.
     ports:
       - "80:80"
-    # Caddyfile now listens on :80 for any hostname (CF Tunnel routes the
-     # specific domains we expose), so PUBLIC_HOSTNAME no longer has to be
-     # threaded into Caddy. We still accept it from the env for any deployer
-     # who has it in their .env file from earlier releases — Caddy ignores
-     # unset variables silently when nothing references them.
+      - "443:443"
     environment:
       PUBLIC_HOSTNAME: ${PUBLIC_HOSTNAME:-footballreputationindex.online}
+      # Where Let's Encrypt sends expiry warnings. Optional — Caddyfile
+      # has a fallback default.
+      ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
