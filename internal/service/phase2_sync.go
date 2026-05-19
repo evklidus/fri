@@ -69,19 +69,69 @@ func (demoPerformanceProvider) Name() string {
 	return performanceProviderName
 }
 
+// realSocialOverrides bootstraps credible Instagram-follower / engagement
+// numbers for the players we know personally, until a real Instagram /
+// Twitter Graph API integration lands in Phase 6. Numbers are approximate
+// public counts as of May 2026 — verified for the visible top (Yamal,
+// Mbappé, Vinicius, Bellingham, Haaland) via web search, the rest by
+// rough estimation. This keeps the demo's Social pillar from looking
+// random when partner/investor inevitably checks "where's Yamal at?"
+//
+// Match is by exact PlayerSyncTarget.Name. Unknown players fall through
+// to the deterministic hash-based placeholder below.
+var realSocialOverrides = map[string]struct {
+	followers       int64
+	engagementRate  float64
+	mentionsGrowth  float64
+}{
+	"K. Mbappé":     {followers: 140_000_000, engagementRate: 5.5, mentionsGrowth: 78},
+	"M. Salah":      {followers: 70_000_000, engagementRate: 4.5, mentionsGrowth: 60},
+	"Vinicius Jr":   {followers: 53_000_000, engagementRate: 6.0, mentionsGrowth: 72},
+	"L. Yamal":      {followers: 42_000_000, engagementRate: 7.5, mentionsGrowth: 85},
+	"J. Bellingham": {followers: 40_000_000, engagementRate: 6.2, mentionsGrowth: 65},
+	"E. Haaland":    {followers: 38_000_000, engagementRate: 5.8, mentionsGrowth: 62},
+	"H. Kane":       {followers: 27_000_000, engagementRate: 4.0, mentionsGrowth: 55},
+	"Pedri":         {followers: 22_000_000, engagementRate: 5.2, mentionsGrowth: 50},
+	"V. van Dijk":   {followers: 18_000_000, engagementRate: 3.8, mentionsGrowth: 42},
+	"N'Golo Kanté":  {followers: 14_000_000, engagementRate: 3.5, mentionsGrowth: 35},
+	"Raphinha":      {followers: 12_000_000, engagementRate: 4.8, mentionsGrowth: 55},
+	"T. Courtois":   {followers: 12_000_000, engagementRate: 3.5, mentionsGrowth: 45},
+	"F. Valverde":   {followers: 10_000_000, engagementRate: 4.2, mentionsGrowth: 50},
+	"D. Rice":       {followers: 5_000_000, engagementRate: 3.8, mentionsGrowth: 45},
+	"P. Cubarsí":    {followers: 4_000_000, engagementRate: 6.8, mentionsGrowth: 75},
+	"M. Olise":      {followers: 3_500_000, engagementRate: 4.8, mentionsGrowth: 55},
+	"Vitinha":       {followers: 3_000_000, engagementRate: 3.8, mentionsGrowth: 45},
+	"Rayan Cherki":  {followers: 2_000_000, engagementRate: 5.2, mentionsGrowth: 60},
+	"Fermín López":  {followers: 1_800_000, engagementRate: 5.5, mentionsGrowth: 55},
+	"J. García":     {followers: 1_500_000, engagementRate: 5.0, mentionsGrowth: 50},
+	"H. Ekitike":    {followers: 1_200_000, engagementRate: 4.2, mentionsGrowth: 48},
+	"R. Asencio":    {followers: 800_000, engagementRate: 4.8, mentionsGrowth: 62},
+}
+
 func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain.PlayerSyncTarget) (domain.SocialSnapshot, error) {
 	if err := ctx.Err(); err != nil {
 		return domain.SocialSnapshot{}, err
 	}
 
-	popularity := deterministicPercent(player.Name + ":social:popularity")
-	engagementSeed := deterministicPercent(player.Name + ":social:engagement")
-	mentionsSeed := deterministicPercent(player.Name + ":social:mentions")
+	var followers int64
+	var engagementRate, mentionsGrowth float64
 
-	followers := int64(math.Round(math.Pow(10, 4.7+(popularity/100*3.9))))
-	engagementRate := round1(1.5 + (engagementSeed / 100 * 5.5))
-	mentionsGrowth := round1(mentionsSeed)
-	youtubeViews := int64(math.Round(float64(followers)*0.08 + math.Pow(mentionsSeed+10, 3.15)))
+	if override, ok := realSocialOverrides[player.Name]; ok {
+		followers = override.followers
+		engagementRate = override.engagementRate
+		mentionsGrowth = override.mentionsGrowth
+	} else {
+		// Unknown player — fall back to deterministic-hash placeholder so
+		// scores stay stable across syncs instead of being random.
+		popularity := deterministicPercent(player.Name + ":social:popularity")
+		engagementSeed := deterministicPercent(player.Name + ":social:engagement")
+		mentionsSeed := deterministicPercent(player.Name + ":social:mentions")
+		followers = int64(math.Round(math.Pow(10, 4.7+(popularity/100*3.9))))
+		engagementRate = round1(1.5 + (engagementSeed / 100 * 5.5))
+		mentionsGrowth = round1(mentionsSeed)
+	}
+
+	youtubeViews := int64(math.Round(float64(followers)*0.08 + math.Pow(mentionsGrowth+10, 3.15)))
 
 	followersNormalized := normalizeLog(float64(followers), 50_000, 500_000_000)
 	engagementNormalized := normalizeLinear(engagementRate, 1, 8)
