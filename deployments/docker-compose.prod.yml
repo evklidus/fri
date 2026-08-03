@@ -77,14 +77,14 @@ services:
       YOUTUBE_BASE_URL: ${YOUTUBE_BASE_URL:-https://www.googleapis.com/youtube/v3}
       MEDIASTACK_API_KEY: ${MEDIASTACK_API_KEY:-}
       MEDIASTACK_BASE_URL: ${MEDIASTACK_BASE_URL:-http://api.mediastack.com/v1}
-    # Hardcode IPv6 for api.mediastack.com because their DNS provider
-    # returns SERVFAIL through public DNS64 resolvers (Trex / Google),
-    # making the host unresolvable on IPv6-only servers. The address below
-    # is mediastack's Cloudflare-hosted IPv6 endpoint — stable as long as
-    # they stay on Cloudflare. If sync starts failing again, re-resolve:
-    #   dig +short AAAA api.mediastack.com
-    extra_hosts:
-      - "api.mediastack.com:2606:4700:3030::ac43:96e1"
+    # NOTE: there used to be an `extra_hosts` pin mapping api.mediastack.com
+    # to a hardcoded IPv6 address. That was a workaround for the original
+    # IPv6-only server, where DNS64 resolvers returned SERVFAIL for
+    # mediastack. It was removed on 2026-08-03 when we moved to a host with
+    # native IPv4 — keeping it would have pinned outbound calls to an IPv6
+    # endpoint that may not be routable, breaking media sync for a reason
+    # that takes an hour to find. Plain DNS resolution works here.
+    #
     # No "ports:" — Caddy talks to app over the docker network on port 8080.
     expose:
       - "8080"
@@ -127,11 +127,9 @@ volumes:
   caddy-data:
   caddy-config:
 
-# Enable IPv6 on the default compose network. Required when the host is
-# IPv6-only (e.g. cheap VPS without a paid IPv4): containers need their
-# own IPv6 address to reach external services like the MediaStack and
-# YouTube APIs. The actual /64 prefix is allocated by Docker from
-# `fixed-cidr-v6` in /etc/docker/daemon.json — see deploy.sh for that.
-networks:
-  default:
-    enable_ipv6: true
+# The default compose network used to declare `enable_ipv6: true`, which
+# an IPv6-only host needed so containers could reach MediaStack / YouTube
+# at all. It depended on `fixed-cidr-v6` being set in daemon.json, which
+# deploy.sh now only writes on hosts without IPv4. Declaring it here on an
+# IPv4 host would ask Docker for a v6 subnet the daemon isn't configured
+# to hand out, so the whole stack fails to come up. Dropped 2026-08-03.

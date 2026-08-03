@@ -89,22 +89,39 @@ fi
 log "Docker version: $(docker --version)"
 log "Compose version: $(docker compose version)"
 
-# ─── 3.5. Docker daemon: registry mirror + IPv6 ────────────────────────
-# Two reasons we replace daemon.json:
-#   1. Docker Hub rate-limits unauthenticated pulls per IP. Timeweb VPSs
-#      share IP ranges, so the limit is often already exhausted. We
-#      configure mirror.gcr.io (Google's public Docker Hub mirror) which
-#      has a separate quota.
-#   2. On IPv6-only VPSs (cheap Timeweb tier without a paid IPv4) we need
-#      Docker containers themselves to have IPv6 — otherwise outbound
-#      requests to MediaStack / YouTube APIs fail with "no route". The
-#      `ipv6: true` + `ip6tables: true` + `fixed-cidr-v6` triple does
-#      this; the `dns` block points containers at public DNS64 resolvers
-#      so IPv4-only hostnames still resolve (via NAT64 synthesis).
+# ─── 3.5. Docker daemon config ─────────────────────────────────────────
+# Always: a registry mirror. Docker Hub rate-limits unauthenticated pulls
+# per source IP, and Timeweb VPSs share IP ranges, so the limit is often
+# already spent by a neighbour. mirror.gcr.io (Google's public Docker Hub
+# mirror) has its own quota.
+#
+# Conditionally: the whole IPv6/NAT64 apparatus below only makes sense on
+# an IPv6-only host. The original 2026-05 server was on a cheap tier with
+# no IPv4, so containers had to speak IPv6 to reach MediaStack/YouTube,
+# and the host needed DNS64 to resolve IPv4-only names like github.com.
+#
+# On a host WITH IPv4 that setup is worse than useless — forcing container
+# DNS at NAT64 resolvers adds latency and a third-party dependency for
+# name resolution that plain IPv4 handles natively. So we detect first.
+if ip -4 route show default 2>/dev/null | grep -q .; then
+  HOST_HAS_IPV4=1
+  log "Host has an IPv4 default route — skipping IPv6/NAT64 workarounds."
+else
+  HOST_HAS_IPV4=0
+  warn "Host has no IPv4 route — enabling IPv6 + NAT64 fallbacks."
+fi
+
 if ! grep -q 'mirror.gcr.io' /etc/docker/daemon.json 2>/dev/null; then
-  log "Configuring Docker daemon (registry mirror + IPv6)..."
+  log "Configuring Docker daemon..."
   mkdir -p /etc/docker
-  cat > /etc/docker/daemon.json <<'EOF'
+  if [[ "$HOST_HAS_IPV4" -eq 1 ]]; then
+    cat > /etc/docker/daemon.json <<'EOF'
+{
+  "registry-mirrors": ["https://mirror.gcr.io"]
+}
+EOF
+  else
+    cat > /etc/docker/daemon.json <<'EOF'
 {
   "registry-mirrors": ["https://mirror.gcr.io"],
   "ipv6": true,
@@ -114,15 +131,16 @@ if ! grep -q 'mirror.gcr.io' /etc/docker/daemon.json 2>/dev/null; then
   "dns": ["2001:4860:4860::6464", "2001:4860:4860::64", "2a01:4f9:c010:3f02::1"]
 }
 EOF
+  fi
   systemctl restart docker
   sleep 3
 fi
 
-# Host-level NAT64 DNS so the host itself can reach IPv4-only services
-# like github.com (which has no AAAA record). Trex's free public DNS64
-# synthesizes AAAA for IPv4-only hosts, routed through their NAT64
-# gateway. Without this, even `git clone` fails on an IPv6-only VPS.
-if ! grep -q 'nat64' /etc/systemd/resolved.conf.d/nat64.conf 2>/dev/null; then
+# Host-level NAT64 DNS so an IPv6-only host can still reach IPv4-only
+# services like github.com (no AAAA record). Trex's public DNS64
+# synthesizes AAAA records routed through their NAT64 gateway. Without
+# this, even `git clone` fails — but only on an IPv6-only box.
+if [[ "$HOST_HAS_IPV4" -eq 0 ]] && ! grep -q 'nat64' /etc/systemd/resolved.conf.d/nat64.conf 2>/dev/null; then
   log "Configuring host NAT64 DNS (so the host can clone github.com)..."
   mkdir -p /etc/systemd/resolved.conf.d
   cat > /etc/systemd/resolved.conf.d/nat64.conf <<'EOF'
