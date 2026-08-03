@@ -78,6 +78,13 @@ func (p *gdeltMediaProvider) FetchPlayerArticles(ctx context.Context, player dom
 	candidates = append(candidates, ruCandidates...)
 
 	candidates = applyDomainDenylist(candidates)
+	// Same football-context whitelist the MediaStack provider uses. GDELT
+	// matches on the player's name alone, so a surname query pulls in the
+	// biotech firm "Kane", the golfer Sergio García, and a park named after
+	// Bellingham — exactly the off-topic articles that got flagged in the
+	// May feed review. Without this the free GDELT path reintroduces a bug
+	// we already fixed on the paid path.
+	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
 	if len(candidates) > p.articlesPerPlayer {
