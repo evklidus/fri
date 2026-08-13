@@ -27,6 +27,14 @@
 	# fails with "wrong argument count after email". Just hardcoding the
 	# default avoids the trap.
 	email admin@footballreputationindex.online
+
+	# Pin the ACME CA to Let's Encrypt. By default Caddy falls back to
+	# ZeroSSL when LE fails, but from this Moscow host ZeroSSL's account
+	# API answers with something that isn't JSON — Caddy dies on
+	# "invalid character 'A' looking for beginning of value", most likely
+	# a geo-block page. That turns a real LE failure into a confusing
+	# ZeroSSL error and buries the actual cause. LE alone is predictable.
+	acme_ca https://acme-v02.api.letsencrypt.org/directory
 }
 
 # Primary site — both apex and www get the same cert + same proxy rule.
