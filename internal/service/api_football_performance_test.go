@@ -909,6 +909,46 @@ func TestPlayerSearchTermPrefersSurname(t *testing.T) {
 	}
 }
 
+func TestPlayerSearchTermsFallBackToGivenName(t *testing.T) {
+	// api-football's `search` matches the display name, and Spanish and
+	// Brazilian squads list plenty of players under a mononym. Our roster
+	// carries "Fermín López"; the API calls him "Fermín" and keeps "López
+	// Martín" in a lastname field that search ignores, so querying the
+	// surname returns nothing. The given name has to be among the terms we
+	// try, or the player is simply unreachable.
+	terms := playerSearchTerms("Fermín López")
+	if len(terms) < 2 {
+		t.Fatalf("playerSearchTerms(%q) = %v, want at least surname and given name", "Fermín López", terms)
+	}
+	if terms[0] != "lopez" {
+		t.Errorf("first term = %q, want %q (surname stays the best guess)", terms[0], "lopez")
+	}
+	var hasGivenName bool
+	for _, term := range terms {
+		if term == "fermin" {
+			hasGivenName = true
+		}
+	}
+	if !hasGivenName {
+		t.Errorf("playerSearchTerms(%q) = %v, want it to include %q", "Fermín López", terms, "fermin")
+	}
+
+	// Terms must stay unique — a duplicate is a wasted request against a
+	// rate-limited API, and every term costs one.
+	for _, name := range []string{"Pedri", "Vinicius Jr", "N'Golo Kanté", "Fermín López"} {
+		seen := make(map[string]bool)
+		for _, term := range playerSearchTerms(name) {
+			if seen[term] {
+				t.Errorf("playerSearchTerms(%q) repeated %q", name, term)
+			}
+			seen[term] = true
+			if len(term) < 4 {
+				t.Errorf("playerSearchTerms(%q) produced %q, shorter than the API minimum", name, term)
+			}
+		}
+	}
+}
+
 func TestCanonicalTeamIDShortCircuitsFindTeam(t *testing.T) {
 	calls := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {

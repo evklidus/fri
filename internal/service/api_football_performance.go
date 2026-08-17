@@ -871,32 +871,51 @@ func teamNameOverlap(needle, candidate string) int {
 
 func (p *apiFootballPerformanceProvider) findPlayer(ctx context.Context, player domain.PlayerSyncTarget, teamID int) (apiFootballPlayerEntry, error) {
 	info := p.currentSeasonForTeam(ctx, teamID)
-	searchTerm := playerSearchTerm(player.Name)
-	params := url.Values{
-		"team":   []string{strconv.Itoa(teamID)},
-		"season": []string{strconv.Itoa(info.Season)},
-		"search": []string{searchTerm},
-	}
 
-	var response apiFootballPlayersResponse
-	if err := p.get(ctx, "/players", params, &response); err != nil {
-		return apiFootballPlayerEntry{}, err
-	}
-	if hasAPIFootballErrors(response.Errors) {
-		return apiFootballPlayerEntry{}, fmt.Errorf("api-football players error: %s", string(response.Errors))
-	}
-	if len(response.Response) == 0 {
-		return apiFootballPlayerEntry{}, fmt.Errorf("api-football player not found: %s", player.Name)
-	}
+	var lastErr error
+	for _, searchTerm := range playerSearchTerms(player.Name) {
+		params := url.Values{
+			"team":   []string{strconv.Itoa(teamID)},
+			"season": []string{strconv.Itoa(info.Season)},
+			"search": []string{searchTerm},
+		}
 
-	needle := normalizeFootballName(player.Name)
-	for _, item := range response.Response {
-		if strings.Contains(needle, normalizeFootballName(item.Player.Lastname)) ||
-			strings.Contains(normalizeFootballName(item.Player.Name), playerSearchTerm(needle)) {
-			return item, nil
+		var response apiFootballPlayersResponse
+		if err := p.get(ctx, "/players", params, &response); err != nil {
+			return apiFootballPlayerEntry{}, err
+		}
+		if hasAPIFootballErrors(response.Errors) {
+			return apiFootballPlayerEntry{}, fmt.Errorf("api-football players error: %s", string(response.Errors))
+		}
+		if len(response.Response) == 0 {
+			lastErr = fmt.Errorf("api-football player not found: %s (search=%q)", player.Name, searchTerm)
+			continue
+		}
+
+		needle := normalizeFootballName(player.Name)
+		for _, item := range response.Response {
+			if lastname := normalizeFootballName(item.Player.Lastname); lastname != "" && strings.Contains(needle, lastname) {
+				return item, nil
+			}
+			if firstname := normalizeFootballName(item.Player.Firstname); firstname != "" && strings.Contains(needle, firstname) {
+				return item, nil
+			}
+			if strings.Contains(normalizeFootballName(item.Player.Name), playerSearchTerm(needle)) {
+				return item, nil
+			}
+		}
+		// The search hit something but nothing corroborated the name. Prefer
+		// the first entry only when this was our best guess; otherwise keep
+		// trying, since a weaker term may still land on the right player.
+		if searchTerm == playerSearchTerm(player.Name) {
+			return response.Response[0], nil
 		}
 	}
-	return response.Response[0], nil
+
+	if lastErr != nil {
+		return apiFootballPlayerEntry{}, lastErr
+	}
+	return apiFootballPlayerEntry{}, fmt.Errorf("api-football player not found: %s", player.Name)
 }
 
 func (p *apiFootballPerformanceProvider) currentSeasonForTeam(ctx context.Context, teamID int) teamSeasonInfo {
@@ -1436,31 +1455,66 @@ func positionXGXAMax(position string) float64 {
 // fall through to the longest word ≥4 — that gives "vinicius". Final
 // fallback joins the parts so single-word names still work.
 func playerSearchTerm(name string) string {
+	terms := playerSearchTerms(name)
+	if len(terms) == 0 {
+		return asciiOnly(name)
+	}
+	return terms[0]
+}
+
+// playerSearchTerms returns every search term worth trying for a name, best
+// guess first. One guess isn't enough because api-football's `search` matches
+// the player's *display* name, and Spanish and Brazilian squads are full of
+// players listed under a mononym: our roster says "Fermín López", the API
+// calls him "Fermín", and his surname lives in a `lastname` field that search
+// never looks at. Querying "lopez" against Barcelona returns nothing at all.
+//
+// So the surname guess stays first — it is right for most names — and the
+// given name follows as a fallback. Callers try each in order and stop at the
+// first that resolves, paying the extra request only when the first misses.
+func playerSearchTerms(name string) []string {
 	name = asciiOnly(name)
 	parts := strings.Fields(name)
 	if len(parts) == 0 {
-		return name
+		if name == "" {
+			return nil
+		}
+		return []string{name}
 	}
-	// (1) Last word ≥4 — the surname for almost every player name we see.
-	if last := parts[len(parts)-1]; len(last) >= 4 {
-		return last
+
+	var terms []string
+	add := func(candidate string) {
+		if len(candidate) < 4 {
+			return
+		}
+		for _, existing := range terms {
+			if existing == candidate {
+				return
+			}
+		}
+		terms = append(terms, candidate)
 	}
-	// (2) Otherwise, longest word ≥4 — e.g. "Vinicius Jr" → "vinicius".
+
+	// (1) Last word — the surname for almost every player name we see.
+	add(parts[len(parts)-1])
+	// (2) First word — catches mononym listings like "Fermín" and "Pedri".
+	add(parts[0])
+	// (3) Longest word — e.g. "Vinicius Jr", where the surname slot is "jr".
 	longest := ""
 	for _, p := range parts {
 		if len(p) > len(longest) {
 			longest = p
 		}
 	}
-	if len(longest) >= 4 {
-		return longest
+	add(longest)
+	// (4) Everything joined, so short single-word names still clear the API's
+	//     four-character minimum.
+	add(strings.Join(parts, ""))
+
+	if len(terms) == 0 {
+		return []string{parts[0]}
 	}
-	// (3) Single-word name shorter than 4 chars (rare) — return the whole
-	//     thing concatenated so api-football's min-length validator passes.
-	if compact := strings.Join(parts, ""); len(compact) >= 4 {
-		return compact
-	}
-	return parts[0]
+	return terms
 }
 
 func normalizeFootballName(value string) string {
