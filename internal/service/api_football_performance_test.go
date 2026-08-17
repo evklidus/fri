@@ -120,7 +120,12 @@ func writeJSON(w http.ResponseWriter, body any) {
 
 func newTestProvider(server *httptest.Server, store externalIDsStore) *apiFootballPerformanceProvider {
 	p := newAPIFootballPerformanceProvider("test-key", server.URL, store, time.Second, demoPerformanceProvider{})
-	return p.(*apiFootballPerformanceProvider)
+	provider := p.(*apiFootballPerformanceProvider)
+	// The production request gap exists to stay under api-football's
+	// per-minute ceiling. There is no ceiling on a local httptest server, and
+	// paying 250ms per call would add minutes to the suite for no signal.
+	provider.minGap = 0
+	return provider
 }
 
 func TestAPIFootballMappingPathUsesExternalID(t *testing.T) {

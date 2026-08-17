@@ -76,6 +76,15 @@ type apiFootballPerformanceProvider struct {
 
 	formMu       sync.Mutex
 	formByPlayer map[int]formCacheEntry // external player ID -> form
+
+	// Outbound pacing. A performance sync spends ~9 requests per player with
+	// no natural gaps, so 22 players emit nearly 200 calls in under 20
+	// seconds — enough to trip the per-minute ceiling on a Pro plan and get
+	// a whole sync answered with "Too many requests". minGap spaces calls
+	// out; lastCallAt tracks when the previous one went out.
+	callMu     sync.Mutex
+	lastCallAt time.Time
+	minGap     time.Duration
 }
 
 func newAPIFootballPerformanceProvider(key, baseURL string, store externalIDsStore, timeout time.Duration, fallback performanceProvider) performanceProvider {
@@ -96,6 +105,7 @@ func newAPIFootballPerformanceProvider(key, baseURL string, store externalIDsSto
 		seasonByTeam: make(map[int]seasonCacheEntry),
 		topNByLeague: make(map[int]map[string]topNRanks),
 		formByPlayer: make(map[int]formCacheEntry),
+		minGap:       apiFootballMinRequestGap,
 	}
 }
 
@@ -109,6 +119,15 @@ const (
 	// rank anyone on — one good substitute appearance would outrank a season
 	// of elite output. Five matches is roughly a month of league play.
 	minPlayedFixturesForSeason = 5
+
+	// Minimum spacing between outbound API-Football calls. The Pro plan
+	// allows 300 requests/minute; 250ms sustains 240/minute, which leaves
+	// room for the retry traffic a sync generates without ever reaching the
+	// ceiling. A full 22-player sync costs roughly 50s of wall clock at this
+	// pace — irrelevant for a job that runs twice a day, and far better than
+	// a fast sync that comes back rate-limited and silently keeps stale
+	// scores. Raise it if the roster grows onto an Ultra plan.
+	apiFootballMinRequestGap = 250 * time.Millisecond
 )
 
 func (p *apiFootballPerformanceProvider) Name() string {
@@ -967,6 +986,10 @@ func defaultCurrentSeason() int {
 }
 
 func (p *apiFootballPerformanceProvider) get(ctx context.Context, path string, params url.Values, target any) error {
+	if err := p.respectRateLimit(ctx); err != nil {
+		return err
+	}
+
 	endpoint := p.baseURL + path
 	if len(params) > 0 {
 		endpoint += "?" + params.Encode()
@@ -990,6 +1013,32 @@ func (p *apiFootballPerformanceProvider) get(ctx context.Context, path string, p
 	}
 
 	return json.NewDecoder(resp.Body).Decode(target)
+}
+
+// respectRateLimit blocks until at least minGap has passed since the previous
+// outbound call, so a sync paces itself instead of emptying its per-minute
+// budget in one burst. It holds the lock across the wait on purpose: callers
+// must queue behind each other, otherwise ten goroutines all see "the gap has
+// elapsed" and fire together, which is the exact failure this prevents.
+func (p *apiFootballPerformanceProvider) respectRateLimit(ctx context.Context) error {
+	if p.minGap <= 0 {
+		return nil
+	}
+
+	p.callMu.Lock()
+	defer p.callMu.Unlock()
+
+	if wait := time.Until(p.lastCallAt.Add(p.minGap)); wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+	p.lastCallAt = time.Now()
+	return nil
 }
 
 // performanceWeights groups the six signals that go into a player's
