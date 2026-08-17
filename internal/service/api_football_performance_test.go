@@ -1126,7 +1126,23 @@ func TestAPIFootballFormUsesLastFixturesAndCaches(t *testing.T) {
 			},
 		})
 	})
-	handler.on("/fixtures", func(w http.ResponseWriter, _ *http.Request) {
+	// /fixtures serves two callers: the season-rollover guard (status=FT, to
+	// count played matches) and the form window (last=N). Count the form
+	// calls separately so this test keeps asserting what it is about — that
+	// the form cache prevents a refetch — instead of drifting whenever the
+	// season guard changes how often it asks.
+	var formFixtureCalls int
+	handler.on("/fixtures", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Query().Get("status") == "FT" {
+			// Season guard: report a full season so no rollback happens.
+			response := make([]any, 0, 30)
+			for i := 0; i < 30; i++ {
+				response = append(response, map[string]any{"fixture": map[string]any{"id": 2000 + i}})
+			}
+			writeJSON(w, map[string]any{"errors": []any{}, "response": response})
+			return
+		}
+		formFixtureCalls++
 		writeJSON(w, map[string]any{
 			"errors": []any{},
 			"response": []any{
@@ -1180,8 +1196,8 @@ func TestAPIFootballFormUsesLastFixturesAndCaches(t *testing.T) {
 	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); err != nil {
 		t.Fatalf("second fetch: %v", err)
 	}
-	if got := handler.hitCount("/fixtures"); got != 1 {
-		t.Errorf("/fixtures should be called once due to form cache, got %d", got)
+	if formFixtureCalls != 1 {
+		t.Errorf("/fixtures (form window) should be called once due to form cache, got %d", formFixtureCalls)
 	}
 	if got := handler.hitCount("/fixtures/players"); got != 2 {
 		t.Errorf("/fixtures/players should be called 2 times once and reused (form cache), got %d", got)

@@ -103,6 +103,12 @@ const (
 	topNCacheTTL = 6 * time.Hour
 	formCacheTTL = 1 * time.Hour
 	formMatches  = 5
+
+	// How many finished fixtures a season needs before we treat its stats as
+	// a fair reading of current form. Below this the sample is too thin to
+	// rank anyone on — one good substitute appearance would outrank a season
+	// of elite output. Five matches is roughly a month of league play.
+	minPlayedFixturesForSeason = 5
 )
 
 func (p *apiFootballPerformanceProvider) Name() string {
@@ -366,6 +372,29 @@ func (p *apiFootballPerformanceProvider) formFor(ctx context.Context, externalPl
 	p.formMu.Unlock()
 
 	return form, form.Games > 0
+}
+
+// playedFixtures counts finished matches a team has in a season. It answers
+// "does this season have any evidence in it yet?" — the question that
+// separates a real current season from one that merely opened on the
+// calendar. Returns -1 when the count can't be established, so callers can
+// tell "no matches" apart from "couldn't ask" and leave the season alone.
+func (p *apiFootballPerformanceProvider) playedFixtures(ctx context.Context, teamID, season int) int {
+	params := url.Values{
+		"team":   []string{strconv.Itoa(teamID)},
+		"season": []string{strconv.Itoa(season)},
+		"status": []string{"FT"},
+	}
+	var response apiFootballFixturesResponse
+	if err := p.get(ctx, "/fixtures", params, &response); err != nil {
+		log.Printf("api-football: playedFixtures failed for team %d season %d: %v", teamID, season, err)
+		return -1
+	}
+	if hasAPIFootballErrors(response.Errors) {
+		log.Printf("api-football: playedFixtures error for team %d season %d: %s", teamID, season, string(response.Errors))
+		return -1
+	}
+	return len(response.Response)
 }
 
 func (p *apiFootballPerformanceProvider) lastFixtures(ctx context.Context, teamID int) ([]int, error) {
@@ -853,6 +882,31 @@ func (p *apiFootballPerformanceProvider) currentSeasonForTeam(ctx context.Contex
 	info, err := p.fetchCurrentSeason(ctx, teamID)
 	if err != nil || info.Season <= 0 {
 		info.Season = defaultCurrentSeason()
+	}
+
+	// Season-rollover guard (2026-08).
+	//
+	// API-Football flips "current" to the new season the moment it opens —
+	// in August it reported La Liga 2026/27 as current, ending 2027-05-30,
+	// which is correct but useless: no matches had been played, so every
+	// player came back with zero minutes, zero goals and no rating. The
+	// snapshot builder then substituted its 5.8 default rating and produced
+	// nonsense — Pedri scored 18.9 and Yamal 26.1 on a 0–100 scale.
+	//
+	// So don't trust the label, count the evidence: if the season has barely
+	// any finished fixtures AND the one before it demonstrably has more, use
+	// the older season. Requiring the second half of that test matters —
+	// checking only "current looks empty" would roll a whole season back on
+	// any empty-but-successful response, which is indistinguishable from a
+	// genuinely fresh season. Comparing the two makes a wrong answer require
+	// two wrong answers. This self-heals as the new season fills in, and both
+	// calls are cached per team for the season TTL.
+	if played := p.playedFixtures(ctx, teamID, info.Season); played >= 0 && played < minPlayedFixturesForSeason {
+		if previous := p.playedFixtures(ctx, teamID, info.Season-1); previous > played {
+			log.Printf("api-football: season %d for team %d has %d finished fixtures vs %d in %d — using the older season",
+				info.Season, teamID, played, previous, info.Season-1)
+			info.Season--
+		}
 	}
 
 	p.seasonMu.Lock()
