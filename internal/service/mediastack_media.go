@@ -79,17 +79,21 @@ func (p *mediaStackMediaProvider) FetchPlayerArticles(ctx context.Context, playe
 	}
 	candidates = append(candidates, enArticles...)
 
-	if err := p.respectRateLimit(ctx); err != nil {
-		return candidates, nil
-	}
-	ruArticles, err := p.fetch(ctx, player.Name, "ru", fromDate, toDate)
-	if err != nil {
-		log.Printf("mediastack: ru fetch failed for %q: %v", player.Name, err)
-	}
-	candidates = append(candidates, ruArticles...)
+	// There used to be a second request here for Russian-language coverage.
+	// It was removed on 2026-08-17 after measuring what it returned: nothing,
+	// ever. mediaStackKeywordFor reduces a player to their Latin surname, and
+	// Russian outlets spell names in Cyrillic — "Мбаппе", not "Mbappé" — so
+	// the query cannot match by construction. Measured against the live API:
+	// keyword "Mbappé" returns 984 English articles and 0 Russian; "Yamal"
+	// returns 1295 and 0. It was doubling our request bill for empty results.
+	//
+	// Russian coverage is still worth having, but it needs Cyrillic
+	// transliteration of every player name — a real feature, not a language
+	// parameter.
 
 	candidates = applyDomainDenylist(candidates)
 	candidates = filterTitleMentionsPlayer(candidates, player.Name)
+	candidates = filterOtherSports(candidates)
 	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
@@ -194,6 +198,64 @@ func filterFootballContext(items []domain.MediaArticleCandidate) []domain.MediaA
 			}
 		}
 		if matched {
+			out = append(out, item)
+		}
+	}
+	return out
+}
+
+// otherSportsURLMarkers are path segments that identify an article as
+// belonging to a different sport. Publishers that cover several sports file
+// them under a section, and the URL states it plainly: sportskeeda's
+// "/us/nhl/", yardbarker's "/mlb/". Slashes on both sides keep this from
+// firing on a substring inside a slug.
+var otherSportsURLMarkers = []string{
+	"/nhl/", "/mlb/", "/nba/", "/nfl/", "/wnba/",
+	"/cricket/", "/tennis/", "/golf/", "/f1/", "/ufc/", "/mma/", "/boxing/",
+	"/hockey/", "/baseball/", "/basketball/", "/rugby/", "/esports/",
+}
+
+// otherSportsTextMarkers catch the same thing when the URL is uninformative.
+// Kept narrow on purpose — league names and sport-specific roles that never
+// appear in football coverage. Generic words like "goals", "scored" or
+// "trade" are useless here: hockey and baseball use them exactly as football
+// does, which is why filterFootballContext waved these articles through.
+var otherSportsTextMarkers = []string{
+	" nhl", "nhl ", " mlb", "mlb ", " nba", "nba ", " nfl", "nfl ",
+	"stanley cup", "world series", "super bowl", "grand slam",
+	"home run", "touchdown", "innings", "quarterback", "pitcher",
+	"yankees", "oilers", "blackhawks", "lakers", "celtics",
+}
+
+// filterOtherSports drops articles about a same-surname athlete in another
+// sport. This is filterFootballContext's blind spot: hockey and baseball
+// share football's vocabulary, so an NHL piece saying a player "scored" in
+// the "season" satisfies the football whitelist. Two Patrick/Evander Kane
+// stories were filed under Harry Kane, and two about the Yankees' Luis
+// Garcia under Joan García — each one feeding a foreign sport's sentiment
+// into a footballer's Media score.
+func filterOtherSports(items []domain.MediaArticleCandidate) []domain.MediaArticleCandidate {
+	out := make([]domain.MediaArticleCandidate, 0, len(items))
+	for _, item := range items {
+		url := strings.ToLower(item.SourceURL)
+		text := strings.ToLower(item.Title + " " + item.Summary)
+
+		rejected := false
+		for _, marker := range otherSportsURLMarkers {
+			if strings.Contains(url, marker) {
+				rejected = true
+				break
+			}
+		}
+		if !rejected {
+			for _, marker := range otherSportsTextMarkers {
+				if strings.Contains(text, marker) {
+					rejected = true
+					break
+				}
+			}
+		}
+		if !rejected {
 			out = append(out, item)
 		}
 	}

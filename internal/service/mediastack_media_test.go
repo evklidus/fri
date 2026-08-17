@@ -12,7 +12,14 @@ import (
 	"fri.local/football-reputation-index/internal/domain"
 )
 
-func TestMediaStackFetchesEnAndRu(t *testing.T) {
+// The provider used to issue a second request per player for Russian
+// coverage. It was dropped on 2026-08-17: the keyword is the player's Latin
+// surname and Russian outlets spell names in Cyrillic, so the query matched
+// nothing by construction — "Mbappé" returned 984 English articles and 0
+// Russian against the live API. This test now guards the opposite property,
+// because reintroducing the second call would double the request bill of a
+// metered API for no articles.
+func TestMediaStackFetchesEnglishOnly(t *testing.T) {
 	var mu sync.Mutex
 	var calls []url.Values
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -49,22 +56,18 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 	if err != nil {
 		t.Fatalf("fetch: %v", err)
 	}
-	if len(candidates) != 3 {
-		t.Errorf("got %d candidates, want 3 (2 EN + 1 RU)", len(candidates))
+	if len(candidates) != 2 {
+		t.Errorf("got %d candidates, want 2 (English only)", len(candidates))
 	}
 
 	mu.Lock()
 	defer mu.Unlock()
-	if len(calls) != 2 {
-		t.Errorf("expected 2 calls (EN + RU), got %d", len(calls))
+	if len(calls) != 1 {
+		t.Fatalf("expected exactly 1 call (English), got %d — a second language costs a request per player and returns nothing", len(calls))
 	}
-	hasEN, hasRU := false, false
 	for _, q := range calls {
-		switch q.Get("languages") {
-		case "en":
-			hasEN = true
-		case "ru":
-			hasRU = true
+		if got := q.Get("languages"); got != "en" {
+			t.Errorf("languages = %q, want en", got)
 		}
 		if got := q.Get("access_key"); got != "test-key" {
 			t.Errorf("access_key = %q, want test-key", got)
@@ -79,9 +82,6 @@ func TestMediaStackFetchesEnAndRu(t *testing.T) {
 		if got := q.Get("categories"); got != "sports" {
 			t.Errorf("categories = %q, want sports", got)
 		}
-	}
-	if !hasEN || !hasRU {
-		t.Errorf("expected both EN and RU calls, got %v", calls)
 	}
 }
 
@@ -208,13 +208,18 @@ func TestMediaStackHonoursRateLimit(t *testing.T) {
 	}
 }
 
-func TestMediaStackDedupAcrossLanguages(t *testing.T) {
+// Dedup used to matter because the same story came back from both the
+// English and Russian queries. With the Russian call gone the duplicates now
+// arrive within a single response — syndicated wire copy republished under
+// several URLs — so the fake returns the story twice to keep the property
+// under test.
+func TestMediaStackDedupesRepeatedArticles(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		// Same article returned for both languages — must dedupe.
 		_, _ = w.Write([]byte(`{
 			"data":[
-				{"title":"Messi scored a goal","description":"Goal","url":"https://bbc.com/a","source":"BBC","language":"en","published_at":"2026-05-05T10:00:00+00:00"}
+				{"title":"Messi scored a goal","description":"Goal","url":"https://bbc.com/a","source":"BBC","language":"en","published_at":"2026-05-05T10:00:00+00:00"},
+				{"title":"Messi scored a goal","description":"Goal","url":"https://bbc.com/a?utm_source=rss","source":"BBC","language":"en","published_at":"2026-05-05T10:00:00+00:00"}
 			],
 			"error":{}
 		}`))
@@ -322,6 +327,73 @@ func TestFilterFootballContextDropsNonFootballNoise(t *testing.T) {
 		got := len(out) > 0
 		if got != tc.keep {
 			t.Errorf("keep=%v for %q (summary %q) want %v", got, tc.title, tc.summary, tc.keep)
+		}
+	}
+}
+
+func TestFilterOtherSportsDropsSameSurnameAthletes(t *testing.T) {
+	// Every "drop" case below is an article that actually reached production
+	// on 2026-08-17 and was attributed to a footballer. They cleared
+	// filterFootballContext because hockey and baseball describe players
+	// scoring in a season exactly like football does — the whitelist cannot
+	// tell them apart, which is why this filter exists.
+	cases := []struct {
+		name    string
+		title   string
+		summary string
+		url     string
+		keep    bool
+	}{
+		{
+			name:  "NHL section in URL",
+			title: `"Last dance tour" - NHL fans react as Patrick Kane drops major update`,
+			url:   "https://www.sportskeeda.com/us/nhl/news-last-dance-tour-nhl-fans-react-patrick-kane",
+			keep:  false,
+		},
+		{
+			name:  "NHL player, hockey club in text",
+			title: "EDM reporter open to Oilers potentially bringing back Evander Kane",
+			url:   "https://www.sportskeeda.com/us/nhl/news-edm-reporter-oilers-evander-kane",
+			keep:  false,
+		},
+		{
+			name:  "MLB section in URL",
+			title: "Yankees make questionable trade with Nationals for Luis Garcia Jr",
+			url:   "https://www.yardbarker.com/mlb/articles/yankees_trade_luis_garcia_jr/s1_13132_44130257",
+			keep:  false,
+		},
+		{
+			name:  "baseball terms with a neutral URL",
+			title: "Projecting the lineup and trade grade if they acquire Luis Garcia Jr",
+			summary: "The infielder had a strong showing at the plate, driving in runs " +
+				"with a home run in the seventh innings.",
+			url:  "https://fansided.com/projecting-the-lineup-01kz20agrh16",
+			keep: false,
+		},
+		// Football must survive. "Transfer", "season" and "scored" appear in
+		// both worlds, so a filter keyed on those would take these too.
+		{
+			name:    "football transfer story",
+			title:   "Kane tells Bayern he wants Premier League return",
+			summary: "The striker scored 40 goals last season before the transfer talk began.",
+			url:     "https://www.skysports.com/football/news/kane-bayern-return",
+			keep:    true,
+		},
+		{
+			name:    "football article on a multi-sport publisher",
+			title:   "Joan García keeps clean sheet as Barcelona edge Sevilla",
+			summary: "The goalkeeper made seven saves in the La Liga win.",
+			url:     "https://www.sportskeeda.com/football/news-joan-garcia-barcelona-sevilla",
+			keep:    true,
+		},
+	}
+
+	for _, tc := range cases {
+		out := filterOtherSports([]domain.MediaArticleCandidate{
+			{Title: tc.title, Summary: tc.summary, SourceURL: tc.url},
+		})
+		if got := len(out) > 0; got != tc.keep {
+			t.Errorf("%s: keep=%v, want %v (title %q)", tc.name, got, tc.keep, tc.title)
 		}
 	}
 }

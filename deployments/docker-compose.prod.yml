@@ -65,7 +65,13 @@ services:
       DB_MAX_CONNS: 10
       AUTO_SYNC_ENABLED: "true"
       SYNC_ON_STARTUP: "false"
-      MEDIA_SYNC_INTERVAL_MINUTES: 360
+      # Every 12h, not 6h. Each media query asks MediaStack for a 30-day
+      # window (mediaStackLookbackDays), so consecutive syncs six hours apart
+      # overlap by 99% — we were paying four times a day to re-read the same
+      # month. At 12h the feed is at most half a day behind, request volume
+      # drops from ~5,300/month to ~2,600, and the roster can grow to roughly
+      # 80 players before the Standard plan's 10,000/month becomes the limit.
+      MEDIA_SYNC_INTERVAL_MINUTES: 720
       SOCIAL_SYNC_INTERVAL_MINUTES: 1440
       PERFORMANCE_SYNC_INTERVAL_MINUTES: 1440
       CHARACTER_SYNC_INTERVAL_MINUTES: 720
