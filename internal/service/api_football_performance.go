@@ -398,11 +398,22 @@ func (p *apiFootballPerformanceProvider) formFor(ctx context.Context, externalPl
 // separates a real current season from one that merely opened on the
 // calendar. Returns -1 when the count can't be established, so callers can
 // tell "no matches" apart from "couldn't ask" and leave the season alone.
-func (p *apiFootballPerformanceProvider) playedFixtures(ctx context.Context, teamID, season int) int {
+//
+// Pass a leagueID to count only that competition. This matters more than it
+// looks: pre-season friendlies are finished fixtures too, and a club on a
+// summer tour racks up half a dozen before the league kicks off. Counting
+// them made Real Madrid look like it had a season underway while La Liga
+// hadn't started, so its players were still being scored on an empty 2026 —
+// Vinícius couldn't even be found, because the squad list for that season
+// was empty.
+func (p *apiFootballPerformanceProvider) playedFixtures(ctx context.Context, teamID, season, leagueID int) int {
 	params := url.Values{
 		"team":   []string{strconv.Itoa(teamID)},
 		"season": []string{strconv.Itoa(season)},
 		"status": []string{"FT"},
+	}
+	if leagueID > 0 {
+		params.Set("league", strconv.Itoa(leagueID))
 	}
 	var response apiFootballFixturesResponse
 	if err := p.get(ctx, "/fixtures", params, &response); err != nil {
@@ -920,10 +931,10 @@ func (p *apiFootballPerformanceProvider) currentSeasonForTeam(ctx context.Contex
 	// genuinely fresh season. Comparing the two makes a wrong answer require
 	// two wrong answers. This self-heals as the new season fills in, and both
 	// calls are cached per team for the season TTL.
-	if played := p.playedFixtures(ctx, teamID, info.Season); played >= 0 && played < minPlayedFixturesForSeason {
-		if previous := p.playedFixtures(ctx, teamID, info.Season-1); previous > played {
-			log.Printf("api-football: season %d for team %d has %d finished fixtures vs %d in %d — using the older season",
-				info.Season, teamID, played, previous, info.Season-1)
+	if played := p.playedFixtures(ctx, teamID, info.Season, info.LeagueID); played >= 0 && played < minPlayedFixturesForSeason {
+		if previous := p.playedFixtures(ctx, teamID, info.Season-1, info.LeagueID); previous > played {
+			log.Printf("api-football: season %d for team %d (league %d) has %d finished fixtures vs %d in %d — using the older season",
+				info.Season, teamID, info.LeagueID, played, previous, info.Season-1)
 			info.Season--
 		}
 	}
