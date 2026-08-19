@@ -51,7 +51,7 @@ func MustLoad() Config {
 		YouTubeAPIKey:       getEnv("YOUTUBE_API_KEY", ""),
 		YouTubeBaseURL:      getEnv("YOUTUBE_BASE_URL", "https://www.googleapis.com/youtube/v3"),
 		MediaStackAPIKey:    getEnv("MEDIASTACK_API_KEY", ""),
-		MediaStackBaseURL:   getEnv("MEDIASTACK_BASE_URL", "http://api.mediastack.com/v1"),
+		MediaStackBaseURL:   getEnv("MEDIASTACK_BASE_URL", "https://api.mediastack.com/v1"),
 	}
 
 	return cfg

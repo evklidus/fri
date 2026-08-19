@@ -18,9 +18,11 @@ import (
 
 const (
 	mediaStackProviderName = "mediastack"
-	// Free tier requires HTTP. Paid plans serve HTTPS — override via
-	// MEDIASTACK_BASE_URL when upgrading.
-	mediaStackDefaultBaseURL = "http://api.mediastack.com/v1"
+	// HTTPS, because the access key travels in the query string and the
+	// free tier's HTTP-only endpoint put it on the wire in clear text. Paid
+	// plans serve HTTPS, so there is no reason to keep the plaintext default
+	// around. Override via MEDIASTACK_BASE_URL if ever needed.
+	mediaStackDefaultBaseURL = "https://api.mediastack.com/v1"
 	mediaStackDefaultTimeout = 30 * time.Second
 	mediaStackPageSize       = 25
 	mediaStackLookbackDays   = 30
