@@ -25,7 +25,20 @@ const (
 	mediaStackDefaultBaseURL = "https://api.mediastack.com/v1"
 	mediaStackDefaultTimeout = 30 * time.Second
 	mediaStackPageSize       = 25
-	mediaStackLookbackDays   = 30
+	// How far back a media query reaches. Deliberately wide, and it costs
+	// nothing to be: queries sort by published_desc and we keep only
+	// articlesPerPlayer of the result, so mid-season this still returns the
+	// newest articles and the window never comes into play.
+	//
+	// It matters in the off-season. Measured on 2026-08-19, a month into the
+	// summer break, a 30-day window returned zero articles for 15 of our 22
+	// players — Vitinha, Pedri, Cubarsí and Olise included — because
+	// MediaStack's most recent piece on Vitinha was from 17 June. Those
+	// players kept whatever Media score they already had, which is how a
+	// seeded placeholder survives for months while looking like live data.
+	// At 180 days every player has coverage: Vitinha 10 articles, Cubarsí
+	// 14, Pedri 20.
+	mediaStackLookbackDays   = 180
 	// 500ms keeps us well under any documented per-second cap on Standard/Pro
 	// plans while still surviving free-tier throttling (where retry kicks in).
 	mediaStackDefaultMinGap   = 500 * time.Millisecond
