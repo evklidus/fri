@@ -1645,6 +1645,14 @@ func scanPlayerWithScore(row interface {
 	if derived := domain.AgeFromBirthDate(item.BirthDate, time.Now().UTC()); derived > 0 {
 		item.Age = derived
 	}
+	// Don't ship both portraits. photo_data is a base64 data URI worth tens of
+	// kilobytes per player and it is only a fallback for rows the sync hasn't
+	// given a URL yet — sending it alongside photo_url is what kept
+	// /api/players at 867KB after the URLs landed. The column stays in the
+	// database; it just doesn't travel once something better exists.
+	if item.PhotoURL != "" {
+		item.PhotoData = ""
+	}
 	return item, err
 }
 
