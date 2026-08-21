@@ -63,7 +63,12 @@ type Score struct {
 	CharacterUpdatedAt   time.Time `json:"character_updated_at"`
 }
 
+// PlayerWithScore joins a player with their current scores. Locked marks a
+// row whose contents were withheld because the caller has no account — the
+// rank is still real, everything else is blank.
 type PlayerWithScore struct {
+	Locked bool `json:"locked,omitempty"`
+
 	Player
 	Score
 }
@@ -359,4 +364,32 @@ type PlayerSyncDelta struct {
 	OldFRI      float64 `json:"old_fri"`
 	NewFRI      float64 `json:"new_fri"`
 	ImpactDelta float64 `json:"impact_delta"`
+}
+
+// User is a registered account. The password hash never leaves the
+// repository layer — it has no JSON tag on purpose, so an accidental
+// marshal of this struct can't leak it.
+type User struct {
+	ID           int64      `json:"id"`
+	Email        string     `json:"email"`
+	PasswordHash string     `json:"-"`
+	IsAdmin      bool       `json:"is_admin"`
+	CreatedAt    time.Time  `json:"created_at"`
+	LastLoginAt  *time.Time `json:"last_login_at,omitempty"`
+}
+
+// Session is one logged-in browser. Token doubles as the cookie value, so it
+// is omitted from JSON: the client already holds it in a cookie and echoing
+// it into a response body only widens where it can leak (logs, caches).
+type Session struct {
+	Token     string    `json:"-"`
+	UserID    int64     `json:"user_id"`
+	CreatedAt time.Time `json:"created_at"`
+	ExpiresAt time.Time `json:"expires_at"`
+}
+
+// Credentials is the request body for register and login.
+type Credentials struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
 }

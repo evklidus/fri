@@ -64,13 +64,30 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		api.GET("/events/pending", handler.listPendingEvents)
 		api.GET("/events/:id", handler.getPendingEvent)
 		api.POST("/events/:id/vote", handler.submitEventVote)
-		api.POST("/sync/finalize-events", handler.runFinalizeEvents)
-		api.POST("/sync/career-baseline", handler.runCareerBaselineSync)
-		api.POST("/sync/media", handler.runMediaSync)
-		api.POST("/sync/social", handler.runSocialSync)
-		api.POST("/sync/performance", handler.runPerformanceSync)
-		api.POST("/sync/character", handler.runCharacterSync)
-		api.POST("/sync/all", handler.runAllSync)
+		// Accounts. Registration exists so the product can report how many
+		// people use it; the leaderboard gate and the admin tools are built
+		// on the same sessions.
+		api.POST("/auth/register", handler.register)
+		api.POST("/auth/login", handler.login)
+		api.POST("/auth/logout", handler.logout)
+		api.GET("/auth/me", handler.me)
+		api.GET("/stats/users", handler.userCount)
+
+		// Everything that changes data sits behind an admin session. These
+		// were open to the internet until now: anyone who knew the paths
+		// could trigger a full sync (burning metered API quota) or, once
+		// news deletion landed, empty the feed.
+		admin := api.Group("", handler.requireAdmin)
+		{
+			admin.DELETE("/news/:id", handler.deleteNewsItem)
+			admin.POST("/sync/finalize-events", handler.runFinalizeEvents)
+			admin.POST("/sync/career-baseline", handler.runCareerBaselineSync)
+			admin.POST("/sync/media", handler.runMediaSync)
+			admin.POST("/sync/social", handler.runSocialSync)
+			admin.POST("/sync/performance", handler.runPerformanceSync)
+			admin.POST("/sync/character", handler.runCharacterSync)
+			admin.POST("/sync/all", handler.runAllSync)
+		}
 	}
 
 	router.Static("/assets", filepath.Join(cfg.WebDir, "assets"))
@@ -92,7 +109,15 @@ func (r *Router) listPlayers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": players})
+	// The top places are the reason to create an account, so they are
+	// withheld rather than merely blurred — see maskLockedPlayers.
+	_, signedIn := r.currentUser(c)
+	players = maskLockedPlayers(players, signedIn)
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": players,
+		"meta": gin.H{"locked_top": lockedTopN, "signed_in": signedIn},
+	})
 }
 
 func (r *Router) getPlayer(c *gin.Context) {

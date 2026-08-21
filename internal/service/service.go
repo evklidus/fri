@@ -5,6 +5,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -56,6 +57,12 @@ type Service struct {
 	performanceProvider    performanceProvider
 	careerBaselineProvider careerBaselineProvider // optional; may be nil if no API-Football key
 
+	// auth is the accounts store. Separate from `repo` so the auth surface
+	// stays small and testable on its own; nil when the caller hasn't wired
+	// accounts, in which case the auth endpoints report unavailable rather
+	// than panicking.
+	auth authStore
+
 	// Per-component sync locks prevent overlapping scheduled and ad-hoc HTTP
 	// runs of the same component. We use TryLock so a concurrent caller
 	// returns immediately with status=skipped instead of queueing.
@@ -68,12 +75,29 @@ type Service struct {
 }
 
 func New(repo repository, mediaProvider mediaProvider, socialProvider socialProvider, performanceProvider performanceProvider) *Service {
-	return &Service{
+	svc := &Service{
 		repo:                repo,
 		mediaProvider:       mediaProvider,
 		socialProvider:      socialProvider,
 		performanceProvider: performanceProvider,
 	}
+	// The Postgres repository implements the accounts store too. Wiring it
+	// here by type assertion keeps New's signature stable for the tests that
+	// pass fakes, which simply leave auth nil.
+	if store, ok := repo.(authStore); ok {
+		svc.auth = store
+	}
+	return svc
+}
+
+// AuthEnabled reports whether accounts are available. False for a service
+// built on a fake repository in tests.
+func (s *Service) AuthEnabled() bool { return s.auth != nil }
+
+// logAuthWarning records a non-fatal auth problem. Kept as a named helper so
+// these lines are greppable when diagnosing login trouble.
+func logAuthWarning(op string, err error) {
+	log.Printf("auth: %s failed: %v", op, err)
 }
 
 // WithCareerBaselineProvider wires an optional career-baseline source. Pass

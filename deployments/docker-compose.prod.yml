@@ -83,6 +83,11 @@ services:
       YOUTUBE_BASE_URL: ${YOUTUBE_BASE_URL:-https://www.googleapis.com/youtube/v3}
       MEDIASTACK_API_KEY: ${MEDIASTACK_API_KEY:-}
       MEDIASTACK_BASE_URL: ${MEDIASTACK_BASE_URL:-https://api.mediastack.com/v1}
+      # Authorises machine callers against the admin endpoints (the sync
+      # triggers, news deletion). Browsers use an admin session instead.
+      # Generate with `openssl rand -hex 32`; leaving it empty disables the
+      # header path and leaves sessions as the only way in.
+      ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
     # NOTE: there used to be an `extra_hosts` pin mapping api.mediastack.com
     # to a hardcoded IPv6 address. That was a workaround for the original
     # IPv6-only server, where DNS64 resolvers returned SERVFAIL for

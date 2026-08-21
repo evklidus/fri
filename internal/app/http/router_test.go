@@ -7,6 +7,7 @@ import (
 	"errors"
 	stdhttp "net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -105,11 +106,32 @@ func (f *fakeService) SyncAll(ctx context.Context) ([]domain.ComponentSyncResult
 	return f.syncAllFn(ctx)
 }
 
+// testAdminToken authorises the admin-only routes in tests. The sync
+// endpoints moved behind requireAdmin once accounts landed — they trigger
+// metered API calls, so leaving them open to the internet was a standing
+// invitation to burn someone else's quota.
+const testAdminToken = "test-admin-token"
+
 func newServerWithFake(t *testing.T, fake *fakeService) *httptest.Server {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	router := NewRouter(config.Config{WebDir: "."}, fake)
+	router := NewRouter(config.Config{WebDir: ".", AdminAPIToken: testAdminToken}, fake)
 	return httptest.NewServer(router)
+}
+
+// postAdmin issues an authenticated POST against an admin route.
+func postAdmin(t *testing.T, url string) *stdhttp.Response {
+	t.Helper()
+	req, err := stdhttp.NewRequest(stdhttp.MethodPost, url, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set(adminTokenHeader, testAdminToken)
+	resp, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post %s: %v", url, err)
+	}
+	return resp
 }
 
 func decode(t *testing.T, body []byte, into any) {
@@ -314,10 +336,7 @@ func TestSyncEndpointsReturnResultJSON(t *testing.T) {
 	defer server.Close()
 
 	for _, path := range []string{"/api/sync/media", "/api/sync/social", "/api/sync/performance"} {
-		resp, err := stdhttp.Post(server.URL+path, "application/json", nil)
-		if err != nil {
-			t.Fatalf("post %s: %v", path, err)
-		}
+		resp := postAdmin(t, server.URL+path)
 		if resp.StatusCode != stdhttp.StatusOK {
 			t.Errorf("%s: status = %d, want 200", path, resp.StatusCode)
 		}
@@ -341,10 +360,7 @@ func TestSyncEndpointReturns500OnError(t *testing.T) {
 	server := newServerWithFake(t, fake)
 	defer server.Close()
 
-	resp, err := stdhttp.Post(server.URL+"/api/sync/media", "application/json", nil)
-	if err != nil {
-		t.Fatalf("post: %v", err)
-	}
+	resp := postAdmin(t, server.URL+"/api/sync/media")
 	defer resp.Body.Close()
 	if resp.StatusCode != stdhttp.StatusInternalServerError {
 		t.Errorf("status = %d, want 500", resp.StatusCode)
@@ -400,4 +416,121 @@ func readBody(resp *stdhttp.Response) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
+}
+
+func TestAdminRoutesRejectAnonymousCallers(t *testing.T) {
+	// Before accounts existed these were open to anyone who knew the path.
+	// A stranger could trigger a full sync — which spends metered
+	// API-Football and MediaStack quota — or, once deletion landed, empty
+	// the news feed. Anonymous callers must be turned away.
+	fake := &fakeService{
+		syncMediaFn: func(context.Context) (*domain.ComponentSyncResult, error) {
+			t.Error("sync ran for an anonymous caller")
+			return nil, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	for _, path := range []string{
+		"/api/sync/media", "/api/sync/all", "/api/sync/performance",
+		"/api/sync/social", "/api/sync/character", "/api/sync/career-baseline",
+	} {
+		resp, err := stdhttp.Post(server.URL+path, "application/json", nil)
+		if err != nil {
+			t.Fatalf("post %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != stdhttp.StatusUnauthorized {
+			t.Errorf("%s: status = %d, want 401", path, resp.StatusCode)
+		}
+	}
+}
+
+func TestAdminRoutesRejectWrongToken(t *testing.T) {
+	server := newServerWithFake(t, &fakeService{})
+	defer server.Close()
+
+	req, err := stdhttp.NewRequest(stdhttp.MethodPost, server.URL+"/api/sync/media", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set(adminTokenHeader, testAdminToken+"-wrong")
+	resp, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != stdhttp.StatusForbidden {
+		t.Errorf("status = %d, want 403", resp.StatusCode)
+	}
+}
+
+func TestLeaderboardWithholdsTopPlacesFromAnonymousCallers(t *testing.T) {
+	// The gate has to be real. Blurring in CSS would leave the names and
+	// scores in the JSON for anyone who opens devtools, so the API itself
+	// must not send them.
+	players := make([]domain.PlayerWithScore, 0, 8)
+	for i := 0; i < 8; i++ {
+		var p domain.PlayerWithScore
+		p.ID = int64(i + 1)
+		p.Name = "Player " + strconv.Itoa(i+1)
+		p.Club = "Club"
+		p.FRI = float64(90 - i)
+		p.Performance = 80
+		players = append(players, p)
+	}
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return players, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp, err := stdhttp.Get(server.URL + "/api/players")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+
+	var payload struct {
+		Data []domain.PlayerWithScore `json:"data"`
+		Meta struct {
+			LockedTop int  `json:"locked_top"`
+			SignedIn  bool `json:"signed_in"`
+		} `json:"meta"`
+	}
+	decode(t, body, &payload)
+
+	if len(payload.Data) != len(players) {
+		t.Fatalf("got %d rows, want %d — locked places must still occupy the table", len(payload.Data), len(players))
+	}
+	if payload.Meta.LockedTop != lockedTopN || payload.Meta.SignedIn {
+		t.Errorf("meta = %+v, want locked_top=%d signed_in=false", payload.Meta, lockedTopN)
+	}
+
+	for i, p := range payload.Data {
+		locked := i < lockedTopN
+		if p.Locked != locked {
+			t.Errorf("row %d: locked = %v, want %v", i, p.Locked, locked)
+		}
+		if !locked {
+			if p.Name == "" || p.FRI == 0 {
+				t.Errorf("row %d: visible row lost its data (name=%q fri=%v)", i, p.Name, p.FRI)
+			}
+			continue
+		}
+		if p.Name != "" || p.Club != "" || p.FRI != 0 || p.Performance != 0 {
+			t.Errorf("row %d leaked withheld data: name=%q club=%q fri=%v perf=%v",
+				i, p.Name, p.Club, p.FRI, p.Performance)
+		}
+	}
+
+	// The raw bytes must not carry a hidden player's name anywhere.
+	for i := 0; i < lockedTopN; i++ {
+		if bytes.Contains(body, []byte(players[i].Name)) {
+			t.Errorf("response body still contains %q", players[i].Name)
+		}
+	}
 }
