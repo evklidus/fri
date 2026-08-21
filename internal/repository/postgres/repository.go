@@ -137,7 +137,7 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 
 	baseQuery := `
 		SELECT
-			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
+			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.birth_date, p.emoji, p.photo_data, p.photo_url, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
 			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
 			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
@@ -184,7 +184,7 @@ func (r *Repository) ListPlayers(ctx context.Context, search, position, club str
 func (r *Repository) GetPlayer(ctx context.Context, id int64) (*domain.PlayerWithScore, error) {
 	row := r.pool.QueryRow(ctx, `
 		SELECT
-			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.emoji, p.photo_data, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
+			p.id, p.slug, p.name, p.club, p.league, p.position, p.age, p.birth_date, p.emoji, p.photo_data, p.photo_url, p.theme_background, p.summary_en, p.summary_ru, p.created_at, p.updated_at,
 			s.player_id, s.fri, s.performance, s.social, s.fan, s.fan_base, s.media, s.character, s.trend_value, s.trend_direction, s.calculated_at,
 			s.performance_updated_at, s.social_updated_at, s.fan_updated_at, s.media_updated_at, s.character_updated_at
 		FROM players p
@@ -502,6 +502,22 @@ func (r *Repository) ApplyPerformanceSync(ctx context.Context, snapshots []domai
 			return nil, err
 		}
 
+		// Refresh the player's profile from whatever the provider saw. Both
+		// fields are written only when present, so a provider that can't
+		// supply them (or a mapping miss) leaves the existing values alone
+		// rather than blanking a good photo with an empty string.
+		if snapshot.BirthDate != nil || snapshot.PhotoURL != "" {
+			if _, err := tx.Exec(ctx, `
+				UPDATE players
+				SET birth_date = COALESCE($2, birth_date),
+				    photo_url  = CASE WHEN $3 <> '' THEN $3 ELSE photo_url END,
+				    updated_at = now()
+				WHERE id = $1
+			`, snapshot.PlayerID, snapshot.BirthDate, snapshot.PhotoURL); err != nil {
+				return nil, err
+			}
+		}
+
 		score, delta, err := refreshComponentScore(ctx, tx, snapshot.PlayerID, "performance", snapshot.NormalizedScore, snapshot.SnapshotAt)
 		if err != nil {
 			return nil, err
@@ -575,17 +591,17 @@ func (r *Repository) UpsertExternalIDs(ctx context.Context, ids domain.PlayerExt
 // Routing by candidate.TargetComponent:
 //
 //   - "character"  → score is RECOMPUTED from scratch as
-//                    clamp(characterBaseline + Σ(all character events), 0, 100).
-//                    This makes character fully data-driven: no inherited seed
-//                    value, no "stuck" historical state. Per the partner's
-//                    "baseline + grows/falls" vision (2026-05-09 chat).
+//     clamp(characterBaseline + Σ(all character events), 0, 100).
+//     This makes character fully data-driven: no inherited seed
+//     value, no "stuck" historical state. Per the partner's
+//     "baseline + grows/falls" vision (2026-05-09 chat).
 //
 //   - "performance" → score gets the per-sync capped Δ added on top of its
-//                     current value. Performance has its own snapshot source
-//                     (api-football) which overwrites the column on every
-//                     performance sync, so events here are intentionally
-//                     ephemeral — they get re-fired by the stats detector
-//                     next sync if the condition still holds.
+//     current value. Performance has its own snapshot source
+//     (api-football) which overwrites the column on every
+//     performance sync, so events here are intentionally
+//     ephemeral — they get re-fired by the stats detector
+//     next sync if the condition still holds.
 //
 // Returns one PlayerSyncDelta per (player, component) pair that actually
 // moved.
@@ -1597,8 +1613,10 @@ func scanPlayerWithScore(row interface {
 		&item.League,
 		&item.Position,
 		&item.Age,
+		&item.BirthDate,
 		&item.Emoji,
 		&item.PhotoData,
+		&item.PhotoURL,
 		&item.ThemeBackground,
 		&item.SummaryEN,
 		&item.SummaryRU,
@@ -1621,6 +1639,12 @@ func scanPlayerWithScore(row interface {
 		&item.MediaUpdatedAt,
 		&item.CharacterUpdatedAt,
 	)
+	// A stored age is a fact with an expiry date: ours were seeded once and
+	// are wrong from each player's next birthday onward. Derive it from the
+	// birth date when we have one, and keep the stored value otherwise.
+	if derived := domain.AgeFromBirthDate(item.BirthDate, time.Now().UTC()); derived > 0 {
+		item.Age = derived
+	}
 	return item, err
 }
 

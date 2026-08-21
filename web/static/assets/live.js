@@ -29,7 +29,10 @@
       trend: trendValue.toFixed(1),
       dir: item.trend_direction || "stable",
       bg: item.theme_background || "linear-gradient(135deg,#1a3a6a,#2a5a9a)",
-      photo: item.photo_data || "",
+      // Prefer the CDN URL: photo_data is a base64 data URI that made
+      // /api/players an 867KB response for 22 players. Fall back to it so
+      // players the sync hasn't reached yet still show a face.
+      photo: item.photo_url || item.photo_data || "",
       sum_en: item.summary_en || "",
       sum_ru: item.summary_ru || "",
     };

@@ -215,6 +215,7 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 	form, _ := p.formFor(ctx, externalPlayerID, currentTeamID)
 
 	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	attachProfile(&snapshot, apiPlayer.Player)
 	// Phase 4.3 MVP: stats-derived performance events. Right now this only
 	// catches goal droughts for attacking positions — full per-fixture
 	// hat-trick / brace detection lands once we expose per-fixture data.
@@ -276,6 +277,7 @@ func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, 
 	form, _ := p.formFor(ctx, apiPlayer.Player.ID, team.ID)
 
 	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	attachProfile(&snapshot, apiPlayer.Player)
 	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
 	return snapshot, nil
 }
@@ -1403,6 +1405,26 @@ func parseAPIFootballRating(raw string) float64 {
 	return value
 }
 
+// attachProfile copies the identity fields api-football returns alongside a
+// player's statistics onto the snapshot. Age is kept as a birth date so it
+// stops being wrong the day after a birthday, and the portrait travels as a
+// CDN URL rather than an inlined image.
+func attachProfile(snapshot *domain.PerformanceSnapshot, profile apiFootballPlayerProfile) {
+	if photo := strings.TrimSpace(profile.Photo); photo != "" {
+		snapshot.PhotoURL = photo
+	}
+	raw := strings.TrimSpace(profile.Birth.Date)
+	if raw == "" {
+		return
+	}
+	born, err := time.Parse("2006-01-02", raw)
+	if err != nil {
+		log.Printf("api-football: unparseable birth date %q for player %d", raw, snapshot.PlayerID)
+		return
+	}
+	snapshot.BirthDate = &born
+}
+
 func per90(value, minutes float64) float64 {
 	if minutes <= 0 {
 		return 0
@@ -1582,6 +1604,16 @@ type apiFootballPlayerProfile struct {
 	Lastname  string `json:"lastname"`
 	Age       int    `json:"age"`
 	Position  string `json:"position"`
+	// Birth date beats age: an age is only true until the player's next
+	// birthday, and ours were seeded once in May and have drifted since.
+	Birth apiFootballBirth `json:"birth"`
+	// Portrait on api-football's CDN. We store the URL rather than the image
+	// so /api/players stays small — see migration 015.
+	Photo string `json:"photo"`
+}
+
+type apiFootballBirth struct {
+	Date string `json:"date"` // YYYY-MM-DD
 }
 
 type apiFootballStatistic struct {

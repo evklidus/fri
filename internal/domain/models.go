@@ -3,20 +3,45 @@ package domain
 import "time"
 
 type Player struct {
-	ID              int64     `json:"id"`
-	Slug            string    `json:"slug"`
-	Name            string    `json:"name"`
-	Club            string    `json:"club"`
-	League          string    `json:"league"`
-	Position        string    `json:"position"`
-	Age             int       `json:"age"`
-	Emoji           string    `json:"emoji"`
+	ID        int64      `json:"id"`
+	Slug      string     `json:"slug"`
+	Name      string     `json:"name"`
+	Club      string     `json:"club"`
+	League    string     `json:"league"`
+	Position  string     `json:"position"`
+	Age       int        `json:"age"`
+	BirthDate *time.Time `json:"birth_date,omitempty"`
+	Emoji     string     `json:"emoji"`
+	// PhotoData is the legacy base64 data URI seeded from the source HTML.
+	// PhotoURL points at api-football's CDN and is preferred when set: it
+	// keeps the players payload small enough to grow a roster into.
 	PhotoData       string    `json:"photo_data"`
+	PhotoURL        string    `json:"photo_url"`
 	ThemeBackground string    `json:"theme_background"`
 	SummaryEN       string    `json:"summary_en"`
 	SummaryRU       string    `json:"summary_ru"`
 	CreatedAt       time.Time `json:"created_at"`
 	UpdatedAt       time.Time `json:"updated_at"`
+}
+
+// AgeFromBirthDate returns a player's age in whole years on the given day.
+// Returns 0 when the birth date is unknown, letting callers keep whatever
+// stored age they already have.
+func AgeFromBirthDate(birth *time.Time, on time.Time) int {
+	if birth == nil || birth.IsZero() {
+		return 0
+	}
+	years := on.Year() - birth.Year()
+	// Compare month and day rather than day-of-year: a leap year shifts every
+	// date after February by one, so a player born 12 July 2000 (leap) read as
+	// a day "earlier" than 12 July 2026 and lost a year on their own birthday.
+	if on.Month() < birth.Month() || (on.Month() == birth.Month() && on.Day() < birth.Day()) {
+		years--
+	}
+	if years < 0 || years > 120 {
+		return 0
+	}
+	return years
 }
 
 type Score struct {
@@ -262,6 +287,14 @@ type PerformanceSnapshot struct {
 	Last5Rating       float64   `json:"last5_rating"`
 	NormalizedScore   float64   `json:"normalized_score"`
 	SnapshotAt        time.Time `json:"snapshot_at"`
+
+	// Profile fields the provider picked up while fetching stats. They don't
+	// belong to the snapshot conceptually, but the API returns them in the
+	// same payload, so carrying them here refreshes a player's birth date and
+	// portrait without spending a second request per player. Empty when the
+	// provider has nothing to offer (the demo provider, or a mapping miss).
+	BirthDate *time.Time `json:"birth_date,omitempty"`
+	PhotoURL  string     `json:"photo_url,omitempty"`
 
 	// PerformanceEvents are stats-derived rating events the provider chose
 	// to emit alongside the snapshot — e.g. "5-match scoring drought" for an
