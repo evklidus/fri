@@ -100,10 +100,26 @@
     return response.json();
   }
 
+  // NEW_BADGE_MAX_SHARE: above this fraction of the roster, "recently added"
+  // stops distinguishing anyone and the badge is dropped. This is not
+  // hypothetical — the database was rebuilt on 2026-08-17, so every player
+  // was two days old and every card wore a NEW tag, which tells a visitor
+  // nothing except that the label is decorative.
+  const NEW_BADGE_MAX_SHARE = 0.5;
+
   async function loadPlayers() {
     const payload = await fetchJSON("/api/players");
     state.players = Array.isArray(payload.data) ? payload.data : [];
-    players.splice(0, players.length, ...state.players.map(toLegacyPlayer));
+    const mapped = state.players.map(toLegacyPlayer);
+
+    const freshCount = mapped.filter((p) => p.isNew).length;
+    if (mapped.length && freshCount / mapped.length > NEW_BADGE_MAX_SHARE) {
+      mapped.forEach((p) => {
+        p.isNew = false;
+      });
+    }
+
+    players.splice(0, players.length, ...mapped);
   }
 
   async function loadNews() {
