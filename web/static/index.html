@@ -1114,10 +1114,16 @@ function renderNews() {
       ? `<div class="news-source-line">${n.domain}<span class="news-source-arrow">↗</span></div>`
       : '';
     // The player's face makes it obvious at a glance whose score this story
-    // moved — the tag alone reads as metadata and gets skipped.
-    const face = n.photo
-      ? `<img class="news-face" src="${escapeHtml(n.photo)}" alt="" loading="lazy" />`
-      : `<div class="news-face" style="display:flex;align-items:center;justify-content:center">${n.emoji || '⚽'}</div>`;
+    // moved — the tag alone reads as metadata and gets skipped. Resolved
+    // here rather than when the feed is parsed: news and players load
+    // concurrently, so looking it up earlier raced the roster and every card
+    // fell back to the ball icon.
+    const owner = players.find(p => p.id === n.playerId) ||
+                  players.find(p => p.name === n.player);
+    const facePhoto = owner ? owner.photo : '';
+    const face = facePhoto
+      ? `<img class="news-face" src="${escapeHtml(facePhoto)}" alt="" loading="lazy" />`
+      : `<div class="news-face" style="display:flex;align-items:center;justify-content:center">${(owner && owner.emoji) || '⚽'}</div>`;
     // Admin-only removal. The filters catch most off-topic articles, but a
     // wrong one still slips through and skews a player's Media score until
     // somebody drops it.

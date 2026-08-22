@@ -58,14 +58,14 @@
   function toLegacyNews(item) {
     const delta = Number(item.impact_delta || 0);
     const sign = delta > 0 ? "+" : "";
-    // Match the article to its player so the card can show a face. The feed
-    // sends player_id; the roster is already loaded by the time news render.
-    const owner = state.players.find((p) => p.id === item.player_id);
     return {
       id: item.id,
+      // Carry the id, not a resolved photo. Players and news load
+      // concurrently, so a lookup here races the roster and loses: every
+      // card rendered the fallback ball instead of a face. The photo is
+      // resolved at render time, when the roster is definitely populated.
+      playerId: item.player_id,
       player: item.player_name,
-      photo: owner ? owner.photo_url || owner.photo_data || "" : "",
-      emoji: owner ? owner.emoji : "",
       impact: item.impact_type,
       delta: `${sign}${round1(delta).toFixed(1)}`,
       time: item.relative_time || "",
