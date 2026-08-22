@@ -31,7 +31,8 @@
 
   /* NAV */
   nav { position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:18px 48px; background:rgba(8,10,13,0.85); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); gap:20px; }
-  .nav-logo { font-family:'Bebas Neue',sans-serif; font-size:28px; letter-spacing:4px; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; flex-shrink:0; }
+  .nav-logo { flex-shrink:0; text-decoration:none; }
+  .nav-logo .nav-logo-text { background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .nav-links { display:flex; gap:28px; list-style:none; }
   .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
   .nav-links a:hover { color:var(--text); }
@@ -299,6 +300,114 @@
     footer { padding:32px 24px; flex-direction:column; text-align:center; }
     .modal-score-row { flex-direction:column; }
   }
+
+  /* ── LOGO ─────────────────────────────────────────────────────── */
+  .nav-logo { display:flex; align-items:center; gap:10px; }
+  .nav-logo img { height:30px; width:auto; display:block; }
+  .nav-logo .nav-logo-text { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:2px; }
+
+  /* ── ACCOUNT CONTROLS (nav, right side next to language) ───────── */
+  .nav-right { display:flex; align-items:center; gap:14px; }
+  .auth-controls { display:flex; align-items:center; gap:8px; }
+  .auth-btn { background:transparent; border:1px solid var(--border); color:var(--text); padding:7px 14px; border-radius:6px;
+              font-family:'DM Sans',sans-serif; font-size:12px; cursor:pointer; transition:border-color .15s, color .15s; }
+  .auth-btn:hover { border-color:var(--gold); color:var(--gold); }
+  .auth-btn.primary { background:linear-gradient(135deg,var(--gold),var(--gold2)); border-color:transparent; color:#0a0a0a; font-weight:600; }
+  .auth-user { display:flex; align-items:center; gap:10px; font-size:12px; color:var(--muted); }
+  .auth-user .auth-email { color:var(--text); max-width:180px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .auth-admin-tag { font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase;
+                    color:var(--gold); border:1px solid rgba(245,200,66,0.35); border-radius:4px; padding:2px 6px; }
+
+  /* ── AUTH MODAL ───────────────────────────────────────────────── */
+  .auth-modal { position:fixed; inset:0; background:rgba(0,0,0,0.82); backdrop-filter:blur(6px); z-index:200;
+                display:none; align-items:center; justify-content:center; padding:24px; }
+  .auth-modal.open { display:flex; }
+  .auth-card { background:var(--card); border:1px solid var(--border); border-radius:14px; padding:32px; width:100%; max-width:400px; position:relative; }
+  .auth-card h3 { font-family:'Bebas Neue',sans-serif; font-size:30px; letter-spacing:1px; margin-bottom:6px; }
+  .auth-card .auth-sub { font-size:13px; color:var(--muted); line-height:1.6; margin-bottom:22px; }
+  .auth-field { display:block; margin-bottom:14px; }
+  .auth-field span { display:block; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px;
+                     text-transform:uppercase; color:var(--muted); margin-bottom:6px; }
+  .auth-field input { width:100%; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:8px;
+                      padding:11px 13px; color:var(--text); font-family:'DM Sans',sans-serif; font-size:14px; outline:none; }
+  .auth-field input:focus { border-color:var(--gold); }
+  .auth-submit { width:100%; background:linear-gradient(135deg,var(--gold),var(--gold2)); border:none; color:#0a0a0a;
+                 padding:13px; border-radius:8px; font-weight:700; font-size:14px; cursor:pointer; margin-top:8px; }
+  .auth-submit:disabled { opacity:.6; cursor:default; }
+  .auth-error { color:var(--red); font-size:12px; margin-top:12px; min-height:16px; line-height:1.5; }
+  .auth-switch { text-align:center; font-size:12px; color:var(--muted); margin-top:16px; }
+  .auth-switch button { background:none; border:none; color:var(--gold); cursor:pointer; font-size:12px; font-family:'DM Sans',sans-serif; }
+  .auth-close { position:absolute; top:14px; right:16px; background:none; border:none; color:var(--muted); font-size:20px; cursor:pointer; }
+
+  /* ── LOCKED LEADERBOARD ROWS ──────────────────────────────────── */
+  /* The row keeps its rank so the table still shows what sits above; the
+     rest is a placeholder because the API never sent it. */
+  .lb-locked td { position:relative; }
+  .lb-locked .locked-cell { filter:blur(7px); user-select:none; pointer-events:none; opacity:.55; }
+  .lb-locked .p-name-blur { display:inline-block; height:13px; width:120px; border-radius:3px; background:rgba(255,255,255,0.35); }
+  .lb-locked .p-club-blur { display:inline-block; height:9px; width:90px; border-radius:3px; background:rgba(255,255,255,0.16); margin-top:6px; }
+  .lb-locked .p-avatar { background:rgba(255,255,255,0.10) !important; }
+  .lb-unlock-row td { padding:0; }
+  .lb-unlock { display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;
+               padding:16px; margin:6px 0 14px; border:1px dashed rgba(245,200,66,0.4); border-radius:10px;
+               background:linear-gradient(135deg,rgba(245,200,66,0.09),rgba(232,168,32,0.03)); }
+  .lb-unlock-text { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); }
+  .lb-unlock-sub { font-size:12px; color:var(--muted); }
+
+  /* ── TOP PLAYER CARDS (homepage) ──────────────────────────────── */
+  .player-cards { display:grid; grid-template-columns:repeat(auto-fill,minmax(210px,1fr)); gap:18px; }
+  .pcard { position:relative; border:1px solid var(--border); border-radius:14px; overflow:hidden; cursor:pointer;
+           background:var(--card); transition:transform .18s, border-color .18s; min-height:280px; display:flex; flex-direction:column; }
+  .pcard:hover { transform:translateY(-4px); border-color:rgba(245,200,66,0.5); }
+  .pcard-top { position:relative; flex:1; display:flex; align-items:flex-end; justify-content:center; padding-top:18px; }
+  .pcard-photo { width:132px; height:132px; border-radius:50%; object-fit:cover; object-position:center top;
+                 border:3px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); }
+  .pcard-rank { position:absolute; top:12px; left:12px; width:30px; height:30px; border-radius:8px; background:#fff; color:#0a0a0a;
+                display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:19px; }
+  .pcard-fri { position:absolute; top:12px; right:12px; font-family:'Bebas Neue',sans-serif; font-size:26px; color:var(--gold); }
+  .pcard-new { position:absolute; top:52px; right:12px; font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px;
+               background:var(--green); color:#062b12; padding:3px 7px; border-radius:4px; font-weight:700; }
+  .pcard-body { padding:14px 16px 18px; text-align:center; }
+  .pcard-name { font-family:'Bebas Neue',sans-serif; font-size:22px; line-height:1.05; letter-spacing:.5px; }
+  .pcard-meta { font-size:11px; color:var(--muted); margin-top:5px; }
+  .pcard.locked .pcard-photo, .pcard.locked .pcard-name, .pcard.locked .pcard-meta { filter:blur(7px); opacity:.55; user-select:none; }
+  .pcard-lock { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
+                background:rgba(10,10,10,0.35); }
+  .pcard-lock span { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); text-align:center; }
+
+  /* ── NEWS WITH PLAYER FACES ───────────────────────────────────── */
+  .news-face { width:44px; height:44px; border-radius:50%; object-fit:cover; object-position:center top; flex-shrink:0;
+               border:2px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); }
+  .news-head { display:flex; align-items:center; gap:12px; margin-bottom:12px; }
+  .news-head-text { min-width:0; }
+  .news-del { background:none; border:1px solid rgba(239,68,68,0.4); color:var(--red); border-radius:6px; font-size:11px;
+              padding:4px 9px; cursor:pointer; margin-left:auto; flex-shrink:0; }
+  .news-del:hover { background:rgba(239,68,68,0.12); }
+
+  /* ── EVENT PLAYER FACE ────────────────────────────────────────── */
+  .event-face { width:40px; height:40px; border-radius:50%; object-fit:cover; object-position:center top;
+                border:2px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); flex-shrink:0; }
+  .event-card-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+
+  /* ── FOOTER ───────────────────────────────────────────────────── */
+  .footer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(220px,1fr)); gap:36px; width:100%;
+                 max-width:1100px; margin:0 auto 30px; text-align:left; }
+  .footer-col h5 { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:2px; text-transform:uppercase;
+                   color:var(--muted); margin-bottom:14px; }
+  .footer-col a { color:var(--text); text-decoration:none; font-size:13px; display:block; margin-bottom:9px; transition:color .15s; }
+  .footer-col a:hover { color:var(--gold); }
+  .footer-socials { display:flex; gap:12px; flex-wrap:wrap; }
+  .footer-social { display:flex; align-items:center; gap:7px; border:1px solid var(--border); border-radius:8px;
+                   padding:8px 12px; font-size:12px; color:var(--text); text-decoration:none; transition:border-color .15s, color .15s; }
+  .footer-social:hover { border-color:var(--gold); color:var(--gold); }
+  .footer-logo img { height:34px; width:auto; }
+
+  @media (max-width:768px) {
+    .nav-right { gap:8px; }
+    .auth-btn { padding:6px 10px; font-size:11px; }
+    .footer-grid { text-align:center; }
+    .footer-socials { justify-content:center; }
+  }
 </style>
 </head>
 <body>
@@ -306,20 +415,54 @@
 
 <!-- NAV -->
 <nav>
-  <div class="nav-logo">FRI</div>
+  <a class="nav-logo" href="#top">
+    <img src="/assets/logo.png" srcset="/assets/logo.png 1x, /assets/logo@2x.png 2x" alt="FRI" />
+    <span class="nav-logo-text">FRI</span>
+  </a>
   <ul class="nav-links">
-    <li><a href="#leaderboard" data-i18n="nav_rankings">Rankings</a></li>
+    <li><a href="#leaderboard" data-i18n="nav_rankings">FRI Leaderboard</a></li>
     <li><a href="#events" data-i18n="nav_events">Vote on Events</a></li>
-    <li><a href="#news" data-i18n="nav_news">Live News</a></li>
-    <li><a href="#formula" data-i18n="nav_formula">Formula</a></li>
-    <li><a href="#personas" data-i18n="nav_for_you">For You</a></li>
-    <li><a href="#leaderboard" class="nav-cta" data-i18n="nav_explore">Explore</a></li>
+    <li><a href="#about" data-i18n="nav_about">About Us</a></li>
   </ul>
-  <div class="lang-switcher">
-    <button class="lang-btn active" id="btn-en" onclick="setLang('en')"><span class="flag">🇬🇧</span> EN</button>
-    <button class="lang-btn" id="btn-ru" onclick="setLang('ru')"><span class="flag">🇷🇺</span> RU</button>
+  <div class="nav-right">
+    <!-- Account controls. Anonymous visitors see sign in / sign up; a signed-in
+         visitor sees who they are, and admins get a marker because admin-only
+         controls (news deletion) appear elsewhere on the page. -->
+    <div class="auth-controls" id="auth-controls">
+      <button class="auth-btn" onclick="openAuth('login')" data-i18n="auth_signin">Sign in</button>
+      <button class="auth-btn primary" onclick="openAuth('register')" data-i18n="auth_signup">Sign up</button>
+    </div>
+    <div class="lang-switcher">
+      <button class="lang-btn active" id="btn-en" onclick="setLang('en')"><span class="flag">🇬🇧</span> EN</button>
+      <button class="lang-btn" id="btn-ru" onclick="setLang('ru')"><span class="flag">🇷🇺</span> RU</button>
+    </div>
   </div>
 </nav>
+
+<!-- AUTH MODAL -->
+<div class="auth-modal" id="auth-modal">
+  <div class="auth-card">
+    <button class="auth-close" onclick="closeAuth()" aria-label="Close">✕</button>
+    <h3 id="auth-title" data-i18n="auth_signin_title">Sign in</h3>
+    <p class="auth-sub" id="auth-sub" data-i18n="auth_signin_sub">Sign in to see the full top five and vote on rating events.</p>
+    <form id="auth-form" onsubmit="return submitAuth(event)">
+      <label class="auth-field">
+        <span data-i18n="auth_email">Email</span>
+        <input type="email" id="auth-email" autocomplete="email" required />
+      </label>
+      <label class="auth-field">
+        <span data-i18n="auth_password">Password</span>
+        <input type="password" id="auth-password" autocomplete="current-password" minlength="8" required />
+      </label>
+      <button type="submit" class="auth-submit" id="auth-submit" data-i18n="auth_submit_signin">Sign in</button>
+      <div class="auth-error" id="auth-error"></div>
+    </form>
+    <div class="auth-switch">
+      <span id="auth-switch-text" data-i18n="auth_no_account">No account yet?</span>
+      <button type="button" onclick="toggleAuthMode()" id="auth-switch-btn" data-i18n="auth_switch_signup">Create one</button>
+    </div>
+  </div>
+</div>
 
 <!-- HERO -->
 <section class="hero">
@@ -334,7 +477,7 @@
     <p class="hero-subtitle" data-i18n="hero_subtitle">FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, fan sentiment, media coverage, and character into one transparent number.</p>
     <div class="hero-actions">
       <button class="btn-primary" onclick="document.getElementById('leaderboard').scrollIntoView({behavior:'smooth'})" data-i18n="hero_btn1">View Rankings</button>
-      <button class="btn-secondary" onclick="document.getElementById('formula').scrollIntoView({behavior:'smooth'})" data-i18n="hero_btn2">How It Works</button>
+      <button class="btn-secondary" onclick="document.getElementById('about').scrollIntoView({behavior:'smooth'})" data-i18n="hero_btn2">How It Works</button>
     </div>
   </div>
   <div class="hero-stats">
@@ -352,6 +495,18 @@
     </div>
   </div>
 </section>
+
+<!-- TOP PLAYERS (cards) -->
+<section id="top-players" class="leaderboard-section">
+  <div class="section-header">
+    <div class="section-eyebrow" data-i18n="cards_eye">Featured</div>
+    <h2 class="section-title" data-i18n="cards_title">Top Players</h2>
+    <p class="section-sub" data-i18n="cards_sub">The ten highest-rated players right now. Newly tracked players are marked NEW.</p>
+  </div>
+  <div class="player-cards" id="player-cards"></div>
+</section>
+
+<div class="section-divider"></div>
 
 <!-- LEADERBOARD -->
 <section id="leaderboard" class="leaderboard-section">
@@ -417,10 +572,15 @@
 
 <div class="section-divider"></div>
 
-<!-- FORMULA -->
-<section id="formula" class="formula-section">
+<!-- ABOUT US (was: Formula + Built For Everyone) -->
+<section id="about" class="formula-section">
   <div class="section-header">
-    <div class="section-eyebrow" data-i18n="form_eye">Methodology</div>
+    <div class="section-eyebrow" data-i18n="about_eye">About Us</div>
+    <h2 class="section-title" data-i18n="about_title">What FRI Is</h2>
+    <p class="section-sub" data-i18n="about_intro">FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, media coverage, and character into one transparent number. Every component is computed from public data on a fixed schedule, and the formula below is the whole of it.</p>
+  </div>
+
+  <div class="section-header" style="margin-top:56px">
     <h2 class="section-title" data-i18n="form_title">The Formula</h2>
     <p class="section-sub" data-i18n="form_sub">Fair, transparent, and position-neutral. Every component is publicly auditable.</p>
   </div>
@@ -434,14 +594,8 @@
     <div class="pillar-detail-card"><h4>📰 <span data-i18n="pil4_t">Media Score</span></h4><div class="pillar-weight" data-i18n="pil4_w">Weight: 20%</div><p data-i18n="pil4_d">NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.</p></div>
     <div class="pillar-detail-card"><h4>⚖️ <span data-i18n="pil5_t">Character Index</span></h4><div class="pillar-weight" data-i18n="pil5_w">Weight: 15%</div><p data-i18n="pil5_d">Yellow/red cards, scandals, referee disputes subtract points. Charity work, fair play awards, captaincy add. Each event runs through community voting (see "Vote on Events") so obvious cases auto-apply and grey-area ones are validated by fans.</p></div>
   </div>
-</section>
 
-<div class="section-divider"></div>
-
-<!-- PERSONAS -->
-<section id="personas" class="personas-section">
-  <div class="section-header">
-    <div class="section-eyebrow" data-i18n="pers_eye">Platform Access</div>
+  <div class="section-header" style="margin-top:64px">
     <h2 class="section-title" data-i18n="pers_title">Built For Everyone</h2>
     <p class="section-sub" data-i18n="pers_sub">Whether you're a player, a fan, or a global brand — FRI gives you the data you need.</p>
   </div>
@@ -486,13 +640,39 @@
 </section>
 
 <footer>
-  <div class="footer-logo">FRI</div>
-  <div class="footer-copy" data-i18n="footer">© 2025 Football Reputation Index. The global standard for player reputation analytics.</div>
+  <div class="footer-grid">
+    <div class="footer-col">
+      <h5 data-i18n="foot_nav">Navigate</h5>
+      <a href="#leaderboard" data-i18n="nav_rankings">FRI Leaderboard</a>
+      <a href="#events" data-i18n="nav_events">Vote on Events</a>
+      <a href="#about" data-i18n="nav_about">About Us</a>
+    </div>
+    <div class="footer-col">
+      <h5 data-i18n="foot_contact">Contact</h5>
+      <a href="mailto:fri.index@gmail.com">fri.index@gmail.com</a>
+      <a href="https://t.me/garso_monch" target="_blank" rel="noopener noreferrer">Telegram: @garso_monch</a>
+    </div>
+    <div class="footer-col">
+      <h5 data-i18n="foot_social">Social</h5>
+      <div class="footer-socials">
+        <a class="footer-social" href="https://t.me/footballreputationindex" target="_blank" rel="noopener noreferrer">✈️ Telegram</a>
+        <a class="footer-social" href="https://www.instagram.com/footballreputationindex" target="_blank" rel="noopener noreferrer">📷 Instagram</a>
+        <a class="footer-social" href="https://x.com/fri_index1" target="_blank" rel="noopener noreferrer">𝕏 X</a>
+      </div>
+    </div>
+  </div>
 
-  <div class="dev-tools" title="Test-only control: triggers a full data sync. Production runs the same logic on a 6–24h scheduler.">
+  <div class="footer-logo">
+    <img src="/assets/logo.png" srcset="/assets/logo.png 1x, /assets/logo@2x.png 2x" alt="FRI" />
+  </div>
+  <div class="footer-copy" data-i18n="footer">© 2026 Football Reputation Index. The global standard for player reputation analytics.</div>
+
+  <!-- Admin-only: the sync trigger is hidden for everyone else and the
+       endpoint behind it rejects non-admin callers anyway. -->
+  <div class="dev-tools" id="admin-tools" style="display:none" title="Admin control: triggers a full data sync. Production runs the same logic on a 12–24h scheduler.">
     <button class="dev-tools-btn" id="dev-sync-btn" onclick="triggerFullSync()">
       <span class="dev-tools-btn-icon">⟳</span>
-      <span id="dev-sync-text">Trigger full sync (test)</span>
+      <span id="dev-sync-text">Trigger full sync</span>
     </button>
     <span id="dev-sync-status" class="dev-tools-status"></span>
   </div>
@@ -549,7 +729,23 @@
 // ── TRANSLATIONS ──────────────────────────────────────────
 const T = {
   en: {
-    nav_rankings:'Rankings', nav_events:'Vote on Events', nav_news:'Live News', nav_formula:'Formula', nav_for_you:'For You', nav_explore:'Explore',
+    nav_rankings:'FRI Leaderboard', nav_events:'Vote on Events', nav_about:'About Us', nav_news:'Live News', nav_explore:'Explore',
+    auth_signin:'Sign in', auth_signup:'Sign up', auth_signout:'Sign out',
+    auth_signin_title:'Sign in', auth_signup_title:'Create account',
+    auth_signin_sub:'Sign in to see the full top five and vote on rating events.',
+    auth_signup_sub:'Create an account to unlock the top five and vote on rating events.',
+    auth_email:'Email', auth_password:'Password',
+    auth_submit_signin:'Sign in', auth_submit_signup:'Create account',
+    auth_no_account:'No account yet?', auth_have_account:'Already have an account?',
+    auth_switch_signup:'Create one', auth_switch_signin:'Sign in',
+    auth_err_generic:'Something went wrong. Try again.',
+    lb_unlock:'Sign in to unlock', lb_unlock_sub:'The top five are reserved for registered users.',
+    cards_eye:'Featured', cards_title:'Top Players', cards_sub:'The ten highest-rated players right now. Newly tracked players are marked NEW.',
+    card_new:'NEW',
+    about_eye:'About Us', about_title:'What FRI Is',
+    about_intro:'FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, media coverage, and character into one transparent number. Every component is computed from public data on a fixed schedule, and the formula below is the whole of it.',
+    foot_nav:'Navigate', foot_contact:'Contact', foot_social:'Social',
+    news_delete:'Delete',
     events_eye:'Community Voice', events_title:'Vote on Events', events_sub:'Each rating event has a proposed delta. Drag the slider to suggest a fairer value. The median of community votes becomes the final change to the player\'s score.', events_empty:'No events pending votes right now. Check back after the next sync.',
     th_media:'Media', th_char:'Character',
     hero_eyebrow:'The Global Standard for Player Reputation', hero_line1:'FOOTBALL', hero_line2:'REPUTATION', hero_line3:'INDEX',
@@ -586,7 +782,23 @@ const T = {
     age_label:'Age',
   },
   ru: {
-    nav_rankings:'Рейтинг', nav_events:'Голосование', nav_news:'Новости', nav_formula:'Формула', nav_for_you:'Для вас', nav_explore:'Смотреть',
+    nav_rankings:'Таблица FRI', nav_events:'Голосование', nav_about:'О проекте', nav_news:'Новости', nav_explore:'Смотреть',
+    auth_signin:'Войти', auth_signup:'Регистрация', auth_signout:'Выйти',
+    auth_signin_title:'Вход', auth_signup_title:'Регистрация',
+    auth_signin_sub:'Войдите, чтобы увидеть первую пятёрку целиком и голосовать за события.',
+    auth_signup_sub:'Зарегистрируйтесь, чтобы открыть первую пятёрку и голосовать за события.',
+    auth_email:'Почта', auth_password:'Пароль',
+    auth_submit_signin:'Войти', auth_submit_signup:'Создать аккаунт',
+    auth_no_account:'Нет аккаунта?', auth_have_account:'Уже есть аккаунт?',
+    auth_switch_signup:'Создать', auth_switch_signin:'Войти',
+    auth_err_generic:'Что-то пошло не так. Попробуйте ещё раз.',
+    lb_unlock:'Войдите, чтобы открыть', lb_unlock_sub:'Первая пятёрка доступна зарегистрированным пользователям.',
+    cards_eye:'Избранное', cards_title:'Лучшие игроки', cards_sub:'Десять игроков с наивысшим рейтингом. Новые игроки отмечены меткой NEW.',
+    card_new:'NEW',
+    about_eye:'О проекте', about_title:'Что такое FRI',
+    about_intro:'FRI — первый универсальный индекс репутации футболистов на основе данных: игровые показатели, влияние в соцсетях, медиаосвещение и характер сведены в одно прозрачное число. Каждый компонент считается из публичных данных по расписанию, а формула ниже — это всё, что за ним стоит.',
+    foot_nav:'Разделы', foot_contact:'Контакты', foot_social:'Соцсети',
+    news_delete:'Удалить',
     events_eye:'Голос болельщиков', events_title:'Голосование за события', events_sub:'У каждого события есть предложенная дельта. Двигайте ползунок, чтобы предложить более справедливое значение. Медиана голосов сообщества становится финальным изменением рейтинга игрока.', events_empty:'Сейчас нет событий, ожидающих голосования. Загляните после следующего sync.',
     th_media:'Медиа', th_char:'Характер',
     hero_eyebrow:'Мировой стандарт репутации футболистов', hero_line1:'ФУТБОЛ', hero_line2:'РЕПУТАЦИЯ', hero_line3:'ИНДЕКС',
@@ -626,9 +838,15 @@ const T = {
 
 // ── LANG ENGINE ───────────────────────────────────────────
 let lang = 'en';
+// live.js renders the account controls and the unlock prompts, and needs the
+// same dictionary. `const`/`let` at top level are not window properties, so
+// publish them deliberately rather than relying on implicit globals.
+window.T = T;
+window.lang = lang;
 
 function setLang(l) {
   lang = l;
+  window.lang = l;
   document.getElementById('btn-en').classList.toggle('active', l === 'en');
   document.getElementById('btn-ru').classList.toggle('active', l === 'ru');
   document.documentElement.lang = l;
@@ -645,6 +863,9 @@ function setLang(l) {
   document.getElementById('news-grid').innerHTML = '';
   renderNews();
   renderTable();
+  if (typeof renderPlayerCards === 'function') renderPlayerCards();
+  // Account controls are built in live.js and carry translated labels.
+  if (typeof window.renderAuthControls === 'function') window.renderAuthControls();
 }
 
 // ── DATA ──────────────────────────────────────────────────
@@ -698,7 +919,13 @@ function renderTable() {
   const tb = document.getElementById('table-body');
   tb.innerHTML = '';
   const t = T[lang];
-  players.filter(p => (p.name.toLowerCase().includes(q)||p.club.toLowerCase().includes(q)) && (posFilter==='all'||p.pos===posFilter) && (leagueFilter==='all'||p.league===leagueFilter)).sort((a,b) => b.fri - a.fri)
+  // Locked rows have no name, club or position to match on — the server
+  // withheld them — so they bypass the filters and always hold their place.
+  let lastLockedRank = 0, unlockRowShown = false;
+  players.filter(p => p.locked || (
+      (p.name.toLowerCase().includes(q)||p.club.toLowerCase().includes(q)) &&
+      (posFilter==='all'||p.pos===posFilter) &&
+      (leagueFilter==='all'||p.league===leagueFilter)))
     .forEach((p, idx) => {
       const displayRank = idx+1; const rc = displayRank===1?'rank-1':displayRank===2?'rank-2':displayRank===3?'rank-3':'';
       const trend = p.dir==='up'
@@ -709,6 +936,40 @@ function renderTable() {
       const c = friColor(p.fri);
       const al = lang==='ru'?'лет':'y';
       const tr = document.createElement('tr');
+
+      // Rows the API withheld: the server sent a rank and nothing else, so
+      // there is nothing here to reveal by inspecting the page.
+      if (p.locked) {
+        tr.className = 'lb-locked';
+        tr.onclick = () => openAuth('register');
+        tr.style.cursor = 'pointer';
+        tr.innerHTML = `
+          <td><div class="rank-num ${rc}">${displayRank}</div></td>
+          <td><div class="player-cell locked-cell"><div class="p-avatar"></div><div><div class="p-name-blur"></div><div class="p-club-blur"></div></div></div></td>
+          <td><span class="fri-badge locked-cell">••</span></td>
+          <td><div class="locked-cell" style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:70%;background:#555"></div></div><span style="font-size:12px">••</span></div></td>
+          <td><div class="locked-cell" style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:60%;background:#555"></div></div><span style="font-size:12px">••</span></div></td>
+          <td><div class="locked-cell" style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:65%;background:#555"></div></div><span style="font-size:12px">••</span></div></td>
+          <td><div class="locked-cell" style="display:flex;align-items:center;gap:10px"><div class="mini-bar-track"><div class="mini-bar-fill" style="width:75%;background:#555"></div></div><span style="font-size:12px">••</span></div></td>
+          <td><span class="trend-stable locked-cell">••</span></td>`;
+        tb.appendChild(tr);
+        lastLockedRank = displayRank;
+        return;
+      }
+
+      // First unlocked row after the withheld block: explain the gap.
+      if (lastLockedRank && !unlockRowShown) {
+        unlockRowShown = true;
+        const unlock = document.createElement('tr');
+        unlock.className = 'lb-unlock-row';
+        unlock.innerHTML = `<td colspan="8"><div class="lb-unlock">
+          <span class="lb-unlock-text">${t.lb_unlock}</span>
+          <span class="lb-unlock-sub">${t.lb_unlock_sub}</span>
+          <button class="auth-btn primary" onclick="openAuth('register')">${t.auth_signup}</button>
+        </div></td>`;
+        tb.appendChild(unlock);
+      }
+
       tr.onclick = () => openModal(p);
       tr.innerHTML = `
         <td><div class="rank-num ${rc}">${displayRank}</div></td>
@@ -723,6 +984,49 @@ function renderTable() {
     });
 }
 function filterTable() { renderTable(); }
+
+// ── TOP PLAYER CARDS ──────────────────────────────────────
+// The homepage grid. Reads the same `players` array as the table, so locked
+// entries stay locked here too rather than becoming a way around the gate.
+function renderPlayerCards() {
+  const grid = document.getElementById('player-cards');
+  if (!grid) return;
+  const t = T[lang];
+  grid.innerHTML = '';
+  players.slice(0, 10).forEach((p, idx) => {
+    const rank = idx + 1;
+    const card = document.createElement('div');
+    card.className = 'pcard' + (p.locked ? ' locked' : '');
+
+    if (p.locked) {
+      card.onclick = () => openAuth('register');
+      card.innerHTML = `
+        <div class="pcard-rank">${rank}</div>
+        <div class="pcard-top"><div class="pcard-photo"></div></div>
+        <div class="pcard-body"><div class="pcard-name">•••••</div><div class="pcard-meta">•••</div></div>
+        <div class="pcard-lock"><span>${t.lb_unlock}</span></div>`;
+      grid.appendChild(card);
+      return;
+    }
+
+    card.onclick = () => openModal(p);
+    const photo = p.photo
+      ? `<img class="pcard-photo" src="${escapeHtml(p.photo)}" alt="${escapeHtml(p.name)}" loading="lazy" />`
+      : `<div class="pcard-photo" style="display:flex;align-items:center;justify-content:center;font-size:44px">${p.emoji}</div>`;
+    const newTag = p.isNew ? `<div class="pcard-new">${t.card_new}</div>` : '';
+    card.innerHTML = `
+      <div class="pcard-rank">${rank}</div>
+      <div class="pcard-fri">${p.fri}</div>
+      ${newTag}
+      <div class="pcard-top" style="background:linear-gradient(180deg,transparent,rgba(255,255,255,0.04))">${photo}</div>
+      <div class="pcard-body">
+        <div class="pcard-name">${escapeHtml(p.name)}</div>
+        <div class="pcard-meta">${escapeHtml(p.club)} · ${escapeHtml(p.pos)}</div>
+      </div>`;
+    grid.appendChild(card);
+  });
+}
+window.renderPlayerCards = renderPlayerCards;
 function filterPos(p,btn) { posFilter=p; document.querySelectorAll('.filter-tab').forEach(b=>b.classList.remove('active')); btn.classList.add('active'); renderTable(); }
 
 // ── MODAL ─────────────────────────────────────────────────
@@ -809,13 +1113,38 @@ function renderNews() {
     const sourceLine = n.domain
       ? `<div class="news-source-line">${n.domain}<span class="news-source-arrow">↗</span></div>`
       : '';
+    // The player's face makes it obvious at a glance whose score this story
+    // moved — the tag alone reads as metadata and gets skipped.
+    const face = n.photo
+      ? `<img class="news-face" src="${escapeHtml(n.photo)}" alt="" loading="lazy" />`
+      : `<div class="news-face" style="display:flex;align-items:center;justify-content:center">${n.emoji || '⚽'}</div>`;
+    // Admin-only removal. The filters catch most off-topic articles, but a
+    // wrong one still slips through and skews a player's Media score until
+    // somebody drops it.
+    const delBtn = window.friIsAdmin && n.id
+      ? `<button class="news-del" data-news-id="${n.id}" title="${t.news_delete}">${t.news_delete}</button>`
+      : '';
     card.innerHTML = `
       <div class="news-card-top"><span class="news-impact ${ic}">${il}</span><span class="news-time">${n.time}</span></div>
-      <div class="news-player-tag">${n.player}</div>
+      <div class="news-head">
+        ${face}
+        <div class="news-head-text"><div class="news-player-tag">${n.player}</div></div>
+        ${delBtn}
+      </div>
       <div class="news-title">${lang==='ru'?n.t_ru:n.t_en}</div>
       <div class="news-summary">${lang==='ru'?n.s_ru:n.s_en}</div>
       ${sourceLine}
       <div class="news-fri-change"><span>${t.news_impact}</span><span class="${dc}">${n.delta}</span><span style="color:var(--muted);margin-left:4px">${t.news_auto}</span></div>`;
+    const del = card.querySelector('.news-del');
+    if (del) {
+      del.addEventListener('click', (ev) => {
+        // The card is an <a> to the source article; without this a delete
+        // click would also navigate away.
+        ev.preventDefault();
+        ev.stopPropagation();
+        deleteNewsItem(n.id, card);
+      });
+    }
     g.appendChild(card);
   });
 }

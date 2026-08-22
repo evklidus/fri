@@ -35,14 +35,37 @@
       photo: item.photo_url || item.photo_data || "",
       sum_en: item.summary_en || "",
       sum_ru: item.summary_ru || "",
+      // Rows the API withheld from anonymous visitors: rank only, no
+      // identifying fields. The UI renders a placeholder for these.
+      locked: item.locked === true,
+      // "Recently added to the index", used for the NEW badge on the cards.
+      isNew: isRecentlyAdded(item.created_at),
     };
+  }
+
+  // NEW_PLAYER_WINDOW_DAYS is how long a player stays marked NEW after being
+  // added. Two weeks is long enough that a visitor who checks in weekly sees
+  // the badge at least once, short enough that it still means something.
+  const NEW_PLAYER_WINDOW_DAYS = 14;
+
+  function isRecentlyAdded(createdAt) {
+    if (!createdAt) return false;
+    const added = new Date(createdAt).getTime();
+    if (Number.isNaN(added)) return false;
+    return Date.now() - added < NEW_PLAYER_WINDOW_DAYS * 24 * 60 * 60 * 1000;
   }
 
   function toLegacyNews(item) {
     const delta = Number(item.impact_delta || 0);
     const sign = delta > 0 ? "+" : "";
+    // Match the article to its player so the card can show a face. The feed
+    // sends player_id; the roster is already loaded by the time news render.
+    const owner = state.players.find((p) => p.id === item.player_id);
     return {
+      id: item.id,
       player: item.player_name,
+      photo: owner ? owner.photo_url || owner.photo_data || "" : "",
+      emoji: owner ? owner.emoji : "",
       impact: item.impact_type,
       delta: `${sign}${round1(delta).toFixed(1)}`,
       time: item.relative_time || "",
@@ -256,6 +279,9 @@
       window.populateLeagueFilter();
     }
     renderTable();
+    if (typeof window.renderPlayerCards === "function") {
+      window.renderPlayerCards();
+    }
     renderNews();
     updateHeroCard();
     populatePollPlayers(); // legacy — no-op now that the poll widget is gone
@@ -320,11 +346,24 @@
       ? `<div class="event-card-source">News: ${escapeHtml(event.news_title)}</div>`
       : `<div class="event-card-source">Stats-derived event</div>`;
 
+    // Show whose score this event moves. The event feed only carries a
+    // player_id and name, so the portrait comes from the roster we already
+    // loaded — no extra request, and it falls back to the emoji when the
+    // player has no photo yet.
+    const eventOwner = state.players.find((p) => p.id === event.player_id);
+    const eventPhoto = eventOwner ? eventOwner.photo_url || eventOwner.photo_data || "" : "";
+    const eventFace = eventPhoto
+      ? `<img class="event-face" src="${escapeHtml(eventPhoto)}" alt="" loading="lazy" />`
+      : `<div class="event-face" style="display:flex;align-items:center;justify-content:center">${(eventOwner && eventOwner.emoji) || "⚽"}</div>`;
+
     card.innerHTML = `
       <div class="event-card-top">
-        <div>
-          <div class="event-card-player">${escapeHtml(event.player_name)}</div>
-          <div class="event-card-trigger">Trigger: <strong>${escapeHtml(event.trigger_word.replace(/_/g, " "))}</strong></div>
+        <div class="event-card-head">
+          ${eventFace}
+          <div>
+            <div class="event-card-player">${escapeHtml(event.player_name)}</div>
+            <div class="event-card-trigger">Trigger: <strong>${escapeHtml(event.trigger_word.replace(/_/g, " "))}</strong></div>
+          </div>
         </div>
         <div class="event-card-meta">
           <span class="event-card-tag ${componentTag}">${componentTag}</span>
@@ -572,8 +611,176 @@
     }
   };
 
+  // ── ACCOUNTS ─────────────────────────────────────────────────────────
+  // The session lives in an HttpOnly cookie, so the page can't read it and
+  // has to ask the server who it is. window.friIsAdmin gates the admin-only
+  // controls in the UI; the endpoints behind them check for themselves.
+  window.friUser = null;
+  window.friIsAdmin = false;
+  let authMode = "login";
+
+  async function loadCurrentUser() {
+    try {
+      const payload = await fetchJSON("/api/auth/me");
+      window.friUser = payload.data || null;
+    } catch (_) {
+      window.friUser = null;
+    }
+    window.friIsAdmin = !!(window.friUser && window.friUser.is_admin);
+    renderAuthControls();
+  }
+
+  function renderAuthControls() {
+    const host = document.getElementById("auth-controls");
+    if (!host) return;
+    const t = (window.T && window.T[window.lang]) || {};
+    const user = window.friUser;
+
+    if (!user) {
+      host.innerHTML =
+        '<button class="auth-btn" onclick="openAuth(\'login\')">' + (t.auth_signin || "Sign in") + "</button>" +
+        '<button class="auth-btn primary" onclick="openAuth(\'register\')">' + (t.auth_signup || "Sign up") + "</button>";
+    } else {
+      const adminTag = user.is_admin ? '<span class="auth-admin-tag">admin</span>' : "";
+      host.innerHTML =
+        '<div class="auth-user">' + adminTag +
+        '<span class="auth-email">' + escapeAttr(user.email) + "</span>" +
+        '<button class="auth-btn" onclick="signOut()">' + (t.auth_signout || "Sign out") + "</button></div>";
+    }
+
+    const adminTools = document.getElementById("admin-tools");
+    if (adminTools) {
+      adminTools.style.display = window.friIsAdmin ? "" : "none";
+    }
+  }
+  window.renderAuthControls = renderAuthControls;
+
+  function escapeAttr(value) {
+    return String(value == null ? "" : value).replace(/[&<>"']/g, (c) =>
+      ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])
+    );
+  }
+
+  window.openAuth = function openAuth(mode) {
+    authMode = mode === "register" ? "register" : "login";
+    const modal = document.getElementById("auth-modal");
+    if (!modal) return;
+    applyAuthMode();
+    document.getElementById("auth-error").textContent = "";
+    modal.classList.add("open");
+    const email = document.getElementById("auth-email");
+    if (email) setTimeout(() => email.focus(), 50);
+  };
+
+  window.closeAuth = function closeAuth() {
+    const modal = document.getElementById("auth-modal");
+    if (modal) modal.classList.remove("open");
+  };
+
+  window.toggleAuthMode = function toggleAuthMode() {
+    authMode = authMode === "login" ? "register" : "login";
+    applyAuthMode();
+  };
+
+  function applyAuthMode() {
+    const t = (window.T && window.T[window.lang]) || {};
+    const signup = authMode === "register";
+    const set = (id, value) => {
+      const el = document.getElementById(id);
+      if (el && value) el.textContent = value;
+    };
+    set("auth-title", signup ? t.auth_signup_title : t.auth_signin_title);
+    set("auth-sub", signup ? t.auth_signup_sub : t.auth_signin_sub);
+    set("auth-submit", signup ? t.auth_submit_signup : t.auth_submit_signin);
+    set("auth-switch-text", signup ? t.auth_have_account : t.auth_no_account);
+    set("auth-switch-btn", signup ? t.auth_switch_signin : t.auth_switch_signup);
+    const pwd = document.getElementById("auth-password");
+    if (pwd) pwd.setAttribute("autocomplete", signup ? "new-password" : "current-password");
+  }
+
+  window.submitAuth = function submitAuth(event) {
+    event.preventDefault();
+    const t = (window.T && window.T[window.lang]) || {};
+    const emailEl = document.getElementById("auth-email");
+    const pwdEl = document.getElementById("auth-password");
+    const errEl = document.getElementById("auth-error");
+    const btn = document.getElementById("auth-submit");
+    if (!emailEl || !pwdEl || !errEl || !btn) return false;
+
+    errEl.textContent = "";
+    btn.disabled = true;
+
+    const path = authMode === "register" ? "/api/auth/register" : "/api/auth/login";
+    fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: emailEl.value.trim(), password: pwdEl.value }),
+    })
+      .then(async (r) => {
+        const payload = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          // The server's message is the useful one — it distinguishes a
+          // taken address from a weak password. Fall back to a generic line
+          // only when there's nothing to show.
+          throw new Error(payload.error || t.auth_err_generic || "Failed");
+        }
+        return payload;
+      })
+      .then(async () => {
+        window.closeAuth();
+        pwdEl.value = "";
+        // Reload the leaderboard: the top five arrive unmasked now.
+        await loadCurrentUser();
+        await Promise.all([loadPlayers(), loadNews()]);
+        renderLiveData();
+      })
+      .catch((err) => {
+        errEl.textContent = err.message;
+      })
+      .finally(() => {
+        btn.disabled = false;
+      });
+    return false;
+  };
+
+  window.signOut = async function signOut() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } catch (_) {
+      /* clearing local state below matters more than the response */
+    }
+    await loadCurrentUser();
+    await Promise.all([loadPlayers(), loadNews()]);
+    renderLiveData();
+  };
+
+  // Admin-only: drop an article the filters let through. Removing it also
+  // removes any rating event it triggered (FK cascade), which is the point —
+  // a wrong article shouldn't leave its score change behind.
+  window.deleteNewsItem = async function deleteNewsItem(newsID, cardEl) {
+    if (!newsID || !window.friIsAdmin) return;
+    const label = (window.T && window.T[window.lang] && window.T[window.lang].news_delete) || "Delete";
+    if (!window.confirm(label + "?")) return;
+    try {
+      const r = await fetch("/api/news/" + encodeURIComponent(newsID), { method: "DELETE" });
+      if (!r.ok) {
+        const payload = await r.json().catch(() => ({}));
+        throw new Error(payload.error || "HTTP " + r.status);
+      }
+      if (cardEl && cardEl.parentNode) cardEl.parentNode.removeChild(cardEl);
+      // The article fed a player's Media score, so refresh the table too.
+      await Promise.all([loadPlayers(), loadNews()]);
+      renderLiveData();
+    } catch (err) {
+      console.error("delete news failed", err);
+      window.alert("Delete failed: " + err.message);
+    }
+  };
+
   async function hydrate() {
     try {
+      // Identity first: it decides whether the leaderboard comes back masked.
+      await loadCurrentUser();
       await Promise.all([loadPlayers(), loadNews()]);
       renderLiveData();
     } catch (error) {
