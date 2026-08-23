@@ -32,7 +32,6 @@
   /* NAV */
   nav { position:fixed; top:0; left:0; right:0; z-index:100; display:flex; align-items:center; justify-content:space-between; padding:18px 48px; background:rgba(8,10,13,0.85); backdrop-filter:blur(20px); border-bottom:1px solid var(--border); gap:20px; }
   .nav-logo { flex-shrink:0; text-decoration:none; }
-  .nav-logo .nav-logo-text { background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .nav-links { display:flex; gap:28px; list-style:none; }
   .nav-links a { color:var(--muted); text-decoration:none; font-size:13px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; transition:color 0.2s; }
   .nav-links a:hover { color:var(--text); }
@@ -215,7 +214,6 @@
   .pillars-detail { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
   .pillar-detail-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; }
   .pillar-detail-card h4 { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:1px; margin-bottom:6px; }
-  .pillar-weight { font-family:'Space Mono',monospace; font-size:11px; color:var(--gold); margin-bottom:12px; }
   .pillar-detail-card p { font-size:13px; color:var(--muted); line-height:1.6; }
 
   /* MODAL */
@@ -303,8 +301,7 @@
 
   /* ── LOGO ─────────────────────────────────────────────────────── */
   .nav-logo { display:flex; align-items:center; gap:10px; }
-  .nav-logo img { height:30px; width:auto; display:block; }
-  .nav-logo .nav-logo-text { font-family:'Bebas Neue',sans-serif; font-size:26px; letter-spacing:2px; }
+  .nav-logo img { height:34px; width:auto; display:block; }
 
   /* ── ACCOUNT CONTROLS (nav, right side next to language) ───────── */
   .nav-right { display:flex; align-items:center; gap:14px; }
@@ -415,9 +412,8 @@
 
 <!-- NAV -->
 <nav>
-  <a class="nav-logo" href="#top">
+  <a class="nav-logo" href="/" aria-label="FRI — Football Reputation Index">
     <img src="/assets/logo.png" srcset="/assets/logo.png 1x, /assets/logo@2x.png 2x" alt="FRI" />
-    <span class="nav-logo-text">FRI</span>
   </a>
   <ul class="nav-links">
     <li><a href="#leaderboard" data-i18n="nav_rankings">FRI Leaderboard</a></li>
@@ -589,10 +585,10 @@
     <span class="formula-note" data-i18n="form_note">All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation</span>
   </div>
   <div class="pillars-detail">
-    <div class="pillar-detail-card"><h4>🏟️ <span data-i18n="pil1_t">Field Performance</span></h4><div class="pillar-weight" data-i18n="pil1_w">Weight: 40%</div><p data-i18n="pil1_d">Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Blended 60/40 with a career baseline so stars don't crater during an off year.</p></div>
-    <div class="pillar-detail-card"><h4>📱 <span data-i18n="pil2_t">Social Influence</span></h4><div class="pillar-weight" data-i18n="pil2_w">Weight: 25%</div><p data-i18n="pil2_d">Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.</p></div>
-    <div class="pillar-detail-card"><h4>📰 <span data-i18n="pil4_t">Media Score</span></h4><div class="pillar-weight" data-i18n="pil4_w">Weight: 20%</div><p data-i18n="pil4_d">NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.</p></div>
-    <div class="pillar-detail-card"><h4>⚖️ <span data-i18n="pil5_t">Character Index</span></h4><div class="pillar-weight" data-i18n="pil5_w">Weight: 15%</div><p data-i18n="pil5_d">Yellow/red cards, scandals, referee disputes subtract points. Charity work, fair play awards, captaincy add. Each event runs through community voting (see "Vote on Events") so obvious cases auto-apply and grey-area ones are validated by fans.</p></div>
+    <div class="pillar-detail-card"><h4>🏟️ <span data-i18n="pil1_t">Field Performance</span></h4><p data-i18n="pil1_d">Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Blended 60/40 with a career baseline so stars don't crater during an off year.</p></div>
+    <div class="pillar-detail-card"><h4>📱 <span data-i18n="pil2_t">Social Influence</span></h4><p data-i18n="pil2_d">Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.</p></div>
+    <div class="pillar-detail-card"><h4>📰 <span data-i18n="pil4_t">Media Score</span></h4><p data-i18n="pil4_d">NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.</p></div>
+    <div class="pillar-detail-card"><h4>⚖️ <span data-i18n="pil5_t">Character Index</span></h4><p data-i18n="pil5_d">Yellow/red cards, scandals, referee disputes subtract points. Charity work, fair play awards, captaincy add. Each event runs through community voting (see "Vote on Events") so obvious cases auto-apply and grey-area ones are validated by fans.</p></div>
   </div>
 
   <div class="section-header" style="margin-top:64px">
@@ -766,11 +762,11 @@ const T = {
     news_pos:'↑ Positive', news_neg:'↓ Negative', news_neu:'— Neutral', news_impact:'FRI Impact:', news_auto:'pts (auto-applied)',
     form_eye:'Methodology', form_title:'The Formula', form_sub:'Fair, transparent, and position-neutral. Every component is publicly auditable.',
     form_note:'All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation',
-    pil1_t:'Field Performance', pil1_w:'Weight: 35%', pil1_d:'Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Age-adjusted for veterans.',
-    pil2_t:'Social Influence', pil2_w:'Weight: 20%', pil2_d:'Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.',
-    pil3_t:'Fan Sentiment', pil3_w:'Weight: 20%', pil3_d:'Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.',
-    pil4_t:'Media Score', pil4_w:'Weight: 15%', pil4_d:'NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.',
-    pil5_t:'Character Index', pil5_w:'Weight: 10%', pil5_d:'Yellow/red cards, confirmed scandals, fan conflicts, referee disputes subtract points. Charity work and fair play awards add. Older incidents decay 20% weight per year.',
+    pil1_t:'Field Performance', pil1_d:'Stats normalized by position and league average. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Age-adjusted for veterans.',
+    pil2_t:'Social Influence', pil2_d:'Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.',
+    pil3_t:'Fan Sentiment', pil3_d:'Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.',
+    pil4_t:'Media Score', pil4_d:'NLP sentiment analysis on news articles from 200+ outlets. Positive coverage raises score, negative stories lower it. Weighted by media outlet authority ranking.',
+    pil5_t:'Character Index', pil5_d:'Yellow/red cards, confirmed scandals, fan conflicts, referee disputes subtract points. Charity work and fair play awards add. Older incidents decay 20% weight per year.',
     pers_eye:'Platform Access', pers_title:'Built For Everyone', pers_sub:"Whether you're a player, a fan, or a global brand — FRI gives you the data you need.",
     p1_name:'Players', p1_desc:"See exactly what's driving your score up or down. Get actionable feedback from millions of fans worldwide.",
     p1_f1:'Full breakdown of all 5 FRI pillars', p1_f2:'See what fans actually think about you', p1_f3:'Historical trend — track your reputation arc', p1_f4:'Compare to position peers worldwide', p1_f5:'Media sentiment timeline',
@@ -819,11 +815,11 @@ const T = {
     news_pos:'↑ Позитив', news_neg:'↓ Негатив', news_neu:'— Нейтрально', news_impact:'Влияние на FRI:', news_auto:'пт (применено автоматически)',
     form_eye:'Методология', form_title:'Формула', form_sub:'Справедливая, прозрачная, нейтральная к позиции. Каждый компонент открыт для проверки.',
     form_note:'Все компоненты нормализованы по шкале 0–100 · Обновляется каждые 24 часа · Новостные события запускают немедленный перерасчёт',
-    pil1_t:'Полевые показатели', pil1_w:'Вес: 35%', pil1_d:'Статистика нормализована по позиции и среднему значению лиги. Вратари — по сейвам, защитники — по отборам/перехватам, ПЗ — по ключевым передачам, нападающие — по голам за 90 минут. Корректировка на возраст для ветеранов.',
-    pil2_t:'Социальное влияние', pil2_w:'Вес: 20%', pil2_d:'Количество подписчиков в Instagram, X, TikTok по логарифмической шкале. Учитывается вовлечённость и рост подписчиков за 30 дней. Исключает монополизацию топ-звёздами.',
-    pil3_t:'Мнение болельщиков', pil3_w:'Вес: 20%', pil3_d:'Еженедельные опросы + оценки по итогам матчей. Только верифицированные голоса (без ботов). Смешение 60/40 между структурированными опросами и оценками болельщиков.',
-    pil4_t:'Медиаоценка', pil4_w:'Вес: 15%', pil4_d:'NLP-анализ тональности статей более чем из 200 изданий. Позитивное освещение повышает оценку, скандалы снижают. Взвешивается по авторитетности источника.',
-    pil5_t:'Индекс характера', pil5_w:'Вес: 10%', pil5_d:'Жёлтые/красные карточки, скандалы, конфликты с болельщиками и судьями снижают баллы. Благотворительность и награды за честную игру — повышают. Старые инциденты теряют 20% веса ежегодно.',
+    pil1_t:'Полевые показатели', pil1_d:'Статистика нормализована по позиции и среднему значению лиги. Вратари — по сейвам, защитники — по отборам/перехватам, ПЗ — по ключевым передачам, нападающие — по голам за 90 минут. Корректировка на возраст для ветеранов.',
+    pil2_t:'Социальное влияние', pil2_d:'Количество подписчиков в Instagram, X, TikTok по логарифмической шкале. Учитывается вовлечённость и рост подписчиков за 30 дней. Исключает монополизацию топ-звёздами.',
+    pil3_t:'Мнение болельщиков', pil3_d:'Еженедельные опросы + оценки по итогам матчей. Только верифицированные голоса (без ботов). Смешение 60/40 между структурированными опросами и оценками болельщиков.',
+    pil4_t:'Медиаоценка', pil4_d:'NLP-анализ тональности статей более чем из 200 изданий. Позитивное освещение повышает оценку, скандалы снижают. Взвешивается по авторитетности источника.',
+    pil5_t:'Индекс характера', pil5_d:'Жёлтые/красные карточки, скандалы, конфликты с болельщиками и судьями снижают баллы. Благотворительность и награды за честную игру — повышают. Старые инциденты теряют 20% веса ежегодно.',
     pers_eye:'Доступ к платформе', pers_title:'Для каждого', pers_sub:'Для игрока, болельщика или бренда — FRI предоставляет нужные данные.',
     p1_name:'Игроки', p1_desc:'Видите, что именно влияет на ваш рейтинг. Получайте обратную связь от миллионов болельщиков по всему миру.',
     p1_f1:'Полная разбивка по всем 5 компонентам FRI', p1_f2:'Узнайте, что болельщики думают о вас', p1_f3:'Исторический тренд — отслеживайте репутационную дугу', p1_f4:'Сравнение с игроками вашей позиции в мире', p1_f5:'Хронология медиасентимента',
