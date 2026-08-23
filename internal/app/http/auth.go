@@ -283,28 +283,110 @@ func maskLockedPlayers(players []domain.PlayerWithScore, signedIn bool) []domain
 		if i >= lockedTopN {
 			break
 		}
-		p := &masked[i]
-		p.Locked = true
-		p.Name = ""
-		p.Club = ""
-		p.League = ""
-		p.Position = ""
-		p.Age = 0
-		p.BirthDate = nil
-		p.Emoji = ""
-		p.PhotoData = ""
-		p.PhotoURL = ""
-		p.SummaryEN = ""
-		p.SummaryRU = ""
-		p.FRI = 0
-		p.Performance = 0
-		p.Social = 0
-		p.Fan = 0
-		p.FanBase = 0
-		p.Media = 0
-		p.Character = 0
-		p.TrendValue = 0
-		p.TrendDirection = ""
+		// Replace the row wholesale rather than blanking field by field. The
+		// first version listed the fields to clear and missed Slug, which is
+		// built from the player's name — "l-yamal" sitting in a masked row
+		// named him as plainly as the name field would have. Rebuilding from
+		// an empty struct means a field added later is withheld by default
+		// instead of leaking until someone remembers to add it here.
+		masked[i] = domain.PlayerWithScore{Locked: true}
+	}
+	return masked
+}
+
+// lockedPlayerIDs returns the player ids occupying the withheld places, taken
+// from the same ordered list the leaderboard uses. Callers pass it to
+// maskLockedNews so the gate covers the news feed as well: an article headlined
+// with a player's name and face tells an anonymous visitor exactly who sits in
+// the top five, which makes blanking the table rows pointless.
+func lockedPlayerIDs(players []domain.PlayerWithScore) map[int64]bool {
+	locked := make(map[int64]bool, lockedTopN)
+	for i, p := range players {
+		if i >= lockedTopN {
+			break
+		}
+		locked[p.ID] = true
+	}
+	return locked
+}
+
+// maskLockedNews blanks the identifying parts of articles about withheld
+// players. The article stays in the feed — the point is to show that coverage
+// exists and is being scored, not to hide that there is news — but the player,
+// the headline, the summary and the source come out, because any of them names
+// the player just as clearly as the tag does.
+//
+// The impact delta stays: it carries no identity and it is the part that makes
+// the case for signing up.
+func maskLockedNews(items []domain.NewsItem, locked map[int64]bool, signedIn bool) []domain.NewsItem {
+	if signedIn || len(locked) == 0 {
+		return items
+	}
+	masked := make([]domain.NewsItem, len(items))
+	copy(masked, items)
+	for i := range masked {
+		n := &masked[i]
+		if n.PlayerID == nil || !locked[*n.PlayerID] {
+			continue
+		}
+		n.Locked = true
+		n.PlayerID = nil
+		n.PlayerName = ""
+		n.TitleEN = ""
+		n.TitleRU = ""
+		n.SummaryEN = ""
+		n.SummaryRU = ""
+		n.Source = ""
+		n.SourceURL = ""
+	}
+	return masked
+}
+
+// lockedForCaller reports whether a given player id is one of the withheld
+// places for this caller, and returns the ordered roster it used so callers
+// that need it again don't query twice.
+//
+// Every per-player endpoint needs this. Before it existed, the gate lived
+// only in the leaderboard handler, and /api/players/:id, its news and its
+// history handed the same data straight back to anyone who guessed an id —
+// which is any integer from 1 to 22.
+func (h *Router) lockedForCaller(c *gin.Context, playerID int64) (bool, error) {
+	if _, signedIn := h.currentUser(c); signedIn {
+		return false, nil
+	}
+	players, err := h.svc.ListPlayers(c.Request.Context(), "", "", "")
+	if err != nil {
+		return false, err
+	}
+	return lockedPlayerIDs(players)[playerID], nil
+}
+
+// abortLocked answers a request for a withheld player. 404 rather than 403:
+// a 403 confirms that the id exists and is interesting, which is most of what
+// an anonymous caller wanted to learn.
+func abortLocked(c *gin.Context) {
+	c.AbortWithStatusJSON(http.StatusNotFound, gin.H{"error": "not found"})
+}
+
+// maskLockedEvents blanks the identity carried by pending rating events. The
+// event itself stays votable-looking, but PlayerName and NewsTitle both name
+// the player outright.
+func maskLockedEvents(events []domain.PendingEvent, locked map[int64]bool, signedIn bool) []domain.PendingEvent {
+	if signedIn || len(locked) == 0 {
+		return events
+	}
+	masked := make([]domain.PendingEvent, len(events))
+	copy(masked, events)
+	for i := range masked {
+		e := &masked[i]
+		if !locked[e.PlayerID] {
+			continue
+		}
+		e.Locked = true
+		e.PlayerID = 0
+		e.PlayerName = ""
+		e.NewsTitle = ""
+		e.NewsItemID = nil
 	}
 	return masked
 }

@@ -126,6 +126,18 @@ func (r *Router) getPlayer(c *gin.Context) {
 		return
 	}
 
+	// A withheld player must not be reachable by guessing an id — there are
+	// only 22 of them.
+	locked, err := r.lockedForCaller(c, playerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if locked {
+		abortLocked(c)
+		return
+	}
+
 	player, err := r.svc.GetPlayer(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "player not found"})
@@ -141,6 +153,18 @@ func (r *Router) getPlayerHistory(c *gin.Context) {
 		return
 	}
 
+	// A withheld player must not be reachable by guessing an id — there are
+	// only 22 of them.
+	locked, err := r.lockedForCaller(c, playerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if locked {
+		abortLocked(c)
+		return
+	}
+
 	points, err := r.svc.GetHistory(c.Request.Context(), playerID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
@@ -153,6 +177,18 @@ func (r *Router) getPlayerHistory(c *gin.Context) {
 func (r *Router) getPlayerNews(c *gin.Context) {
 	playerID, ok := parseID(c)
 	if !ok {
+		return
+	}
+
+	// A withheld player must not be reachable by guessing an id — there are
+	// only 22 of them.
+	locked, err := r.lockedForCaller(c, playerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if locked {
+		abortLocked(c)
 		return
 	}
 
@@ -172,7 +208,24 @@ func (r *Router) listNewsFeed(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"data": items})
+	// The feed names players and links their photos, so leaving it open would
+	// have handed an anonymous visitor the top five that the leaderboard
+	// withholds. Resolving who is locked needs the ordered player list, which
+	// is one extra query on a page that already loads it.
+	_, signedIn := r.currentUser(c)
+	if !signedIn {
+		players, err := r.svc.ListPlayers(c.Request.Context(), "", "", "")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		items = maskLockedNews(items, lockedPlayerIDs(players), false)
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"data": items,
+		"meta": gin.H{"signed_in": signedIn},
+	})
 }
 
 func (r *Router) submitVote(c *gin.Context) {
@@ -301,6 +354,17 @@ func (r *Router) listPendingEvents(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
+	// Events name the player they belong to, and their news_title is a
+	// headline that names them again — an open events feed listed the top
+	// five as clearly as the leaderboard would have.
+	if _, signedIn := r.currentUser(c); !signedIn {
+		players, listErr := r.svc.ListPlayers(c.Request.Context(), "", "", "")
+		if listErr != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
+			return
+		}
+		events = maskLockedEvents(events, lockedPlayerIDs(players), false)
+	}
 	if events == nil {
 		events = []domain.PendingEvent{}
 	}
@@ -322,6 +386,18 @@ func (r *Router) getPendingEvent(c *gin.Context) {
 	}
 	if event == nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "event not pending"})
+		return
+	}
+	// Same gate as the list: fetching one event by id must not be a way
+	// around it.
+	locked, err := r.lockedForCaller(c, event.PlayerID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+	if locked {
+		masked := maskLockedEvents([]domain.PendingEvent{*event}, map[int64]bool{event.PlayerID: true}, false)
+		c.JSON(http.StatusOK, gin.H{"data": masked[0]})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"data": event})

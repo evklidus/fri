@@ -82,6 +82,11 @@ type HistoryPoint struct {
 }
 
 type NewsItem struct {
+	// Locked marks an article about a player whose leaderboard place is
+	// withheld from this caller. Everything identifying has been stripped
+	// server-side; the UI renders a blurred placeholder in its place.
+	Locked bool `json:"locked,omitempty"`
+
 	ID           int64     `json:"id"`
 	PlayerID     *int64    `json:"player_id"`
 	PlayerName   string    `json:"player_name"`
@@ -205,6 +210,10 @@ type CharacterEventCandidate struct {
 // Returned by the /api/events/pending endpoint so the UI can render a slider
 // per event without round-tripping to fetch vote details separately.
 type PendingEvent struct {
+	// Locked marks an event about a player whose leaderboard place is
+	// withheld from this caller; the identifying fields are stripped.
+	Locked bool `json:"locked,omitempty"`
+
 	ID              int64     `json:"id"`
 	PlayerID        int64     `json:"player_id"`
 	PlayerName      string    `json:"player_name"`

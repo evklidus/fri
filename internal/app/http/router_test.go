@@ -32,9 +32,45 @@ type fakeService struct {
 	syncCharacterFn        func(context.Context) (*domain.ComponentSyncResult, error)
 	syncCareerBaselineFn   func(context.Context) (*domain.ComponentSyncResult, error)
 	syncAllFn              func(context.Context) ([]domain.ComponentSyncResult, error)
+
+	// Accounts. sessionUser, when set, is the user a request carrying the
+	// session cookie resolves to — enough to exercise the signed-in branch of
+	// the gates without a database.
+	sessionUser *domain.User
 }
 
+// The fake implements AuthService so the handlers can tell a signed-in caller
+// from an anonymous one. Only the session lookup is exercised here; register
+// and login have their own coverage against the real service.
+func (f *fakeService) AuthEnabled() bool { return true }
+
+func (f *fakeService) Register(context.Context, string, string) (domain.User, string, time.Time, error) {
+	return domain.User{}, "", time.Time{}, errors.New("not implemented in fake")
+}
+
+func (f *fakeService) Login(context.Context, string, string) (domain.User, string, time.Time, error) {
+	return domain.User{}, "", time.Time{}, errors.New("not implemented in fake")
+}
+
+func (f *fakeService) Logout(context.Context, string) error { return nil }
+
+func (f *fakeService) UserBySession(_ context.Context, token string) (domain.User, error) {
+	if f.sessionUser == nil || token == "" {
+		return domain.User{}, errors.New("no session")
+	}
+	return *f.sessionUser, nil
+}
+
+func (f *fakeService) CountUsers(context.Context) (int64, error) { return 0, nil }
+
+// ListPlayers tolerates an unset stub. The leaderboard gate calls it from
+// handlers that have nothing to do with listing players — it needs the ordered
+// roster to decide whether a requested id is withheld — so tests about, say,
+// player history would otherwise have to stub a function they never assert on.
 func (f *fakeService) ListPlayers(ctx context.Context, search, position, club string) ([]domain.PlayerWithScore, error) {
+	if f.listPlayersFn == nil {
+		return nil, nil
+	}
 	return f.listPlayersFn(ctx, search, position, club)
 }
 func (f *fakeService) GetPlayer(ctx context.Context, id int64) (*domain.PlayerWithScore, error) {
@@ -532,5 +568,218 @@ func TestLeaderboardWithholdsTopPlacesFromAnonymousCallers(t *testing.T) {
 		if bytes.Contains(body, []byte(players[i].Name)) {
 			t.Errorf("response body still contains %q", players[i].Name)
 		}
+	}
+}
+
+func TestNewsFeedWithholdsArticlesAboutLockedPlayers(t *testing.T) {
+	// The leaderboard gate is only as strong as its weakest surface. The news
+	// feed carries player names, photos and headlines — an anonymous visitor
+	// reading "Yamal signs new deal" learns exactly who tops a table whose
+	// rows we blanked.
+	players := make([]domain.PlayerWithScore, 0, 8)
+	for i := 0; i < 8; i++ {
+		var p domain.PlayerWithScore
+		p.ID = int64(i + 1)
+		p.Name = "Player " + strconv.Itoa(i+1)
+		p.FRI = float64(90 - i)
+		players = append(players, p)
+	}
+
+	lockedID := int64(1)   // rank 1 — withheld
+	visibleID := int64(7)  // rank 7 — freely visible
+	news := []domain.NewsItem{
+		{ID: 10, PlayerID: &lockedID, PlayerName: "Player 1", TitleEN: "Player 1 signs new deal",
+			SummaryEN: "Details of the Player 1 contract", SourceURL: "https://example.com/player-1", ImpactDelta: 2.5},
+		{ID: 11, PlayerID: &visibleID, PlayerName: "Player 7", TitleEN: "Player 7 scores twice",
+			SummaryEN: "Two goals for Player 7", SourceURL: "https://example.com/player-7", ImpactDelta: 1.5},
+	}
+
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return players, nil
+		},
+		listNewsFn: func(context.Context, *int64) ([]domain.NewsItem, error) { return news, nil },
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp, err := stdhttp.Get(server.URL + "/api/news/feed")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+
+	var payload struct {
+		Data []domain.NewsItem `json:"data"`
+	}
+	decode(t, body, &payload)
+
+	if len(payload.Data) != 2 {
+		t.Fatalf("got %d articles, want 2 — masked articles stay in the feed", len(payload.Data))
+	}
+
+	locked, visible := payload.Data[0], payload.Data[1]
+	if !locked.Locked {
+		t.Error("article about a withheld player is not marked locked")
+	}
+	if locked.PlayerName != "" || locked.TitleEN != "" || locked.SummaryEN != "" || locked.SourceURL != "" {
+		t.Errorf("locked article leaked: name=%q title=%q summary=%q url=%q",
+			locked.PlayerName, locked.TitleEN, locked.SummaryEN, locked.SourceURL)
+	}
+	if locked.PlayerID != nil {
+		t.Error("locked article still carries player_id — the roster maps it straight back to a name")
+	}
+	if locked.ImpactDelta == 0 {
+		t.Error("impact delta was dropped; it identifies nobody and it is the reason to sign up")
+	}
+
+	if visible.Locked || visible.PlayerName != "Player 7" || visible.TitleEN == "" {
+		t.Errorf("article about a visible player was masked: %+v", visible)
+	}
+
+	// Nothing about the withheld player may survive anywhere in the bytes.
+	for _, needle := range []string{"Player 1", "signs new deal", "player-1"} {
+		if bytes.Contains(body, []byte(needle)) {
+			t.Errorf("news feed body still contains %q", needle)
+		}
+	}
+}
+
+func TestNewsFeedIsUnmaskedForSignedInCallers(t *testing.T) {
+	var p domain.PlayerWithScore
+	p.ID = 1
+	p.Name = "Player 1"
+	p.FRI = 90
+	id := int64(1)
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return []domain.PlayerWithScore{p}, nil
+		},
+		listNewsFn: func(context.Context, *int64) ([]domain.NewsItem, error) {
+			return []domain.NewsItem{{ID: 10, PlayerID: &id, PlayerName: "Player 1", TitleEN: "Headline"}}, nil
+		},
+		sessionUser: &domain.User{ID: 1, Email: "a@b.c"},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	req, err := stdhttp.NewRequest(stdhttp.MethodGet, server.URL+"/api/news/feed", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.AddCookie(&stdhttp.Cookie{Name: sessionCookieName, Value: "any-token"})
+	resp, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+	if !bytes.Contains(body, []byte("Player 1")) {
+		t.Errorf("signed-in caller lost the player name: %s", body)
+	}
+}
+
+func TestLockedPlayerIsUnreachableByID(t *testing.T) {
+	// The leaderboard withholds five rows, but there are only twenty-two
+	// players — guessing an id is trivial. Every per-player endpoint has to
+	// refuse, or the gate is a suggestion.
+	players := make([]domain.PlayerWithScore, 0, 8)
+	for i := 0; i < 8; i++ {
+		var p domain.PlayerWithScore
+		p.ID = int64(i + 1)
+		p.Name = "Player " + strconv.Itoa(i+1)
+		p.FRI = float64(90 - i)
+		players = append(players, p)
+	}
+
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return players, nil
+		},
+		getPlayerFn: func(_ context.Context, id int64) (*domain.PlayerWithScore, error) {
+			for i := range players {
+				if players[i].ID == id {
+					return &players[i], nil
+				}
+			}
+			return nil, errors.New("not found")
+		},
+		getHistoryFn: func(context.Context, int64) ([]domain.HistoryPoint, error) {
+			return []domain.HistoryPoint{{FRI: 88}}, nil
+		},
+		listNewsFn: func(context.Context, *int64) ([]domain.NewsItem, error) {
+			return []domain.NewsItem{{ID: 1, PlayerName: "Player 1", TitleEN: "Player 1 headline"}}, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	// Rank 1 is withheld: every route about them must 404 for an anonymous caller.
+	for _, path := range []string{"/api/players/1", "/api/players/1/history", "/api/players/1/news"} {
+		resp, err := stdhttp.Get(server.URL + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		body, _ := readBody(resp)
+		if resp.StatusCode != stdhttp.StatusNotFound {
+			t.Errorf("%s: status = %d, want 404 (body: %s)", path, resp.StatusCode, body)
+		}
+		if bytes.Contains(body, []byte("Player 1")) {
+			t.Errorf("%s leaked the withheld player's name", path)
+		}
+	}
+
+	// Rank 7 is freely visible and must stay that way.
+	for _, path := range []string{"/api/players/7", "/api/players/7/history", "/api/players/7/news"} {
+		resp, err := stdhttp.Get(server.URL + path)
+		if err != nil {
+			t.Fatalf("get %s: %v", path, err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != stdhttp.StatusOK {
+			t.Errorf("%s: status = %d, want 200", path, resp.StatusCode)
+		}
+	}
+
+	// With a session, the withheld player opens up.
+	fake.sessionUser = &domain.User{ID: 1, Email: "a@b.c"}
+	req, err := stdhttp.NewRequest(stdhttp.MethodGet, server.URL+"/api/players/1", nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.AddCookie(&stdhttp.Cookie{Name: sessionCookieName, Value: "token"})
+	resp, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+	if resp.StatusCode != stdhttp.StatusOK || !bytes.Contains(body, []byte("Player 1")) {
+		t.Errorf("signed-in caller was refused the top player: status=%d body=%s", resp.StatusCode, body)
+	}
+}
+
+func TestMaskedRowCarriesNothingIdentifying(t *testing.T) {
+	// The first version of the mask cleared a hand-written list of fields and
+	// missed Slug — which is derived from the name, so "l-yamal" sat in the
+	// response naming the player it was meant to withhold. The row is now
+	// rebuilt from an empty struct; this asserts that nothing but the flag
+	// survives, so a field added to the model later is withheld by default.
+	var p domain.PlayerWithScore
+	p.ID = 42
+	p.Slug = "l-yamal"
+	p.Name = "L. Yamal"
+	p.Club = "FC Barcelona"
+	p.ThemeBackground = "linear-gradient(...)"
+	p.PhotoURL = "https://media.example.com/762.png"
+	p.FRI = 85.2
+
+	masked := maskLockedPlayers([]domain.PlayerWithScore{p}, false)
+	got := masked[0]
+
+	if !got.Locked {
+		t.Fatal("row is not marked locked")
+	}
+	if got.ID != 0 || got.Slug != "" || got.Name != "" || got.Club != "" ||
+		got.ThemeBackground != "" || got.PhotoURL != "" || got.FRI != 0 {
+		t.Errorf("masked row still carries data: %+v", got)
 	}
 }

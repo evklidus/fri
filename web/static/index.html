@@ -372,6 +372,21 @@
                 background:rgba(10,10,10,0.35); }
   .pcard-lock span { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); text-align:center; }
 
+  /* ── LOCKED NEWS CARDS ────────────────────────────────────────── */
+  /* The article stays in the feed so the coverage is visibly there; the
+     server sent no headline, name or link, so there is nothing behind the
+     blur to read out of the DOM. */
+  .news-card.locked { position:relative; pointer-events:none; }
+  .news-card.locked .locked-blur { filter:blur(8px); opacity:.5; user-select:none; }
+  .news-locked-line { height:12px; border-radius:3px; background:rgba(255,255,255,0.28); margin-bottom:9px; }
+  .news-locked-line.short { width:55%; }
+  .news-locked-line.tiny { height:9px; width:70%; background:rgba(255,255,255,0.14); }
+  .news-locked-overlay { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center;
+                         justify-content:center; gap:12px; padding:20px; text-align:center;
+                         background:linear-gradient(180deg,rgba(10,10,10,0.35),rgba(10,10,10,0.6)); pointer-events:auto; }
+  .news-locked-overlay span { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px;
+                              text-transform:uppercase; color:var(--gold); line-height:1.7; }
+
   /* ── NEWS WITH PLAYER FACES ───────────────────────────────────── */
   .news-face { width:44px; height:44px; border-radius:50%; object-fit:cover; object-position:center top; flex-shrink:0;
                border:2px solid rgba(255,255,255,0.14); background:rgba(255,255,255,0.06); }
@@ -742,6 +757,7 @@ const T = {
     about_intro:'FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, media coverage, and character into one transparent number. Every component is computed from public data on a fixed schedule, and the formula below is the whole of it.',
     foot_nav:'Navigate', foot_contact:'Contact', foot_social:'Social',
     news_delete:'Delete',
+    news_locked:'Sign in to see full breakdown',
     events_eye:'Community Voice', events_title:'Vote on Events', events_sub:'Each rating event has a proposed delta. Drag the slider to suggest a fairer value. The median of community votes becomes the final change to the player\'s score.', events_empty:'No events pending votes right now. Check back after the next sync.',
     th_media:'Media', th_char:'Character',
     hero_eyebrow:'The Global Standard for Player Reputation', hero_line1:'FOOTBALL', hero_line2:'REPUTATION', hero_line3:'INDEX',
@@ -795,6 +811,7 @@ const T = {
     about_intro:'FRI — первый универсальный индекс репутации футболистов на основе данных: игровые показатели, влияние в соцсетях, медиаосвещение и характер сведены в одно прозрачное число. Каждый компонент считается из публичных данных по расписанию, а формула ниже — это всё, что за ним стоит.',
     foot_nav:'Разделы', foot_contact:'Контакты', foot_social:'Соцсети',
     news_delete:'Удалить',
+    news_locked:'Войдите, чтобы увидеть полностью',
     events_eye:'Голос болельщиков', events_title:'Голосование за события', events_sub:'У каждого события есть предложенная дельта. Двигайте ползунок, чтобы предложить более справедливое значение. Медиана голосов сообщества становится финальным изменением рейтинга игрока.', events_empty:'Сейчас нет событий, ожидающих голосования. Загляните после следующего sync.',
     th_media:'Медиа', th_char:'Характер',
     hero_eyebrow:'Мировой стандарт репутации футболистов', hero_line1:'ФУТБОЛ', hero_line2:'РЕПУТАЦИЯ', hero_line3:'ИНДЕКС',
@@ -1089,6 +1106,32 @@ function renderNews() {
   const g = document.getElementById('news-grid');
   const t = T[lang];
   news.forEach(n => {
+    // Articles about players whose leaderboard place is withheld: the server
+    // stripped the name, headline, summary and link, so all that can be drawn
+    // is the shape of a card and the invitation to sign in.
+    if (n.locked) {
+      const lockedCard = document.createElement('div');
+      lockedCard.className = 'news-card locked';
+      lockedCard.innerHTML = `
+        <div class="locked-blur">
+          <div class="news-card-top"><span class="news-impact impact-neu">•••</span><span class="news-time">•••</span></div>
+          <div class="news-head">
+            <div class="news-face"></div>
+            <div class="news-head-text"><div class="news-player-tag">••••••••</div></div>
+          </div>
+          <div class="news-locked-line"></div>
+          <div class="news-locked-line short"></div>
+          <div class="news-locked-line tiny"></div>
+          <div class="news-locked-line tiny"></div>
+        </div>
+        <div class="news-locked-overlay">
+          <span>${t.news_locked}</span>
+          <button class="auth-btn primary" style="pointer-events:auto" onclick="openAuth('register')">${t.auth_signup}</button>
+        </div>`;
+      g.appendChild(lockedCard);
+      return;
+    }
+
     const ic = n.impact==='pos'?'impact-pos':n.impact==='neg'?'impact-neg':'impact-neu';
     const il = n.impact==='pos'?t.news_pos:n.impact==='neg'?t.news_neg:t.news_neu;
     const dc = n.impact==='pos'?'fri-delta-pos':'fri-delta-neg';

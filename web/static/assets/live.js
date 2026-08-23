@@ -13,6 +13,9 @@
     const trendValue = Math.abs(Number(item.trend_value || 0));
     return {
       id: item.id,
+      // Server-side flag: this article is about a player whose leaderboard
+      // place is withheld, and arrives with its text and links stripped.
+      locked: item.locked === true,
       rank: index + 1,
       emoji: item.emoji || "⚽",
       name: item.name,
