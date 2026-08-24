@@ -1349,3 +1349,132 @@ func TestSeasonCacheReusesEntries(t *testing.T) {
 		t.Errorf("/leagues should be called once due to cache, got %d", got)
 	}
 }
+
+func TestBestPlayerMatchDistinguishesSameSurname(t *testing.T) {
+	// The real case: Barcelona field two Garcías. Our roster has the
+	// goalkeeper, Joan; api-football returns Eric (a defender) first for a
+	// search on "garcia", and the old first-contains-wins rule took him — so
+	// the player's photo and his whole season's statistics were another man's.
+	eric := apiFootballPlayerEntry{}
+	eric.Player.ID = 619
+	eric.Player.Name = "E. García"
+	eric.Player.Firstname = "Eric"
+	eric.Player.Lastname = "García Martret"
+	eric.Player.Age = 24
+	eric.Statistics = []apiFootballStatistic{{Games: apiFootballGames{Position: "Defender", Minutes: 2000}}}
+
+	joan := apiFootballPlayerEntry{}
+	joan.Player.ID = 182718
+	joan.Player.Name = "J. García"
+	joan.Player.Firstname = "Joan"
+	joan.Player.Lastname = "García Pons"
+	joan.Player.Age = 24
+	joan.Statistics = []apiFootballStatistic{{Games: apiFootballGames{Position: "Goalkeeper", Minutes: 2000}}}
+
+	target := domain.PlayerSyncTarget{ID: 15, Name: "J. García", Club: "FC Barcelona", Position: "GK", Age: 25}
+
+	// Eric first in the response, as the API actually returns him.
+	got, ok := bestPlayerMatch(target, []apiFootballPlayerEntry{eric, joan})
+	if !ok {
+		t.Fatal("no match found for a player who is plainly in the list")
+	}
+	if got.Player.ID != joan.Player.ID {
+		t.Errorf("matched player id %d (%s), want %d (Joan García)", got.Player.ID, got.Player.Name, joan.Player.ID)
+	}
+
+	// Order must not decide it.
+	got, ok = bestPlayerMatch(target, []apiFootballPlayerEntry{joan, eric})
+	if !ok || got.Player.ID != joan.Player.ID {
+		t.Errorf("order changed the answer: got id %d, want %d", got.Player.ID, joan.Player.ID)
+	}
+
+	// With only the wrong man available, refuse rather than take him.
+	if _, ok := bestPlayerMatch(target, []apiFootballPlayerEntry{eric}); ok {
+		t.Error("accepted a defender for our goalkeeper — a contradicted position must be fatal")
+	}
+}
+
+func TestRosterInitial(t *testing.T) {
+	cases := map[string]string{
+		"J. García":     "j",
+		"E. Haaland":    "e",
+		"M. Salah":      "m",
+		"V. van Dijk":   "v",
+		"N'Golo Kanté":  "", // full first name, no initial to check
+		"Vinicius Jr":   "",
+		"Pedri":         "",
+		"Fermín López":  "",
+	}
+	for name, want := range cases {
+		if got := rosterInitial(name); got != want {
+			t.Errorf("rosterInitial(%q) = %q, want %q", name, got, want)
+		}
+	}
+}
+
+func TestPositionsContradictOnlyAcrossTheGoalkeeperLine(t *testing.T) {
+	// The first version of the identity fix rejected any position mismatch.
+	// Checked against the live API, that would have thrown away four of our
+	// best players: api-football files Olise as a Midfielder in every
+	// competition while our roster says FWD, Yamal is an Attacker in La Liga
+	// and a Midfielder in the cups, Salah is both, and Raphinha's rows all say
+	// "Forward" — a value positionGroup did not even recognise.
+	contradicts := []struct{ a, b string }{
+		{"Goalkeeper", "DEF"}, // the García case: a keeper is not a defender
+		{"Goalkeeper", "FWD"},
+		{"Defender", "GK"},
+		{"Midfielder", "GK"},
+	}
+	for _, c := range contradicts {
+		if !positionsContradict(c.a, c.b) {
+			t.Errorf("positionsContradict(%q, %q) = false, want true", c.a, c.b)
+		}
+	}
+
+	// Two steps along the GK-DEF-MID-ATT line is a different footballer.
+	for _, c := range []struct{ a, b string }{
+		{"Defender", "FWD"},   // a defender cannot stand in for our striker
+		{"Attacker", "DEF"},
+	} {
+		if !positionsContradict(c.a, c.b) {
+			t.Errorf("positionsContradict(%q, %q) = false, want true", c.a, c.b)
+		}
+	}
+
+	compatible := []struct{ a, b string }{
+		{"Midfielder", "FWD"}, // Olise, every single competition
+		{"Attacker", "MID"},   // Yamal in the cups
+		{"Forward", "FWD"},    // Raphinha — "Forward" must map to ATT at all
+		{"Defender", "MID"},
+		{"Goalkeeper", "GK"},
+		{"", "FWD"},           // unknown on either side decides nothing
+		{"Attacker", ""},
+	}
+	for _, c := range compatible {
+		if positionsContradict(c.a, c.b) {
+			t.Errorf("positionsContradict(%q, %q) = true, want false", c.a, c.b)
+		}
+	}
+
+	if positionGroup("Forward") != "ATT" {
+		t.Errorf("positionGroup(\"Forward\") = %q, want ATT — Raphinha's every row uses it", positionGroup("Forward"))
+	}
+}
+
+func TestBestPlayerMatchKeepsOutfieldPositionDisagreements(t *testing.T) {
+	// Olise: our roster says FWD, api-football says Midfielder everywhere.
+	// He must still resolve — he is the only Olise at Bayern.
+	olise := apiFootballPlayerEntry{}
+	olise.Player.ID = 19617
+	olise.Player.Name = "M. Olise"
+	olise.Player.Firstname = "Michael"
+	olise.Player.Lastname = "Olise"
+	olise.Player.Age = 23
+	olise.Statistics = []apiFootballStatistic{{Games: apiFootballGames{Position: "Midfielder", Minutes: 2317}}}
+
+	target := domain.PlayerSyncTarget{ID: 13, Name: "M. Olise", Club: "Bayern Munich", Position: "FWD", Age: 23}
+	got, ok := bestPlayerMatch(target, []apiFootballPlayerEntry{olise})
+	if !ok || got.Player.ID != 19617 {
+		t.Errorf("Olise was rejected over an outfield position disagreement: ok=%v id=%d", ok, got.Player.ID)
+	}
+}

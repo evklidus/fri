@@ -871,6 +871,119 @@ func teamNameOverlap(needle, candidate string) int {
 	return overlap
 }
 
+// bestPlayerMatch picks the api-football entry that best corroborates one of
+// our roster players, or reports that none does.
+//
+// The old rule — first candidate whose name contains the search term — is
+// exactly how our goalkeeper "J. García" was bound to Eric García: both are
+// "garcia" at Barcelona, and Eric was returned first. Two signals settle it,
+// and both were being thrown away:
+//
+//   - the initial. Our roster writes "J. García", "E. Haaland", "M. Salah".
+//     If a candidate's first name starts with a different letter, it is not
+//     our player, full stop.
+//   - the position, which lives in the statistics rather than on the player
+//     object (api-football leaves player.position null).
+//
+// A candidate contradicted by either is rejected outright rather than scored
+// down: a defender is not a goalkeeper who had a bad season.
+func bestPlayerMatch(player domain.PlayerSyncTarget, candidates []apiFootballPlayerEntry) (apiFootballPlayerEntry, bool) {
+	needle := normalizeFootballName(player.Name)
+	initial := rosterInitial(player.Name)
+
+	var best apiFootballPlayerEntry
+	bestScore := 0
+
+	for _, item := range candidates {
+		firstname := normalizeFootballName(item.Player.Firstname)
+
+		// Contradicted initial: not our player.
+		if initial != "" && firstname != "" && !strings.HasPrefix(firstname, initial) {
+			continue
+		}
+
+		// Contradicted position: not our player either. Read from the club
+		// statistic, since that is the only place it is populated.
+		if player.Position != "" {
+			apiPosition := ""
+			for _, stat := range item.Statistics {
+				if pos := strings.TrimSpace(stat.Games.Position); pos != "" {
+					apiPosition = pos
+					break
+				}
+			}
+			if positionsContradict(apiPosition, player.Position) {
+				continue
+			}
+		}
+
+		score := 1
+		if initial != "" && strings.HasPrefix(firstname, initial) {
+			score += 3
+		}
+		if player.Position != "" {
+			apiPos := ""
+			for _, stat := range item.Statistics {
+				if pos := strings.TrimSpace(stat.Games.Position); pos != "" {
+					apiPos = pos
+					break
+				}
+			}
+			if apiPos != "" && positionGroup(apiPos) == positionGroup(player.Position) {
+				score += 2
+			}
+		}
+		if lastname := normalizeFootballName(item.Player.Lastname); lastname != "" && strings.Contains(needle, lastname) {
+			score += 3
+		}
+		if firstname != "" && strings.Contains(needle, firstname) {
+			score += 2
+		}
+		if strings.Contains(normalizeFootballName(item.Player.Name), playerSearchTerm(needle)) {
+			score += 2
+		}
+		if player.Age > 0 && item.Player.Age > 0 {
+			diff := item.Player.Age - player.Age
+			if diff < 0 {
+				diff = -diff
+			}
+			if diff <= 1 {
+				score += 2
+			}
+		}
+
+		if score > bestScore {
+			best, bestScore = item, score
+		}
+	}
+
+	// A bare 1 means the candidate survived the contradiction checks but
+	// nothing actually pointed at them; let the caller keep searching.
+	if bestScore <= 1 {
+		return apiFootballPlayerEntry{}, false
+	}
+	return best, true
+}
+
+// rosterInitial returns the lowercased first initial when our roster name
+// carries one ("J. García" -> "j"), and "" when the name leads with a full
+// word ("Vinicius Jr", "Pedri") — in that case there is no initial to check.
+func rosterInitial(name string) string {
+	fields := strings.Fields(strings.TrimSpace(name))
+	if len(fields) < 2 {
+		return ""
+	}
+	first := fields[0]
+	if !strings.HasSuffix(first, ".") {
+		return ""
+	}
+	letters := normalizeFootballName(strings.TrimSuffix(first, "."))
+	if len([]rune(letters)) != 1 {
+		return ""
+	}
+	return letters
+}
+
 func (p *apiFootballPerformanceProvider) findPlayer(ctx context.Context, player domain.PlayerSyncTarget, teamID int) (apiFootballPlayerEntry, error) {
 	info := p.currentSeasonForTeam(ctx, teamID)
 
@@ -894,22 +1007,19 @@ func (p *apiFootballPerformanceProvider) findPlayer(ctx context.Context, player 
 			continue
 		}
 
-		needle := normalizeFootballName(player.Name)
-		for _, item := range response.Response {
-			if lastname := normalizeFootballName(item.Player.Lastname); lastname != "" && strings.Contains(needle, lastname) {
-				return item, nil
-			}
-			if firstname := normalizeFootballName(item.Player.Firstname); firstname != "" && strings.Contains(needle, firstname) {
-				return item, nil
-			}
-			if strings.Contains(normalizeFootballName(item.Player.Name), playerSearchTerm(needle)) {
-				return item, nil
-			}
+		// Score the candidates instead of taking the first one whose name
+		// merely contains the search term. That rule matched "E. García"
+		// against a search for "garcia" when our roster said "J. García", and
+		// Eric happened to come first in the response.
+		if best, ok := bestPlayerMatch(player, response.Response); ok {
+			return best, nil
 		}
-		// The search hit something but nothing corroborated the name. Prefer
-		// the first entry only when this was our best guess; otherwise keep
-		// trying, since a weaker term may still land on the right player.
-		if searchTerm == playerSearchTerm(player.Name) {
+
+		// Nothing corroborated the name. Fall back to the first entry only
+		// when this was our best guess AND the search was unambiguous — with
+		// several candidates back, picking one at random is how the wrong
+		// García got in.
+		if searchTerm == playerSearchTerm(player.Name) && len(response.Response) == 1 {
 			return response.Response[0], nil
 		}
 	}
@@ -1347,11 +1457,19 @@ func selectClubStatistic(statistics []apiFootballStatistic, knownTeamID, knownLe
 // (matching position group OR age within ±3) plus minimal real-match activity
 // (at least one full match worth of minutes).
 func passesSanityCheck(player domain.PlayerSyncTarget, apiPlayer apiFootballPlayerEntry, stat apiFootballStatistic) bool {
-	hasPositionMatch := apiPlayer.Player.Position != "" && player.Position != "" &&
-		positionGroup(apiPlayer.Player.Position) == positionGroup(player.Position)
-	hasPositionMismatch := apiPlayer.Player.Position != "" && player.Position != "" &&
-		positionGroup(apiPlayer.Player.Position) != positionGroup(player.Position)
-	if hasPositionMismatch {
+	// Position comes from the statistic, not the player object: api-football
+	// returns player.position as null, so the old comparison was always
+	// between an empty string and ours and could never fail. That is how our
+	// goalkeeper "J. García" was matched to Eric García, a defender at the
+	// same club — the check fell through to age, 24 against 25, and passed.
+	apiPosition := strings.TrimSpace(stat.Games.Position)
+	if apiPosition == "" {
+		apiPosition = strings.TrimSpace(apiPlayer.Player.Position)
+	}
+
+	hasPositionMatch := apiPosition != "" && player.Position != "" &&
+		positionGroup(apiPosition) == positionGroup(player.Position)
+	if positionsContradict(apiPosition, player.Position) {
 		return false
 	}
 
@@ -1382,9 +1500,48 @@ func passesSanityCheck(player domain.PlayerSyncTarget, apiPlayer apiFootballPlay
 	return true
 }
 
+// positionsContradict reports whether two position labels describe people who
+// cannot be the same footballer.
+//
+// Neither extreme works. Rejecting every mismatch would have dropped four of
+// our best players onto synthetic data: api-football files Olise as a
+// Midfielder in every competition while our roster says FWD, Yamal is an
+// Attacker in La Liga and a Midfielder in the cups, Salah is both. Accepting
+// every mismatch lets a defender stand in for a striker of the same surname.
+//
+// The position groups sit on a line — GK, DEF, MID, ATT — and the useful rule
+// is distance along it. One step apart is ordinary disagreement about how to
+// describe the same player. Two or more is a different footballer: nobody is
+// an attacker here and a defender there.
+//
+// Goalkeeper is the exception to the arithmetic: any mismatch involving GK is
+// fatal regardless of distance. Nobody keeps goal in one competition and plays
+// out in another, which is exactly what separated our Joan García from
+// Barcelona's Eric García — one step apart on the line, and unmistakably two
+// different men.
+func positionsContradict(a, b string) bool {
+	rank := map[string]int{"GK": 0, "DEF": 1, "MID": 2, "ATT": 3}
+
+	ga, gb := positionGroup(a), positionGroup(b)
+	ra, okA := rank[ga]
+	rb, okB := rank[gb]
+	if !okA || !okB {
+		// One side is unknown ("OTHER" or empty) and decides nothing.
+		return false
+	}
+	if (ga == "GK") != (gb == "GK") {
+		return true
+	}
+	diff := ra - rb
+	if diff < 0 {
+		diff = -diff
+	}
+	return diff >= 2
+}
+
 func positionGroup(position string) string {
 	switch strings.ToUpper(strings.TrimSpace(position)) {
-	case "ST", "LW", "RW", "CF", "FW", "FWD", "F", "ATT", "ATTACKER":
+	case "ST", "LW", "RW", "CF", "FW", "FWD", "F", "ATT", "ATTACKER", "FORWARD", "STRIKER", "WINGER":
 		return "ATT"
 	case "AM", "CM", "DM", "MID", "M", "MF", "LM", "RM", "MIDFIELDER":
 		return "MID"
@@ -1636,6 +1793,11 @@ type apiFootballGames struct {
 	Appearances int    `json:"appearences"`
 	Minutes     int    `json:"minutes"`
 	Rating      string `json:"rating"`
+	// Position lives here, not on the player object: api-football returns
+	// player.position as null. We compared the empty one for months, which is
+	// how "J. García" (our goalkeeper) was matched to Eric García, a defender
+	// — the single signal that would have caught it was never populated.
+	Position string `json:"position"`
 }
 
 type apiFootballShots struct {
