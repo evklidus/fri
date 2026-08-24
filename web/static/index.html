@@ -360,18 +360,11 @@
   .pcard-top { position:relative; flex:1; display:flex; align-items:flex-end; justify-content:center; padding-top:18px; }
   .pcard-photo { width:132px; height:132px; border-radius:50%; object-fit:cover; object-position:center top;
                  border:3px solid rgba(255,255,255,0.18); background:rgba(255,255,255,0.06); }
-  .pcard-rank { position:absolute; top:12px; left:12px; width:30px; height:30px; border-radius:8px; background:#fff; color:#0a0a0a;
-                display:flex; align-items:center; justify-content:center; font-family:'Bebas Neue',sans-serif; font-size:19px; }
-  .pcard-fri { position:absolute; top:12px; right:12px; font-family:'Bebas Neue',sans-serif; font-size:26px; color:var(--gold); }
-  .pcard-new { position:absolute; top:52px; right:12px; font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px;
+  .pcard-new { position:absolute; top:12px; right:12px; font-family:'Space Mono',monospace; font-size:9px; letter-spacing:1.5px;
                background:var(--green); color:#062b12; padding:3px 7px; border-radius:4px; font-weight:700; }
   .pcard-body { padding:14px 16px 18px; text-align:center; }
   .pcard-name { font-family:'Bebas Neue',sans-serif; font-size:22px; line-height:1.05; letter-spacing:.5px; }
   .pcard-meta { font-size:11px; color:var(--muted); margin-top:5px; }
-  .pcard.locked .pcard-photo, .pcard.locked .pcard-name, .pcard.locked .pcard-meta { filter:blur(7px); opacity:.55; user-select:none; }
-  .pcard-lock { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:8px;
-                background:rgba(10,10,10,0.35); }
-  .pcard-lock span { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); text-align:center; }
 
   /* ── LOCKED NEWS CARDS ────────────────────────────────────────── */
   /* The article stays in the feed so the coverage is visibly there; the
@@ -727,7 +720,7 @@ const T = {
     auth_switch_signup:'Create one', auth_switch_signin:'Sign in',
     auth_err_generic:'Something went wrong. Try again.',
     lb_unlock:'Sign in to unlock', lb_unlock_sub:'The top five are reserved for registered users.',
-    cards_eye:'Featured', cards_title:'Top Players', cards_sub:'The ten highest-rated players right now. Newly tracked players are marked NEW.',
+    cards_eye:'Featured', cards_title:'Top Players', cards_sub:'The players drawing the most attention right now — big moves, breaking news, new arrivals.',
     card_new:'NEW',
     about_eye:'About Us', about_title:'What FRI Is',
     about_intro:'FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, media coverage, and character into one transparent number. Every component is computed from public data on a fixed schedule, and the formula below is the whole of it.',
@@ -780,7 +773,7 @@ const T = {
     auth_switch_signup:'Создать', auth_switch_signin:'Войти',
     auth_err_generic:'Что-то пошло не так. Попробуйте ещё раз.',
     lb_unlock:'Войдите, чтобы открыть', lb_unlock_sub:'Первая пятёрка доступна зарегистрированным пользователям.',
-    cards_eye:'Избранное', cards_title:'Лучшие игроки', cards_sub:'Десять игроков с наивысшим рейтингом. Новые игроки отмечены меткой NEW.',
+    cards_eye:'Избранное', cards_title:'Лучшие игроки', cards_sub:'Игроки, о которых говорят прямо сейчас: резкие движения рейтинга, свежие новости, новички.',
     card_new:'NEW',
     about_eye:'О проекте', about_title:'Что такое FRI',
     about_intro:'FRI — первый универсальный индекс репутации футболистов на основе данных: игровые показатели, влияние в соцсетях, медиаосвещение и характер сведены в одно прозрачное число. Каждый компонент считается из публичных данных по расписанию, а формула ниже — это всё, что за ним стоит.',
@@ -860,6 +853,11 @@ function setLang(l) {
 const players = [];
 
 const news = [];
+
+// The TOP PLAYERS showcase. Not a slice of `players` — it is chosen by
+// current interest rather than rank, and computed in live.js once both the
+// roster and the news feed have loaded.
+const showcasePlayers = [];
 
 // ── RENDER TABLE ──────────────────────────────────────────
 // Tier thresholds recalibrated 2026-05-15. The scale is FIFA-style: a top
@@ -987,30 +985,22 @@ function renderPlayerCards() {
   if (!grid) return;
   const t = T[lang];
   grid.innerHTML = '';
-  players.slice(0, 10).forEach((p, idx) => {
-    const rank = idx + 1;
+
+  // Fall back to the roster order only until the showcase has been computed,
+  // so the grid is never empty on first paint. Withheld players are filtered
+  // out in both paths: this section is deliberately unblurred, so anyone
+  // appearing here is someone the caller is allowed to see.
+  const source = (showcasePlayers.length ? showcasePlayers : players).filter(p => !p.locked);
+
+  source.slice(0, 6).forEach(p => {
     const card = document.createElement('div');
-    card.className = 'pcard' + (p.locked ? ' locked' : '');
-
-    if (p.locked) {
-      card.onclick = () => openAuth('register');
-      card.innerHTML = `
-        <div class="pcard-rank">${rank}</div>
-        <div class="pcard-top"><div class="pcard-photo"></div></div>
-        <div class="pcard-body"><div class="pcard-name">•••••</div><div class="pcard-meta">•••</div></div>
-        <div class="pcard-lock"><span>${t.lb_unlock}</span></div>`;
-      grid.appendChild(card);
-      return;
-    }
-
+    card.className = 'pcard';
     card.onclick = () => openModal(p);
     const photo = p.photo
       ? `<img class="pcard-photo" src="${escapeHtml(p.photo)}" alt="${escapeHtml(p.name)}" loading="lazy" />`
       : `<div class="pcard-photo" style="display:flex;align-items:center;justify-content:center;font-size:44px">${p.emoji}</div>`;
     const newTag = p.isNew ? `<div class="pcard-new">${t.card_new}</div>` : '';
     card.innerHTML = `
-      <div class="pcard-rank">${rank}</div>
-      <div class="pcard-fri">${p.fri}</div>
       ${newTag}
       <div class="pcard-top" style="background:linear-gradient(180deg,transparent,rgba(255,255,255,0.04))">${photo}</div>
       <div class="pcard-body">

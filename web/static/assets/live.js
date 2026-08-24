@@ -110,6 +110,56 @@
   // nothing except that the label is decorative.
   const NEW_BADGE_MAX_SHARE = 0.5;
 
+  // How many faces the showcase holds. Six fills the grid at every breakpoint
+  // without the row of stragglers ten produced on a narrow screen.
+  const SHOWCASE_SIZE = 6;
+
+  // The showcase answers "who is worth looking at right now", which is not the
+  // same question as the leaderboard's "who is best". Ranking it by FRI would
+  // make it a second, unlocked copy of the table.
+  //
+  // Three signals, each already in the payloads the main page loads:
+  //   buzz     — how much press the player is getting, from the news feed,
+  //              weighted by how much each article moved their score
+  //   momentum — how far their FRI just moved, either direction; a collapse is
+  //              as interesting as a surge
+  //   fresh    — recently added to the index
+  //
+  // Deliberately not a quality measure: a player having a terrible week
+  // belongs here. Note this rewards controversy, since impact magnitude counts
+  // regardless of sign — which is what "hyped" means.
+  function computeShowcase(mapped, newsItems) {
+    const articleWeight = new Map();
+    (newsItems || []).forEach((item) => {
+      const owner = item.player_id;
+      if (!owner) return;
+      const impact = Math.abs(Number(item.impact_delta || 0));
+      // Every article counts for something; a big score move counts for more.
+      articleWeight.set(owner, (articleWeight.get(owner) || 0) + 1 + impact);
+    });
+
+    const maxBuzz = Math.max(1, ...articleWeight.values());
+
+    const scored = mapped
+      // Withheld players never appear here. The showcase is unblurred by
+      // design, so including them would hand over the top five the
+      // leaderboard withholds.
+      .filter((p) => !p.locked)
+      .map((p) => {
+        const buzz = (articleWeight.get(p.id) || 0) / maxBuzz;
+        const momentum = Math.min(1, Math.abs(Number(p.trend || 0)) / 5);
+        const fresh = p.isNew ? 1 : 0;
+        return { player: p, hype: buzz * 0.6 + momentum * 0.3 + fresh * 0.1 };
+      })
+      .sort((a, b) => b.hype - a.hype);
+
+    // On a quiet news day every buzz is 0 and the ordering collapses onto
+    // momentum alone, which can leave near-ties in an arbitrary order. That is
+    // acceptable — the grid still shows real players — but it does mean the
+    // showcase is not stable minute to minute by design.
+    return scored.slice(0, SHOWCASE_SIZE).map((entry) => entry.player);
+  }
+
   async function loadPlayers() {
     const payload = await fetchJSON("/api/players");
     state.players = Array.isArray(payload.data) ? payload.data : [];
@@ -123,12 +173,23 @@
     }
 
     players.splice(0, players.length, ...mapped);
+    refreshShowcase();
+  }
+
+  // The showcase joins players against news, so it can only be built once both
+  // have landed. Both loaders call this; whichever finishes second wins.
+  function refreshShowcase() {
+    const mapped = players.slice();
+    if (!mapped.length) return;
+    const showcase = computeShowcase(mapped, state.news);
+    showcasePlayers.splice(0, showcasePlayers.length, ...showcase);
   }
 
   async function loadNews() {
     const payload = await fetchJSON("/api/news/feed");
     state.news = Array.isArray(payload.data) ? payload.data : [];
     news.splice(0, news.length, ...state.news.map(toLegacyNews));
+    refreshShowcase();
   }
 
   // Modal-only data: history + per-player news. Returns plain arrays so the
@@ -458,8 +519,10 @@
     return `${minutes}m`;
   }
 
-  // Refresh the events feed every 60s so live votes / new events surface
-  // without a page reload. Lightweight — 1 GET per minute.
+  // Refresh the events feed every 60s so live votes and new events surface
+  // without a page reload. loadEventsFeed returns early when #events-feed is
+  // absent, which is now most of the time — the events section lives on its
+  // own route — so this costs one GET a minute only while that page is open.
   setInterval(loadEventsFeed, 60_000);
 
   function getPollSelect() {
