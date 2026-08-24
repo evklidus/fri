@@ -458,3 +458,52 @@ func maskLockedEvents(events []domain.PendingEvent, locked map[int64]bool, locke
 	}
 	return masked
 }
+
+// RosterAdminService is the add-player surface. Separate from the main
+// Service interface so router tests that don't exercise it need not implement
+// it.
+type RosterAdminService interface {
+	AddPlayer(ctx context.Context, input domain.AddPlayerInput) (*domain.PlayerWithScore, error)
+}
+
+func (h *Router) addPlayer(c *gin.Context) {
+	roster, ok := h.svc.(RosterAdminService)
+	if !ok {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "roster management unavailable"})
+		return
+	}
+
+	var input domain.AddPlayerInput
+	if err := c.ShouldBindJSON(&input); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		return
+	}
+
+	player, err := roster.AddPlayer(c.Request.Context(), input)
+	if err == nil {
+		c.JSON(http.StatusCreated, gin.H{"data": player})
+		return
+	}
+
+	// Several people match: hand back the candidates and let the operator pick
+	// by provider id. Answering with a guess is how the wrong García got in.
+	var ambiguous *service.AmbiguousPlayerError
+	if errors.As(err, &ambiguous) {
+		c.JSON(http.StatusConflict, gin.H{
+			"error":      "several players match — repeat the request with provider_player_id",
+			"candidates": ambiguous.Candidates,
+		})
+		return
+	}
+
+	switch {
+	case errors.Is(err, service.ErrPlayerExists):
+		c.JSON(http.StatusConflict, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrPlayerNotFound), errors.Is(err, service.ErrClubUnknown):
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+	case errors.Is(err, service.ErrProviderRequired):
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": err.Error()})
+	default:
+		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+}

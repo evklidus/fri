@@ -402,3 +402,41 @@ type Credentials struct {
 	Email    string `json:"email"`
 	Password string `json:"password"`
 }
+
+// AddPlayerInput is the request body for POST /api/players.
+//
+// Name and club are all an operator should have to know: everything else —
+// position, birth date, portrait — is read from the provider, which knows it
+// better. Position here is a filter for disambiguation, never stored as given:
+// a hand-typed "GK" is precisely what let a defender masquerade as our
+// goalkeeper for weeks.
+type AddPlayerInput struct {
+	Name string `json:"name"`
+	Club string `json:"club"`
+	// ProviderPlayerID pins the choice when a club fields two players who
+	// answer to the same surname. It is the only unambiguous key there is.
+	ProviderPlayerID int    `json:"provider_player_id,omitempty"`
+	Position         string `json:"position,omitempty"`
+}
+
+// PlayerCandidate is one possible match for an add request, returned when the
+// name alone doesn't pick out a single player.
+type PlayerCandidate struct {
+	ProviderPlayerID int    `json:"provider_player_id"`
+	Name             string `json:"name"`
+	FullName         string `json:"full_name"`
+	Position         string `json:"position"`
+	Age              int    `json:"age"`
+	PhotoURL         string `json:"photo_url"`
+}
+
+// ResolvedPlayer is a provider record confirmed to be one specific footballer.
+type ResolvedPlayer struct {
+	ProviderPlayerID int
+	ProviderTeamID   int
+	Name             string
+	Position         string
+	BirthDate        *time.Time
+	PhotoURL         string
+	Age              int
+}

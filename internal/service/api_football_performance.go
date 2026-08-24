@@ -2025,3 +2025,127 @@ type apiFootballTrophyEntry struct {
 	Season  string `json:"season"`
 	Place   string `json:"place"`
 }
+
+// ResolvePlayer identifies one footballer at one club, for the add-player
+// flow. It is deliberately stricter than the sync path: a sync that guesses
+// wrong self-heals on the next run, but a bad identity captured here is
+// written into the roster and pinned as an external id, so it persists.
+//
+// When the name picks out several people it returns them all rather than
+// choosing. Choosing is what bound our goalkeeper to Barcelona's defender.
+func (p *apiFootballPerformanceProvider) ResolvePlayer(ctx context.Context, name, club string, providerPlayerID int, position string) (domain.ResolvedPlayer, error) {
+	team, err := p.findTeam(ctx, club)
+	if err != nil {
+		return domain.ResolvedPlayer{}, fmt.Errorf("%w: %s", ErrClubUnknown, club)
+	}
+	info := p.currentSeasonForTeam(ctx, team.ID)
+
+	// Pinned by id: fetch that player directly and confirm they are at this
+	// club, so a mistyped id can't attach someone from another squad.
+	if providerPlayerID > 0 {
+		entry, err := p.fetchPlayerByID(ctx, providerPlayerID, info.Season)
+		if err != nil {
+			return domain.ResolvedPlayer{}, fmt.Errorf("%w: provider id %d", ErrPlayerNotFound, providerPlayerID)
+		}
+		if !playsForTeam(entry, team.ID) {
+			return domain.ResolvedPlayer{}, fmt.Errorf("%w: provider id %d is not at %s", ErrPlayerNotFound, providerPlayerID, club)
+		}
+		return resolvedFromEntry(entry, team.ID), nil
+	}
+
+	seen := make(map[int]bool)
+	candidates := make([]apiFootballPlayerEntry, 0, 4)
+	for _, term := range playerSearchTerms(name) {
+		params := url.Values{
+			"team":   []string{strconv.Itoa(team.ID)},
+			"season": []string{strconv.Itoa(info.Season)},
+			"search": []string{term},
+		}
+		var response apiFootballPlayersResponse
+		if err := p.get(ctx, "/players", params, &response); err != nil {
+			return domain.ResolvedPlayer{}, err
+		}
+		if hasAPIFootballErrors(response.Errors) {
+			return domain.ResolvedPlayer{}, fmt.Errorf("api-football players error: %s", string(response.Errors))
+		}
+		for _, item := range response.Response {
+			if item.Player.ID == 0 || seen[item.Player.ID] {
+				continue
+			}
+			// An explicitly requested position narrows the field, but only by
+			// discarding people it plainly contradicts.
+			if position != "" && positionsContradict(entryPosition(item), position) {
+				continue
+			}
+			seen[item.Player.ID] = true
+			candidates = append(candidates, item)
+		}
+		if len(candidates) > 0 {
+			// The first term that finds anybody is the most specific one;
+			// widening further only adds noise.
+			break
+		}
+	}
+
+	switch len(candidates) {
+	case 0:
+		return domain.ResolvedPlayer{}, fmt.Errorf("%w: %q at %s", ErrPlayerNotFound, name, club)
+	case 1:
+		return resolvedFromEntry(candidates[0], team.ID), nil
+	}
+
+	out := make([]domain.PlayerCandidate, 0, len(candidates))
+	for _, item := range candidates {
+		out = append(out, domain.PlayerCandidate{
+			ProviderPlayerID: item.Player.ID,
+			Name:             item.Player.Name,
+			FullName:         strings.TrimSpace(item.Player.Firstname + " " + item.Player.Lastname),
+			Position:         entryPosition(item),
+			Age:              item.Player.Age,
+			PhotoURL:         item.Player.Photo,
+		})
+	}
+	return domain.ResolvedPlayer{}, &AmbiguousPlayerError{Candidates: out}
+}
+
+// entryPosition digs the position out of the statistics, where api-football
+// actually puts it — player.position is null in every response we have seen.
+func entryPosition(entry apiFootballPlayerEntry) string {
+	for _, stat := range entry.Statistics {
+		if pos := strings.TrimSpace(stat.Games.Position); pos != "" {
+			return pos
+		}
+	}
+	return strings.TrimSpace(entry.Player.Position)
+}
+
+func playsForTeam(entry apiFootballPlayerEntry, teamID int) bool {
+	for _, stat := range entry.Statistics {
+		if stat.Team.ID == teamID {
+			return true
+		}
+	}
+	return false
+}
+
+func resolvedFromEntry(entry apiFootballPlayerEntry, teamID int) domain.ResolvedPlayer {
+	resolved := domain.ResolvedPlayer{
+		ProviderPlayerID: entry.Player.ID,
+		ProviderTeamID:   teamID,
+		Name:             entry.Player.Name,
+		Position:         entryPosition(entry),
+		PhotoURL:         strings.TrimSpace(entry.Player.Photo),
+		Age:              entry.Player.Age,
+	}
+	if raw := strings.TrimSpace(entry.Player.Birth.Date); raw != "" {
+		if born, err := time.Parse("2006-01-02", raw); err == nil {
+			resolved.BirthDate = &born
+			// Prefer the age we can compute over the one the provider states:
+			// a stored age is only true until the next birthday.
+			if derived := domain.AgeFromBirthDate(&born, time.Now().UTC()); derived > 0 {
+				resolved.Age = derived
+			}
+		}
+	}
+	return resolved
+}

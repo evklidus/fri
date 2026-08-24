@@ -79,6 +79,7 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		// news deletion landed, empty the feed.
 		admin := api.Group("", handler.requireAdmin)
 		{
+			admin.POST("/players", handler.addPlayer)
 			admin.DELETE("/news/:id", handler.deleteNewsItem)
 			admin.POST("/sync/finalize-events", handler.runFinalizeEvents)
 			admin.POST("/sync/career-baseline", handler.runCareerBaselineSync)
