@@ -262,34 +262,43 @@ func (h *Router) deleteNewsItem(c *gin.Context) {
 // an account. The top of the table is the part worth signing up to see.
 const lockedTopN = 5
 
-// maskLockedPlayers blanks the identifying and scoring fields of the top N
-// entries for anonymous callers.
+// maskLockedPlayers withholds the top places from anonymous callers.
 //
-// This has to happen server-side. Blurring in CSS would leave the real names
-// and scores sitting in the JSON, one devtools tab away — which is both a
-// hollow gate and an embarrassing one to have pointed out. The rows are kept
-// (so the table still shows there are five places above) but carry nothing
-// beyond their rank and a Locked flag.
+// It masks by identity, not by position in the slice handed to it. Masking
+// indices 0..4 of a *filtered* result turned the filters into an oracle:
+// ?club=Real+Madrid returned three rows where only one Real Madrid player was
+// nameable, so exactly two of the withheld five played for Real Madrid, and
+// sweeping clubs and positions reconstructed every hidden slot. ?search=Mbappé
+// answered the membership question outright.
 //
-// The caller must pass players already sorted by FRI descending, which is
-// what ListPlayers returns.
-func maskLockedPlayers(players []domain.PlayerWithScore, signedIn bool) []domain.PlayerWithScore {
+// So the withheld set is computed once from the unfiltered roster and matched
+// by id. `filtered` says whether the caller narrowed the list: on the plain
+// leaderboard the placeholder rows stay, because the ranks above are part of
+// what the page is showing. On a filtered request they are dropped entirely —
+// a blank row there would still answer "how many of your hidden five match
+// this club", which is the question we are refusing.
+//
+// This has to happen server-side. Blurring in CSS would leave the names and
+// scores in the JSON one devtools tab away.
+func maskLockedPlayers(players []domain.PlayerWithScore, locked map[int64]bool, signedIn, filtered bool) []domain.PlayerWithScore {
 	if signedIn || len(players) == 0 {
 		return players
 	}
-	masked := make([]domain.PlayerWithScore, len(players))
-	copy(masked, players)
-	for i := range masked {
-		if i >= lockedTopN {
-			break
+	masked := make([]domain.PlayerWithScore, 0, len(players))
+	for _, p := range players {
+		if !locked[p.ID] {
+			masked = append(masked, p)
+			continue
 		}
-		// Replace the row wholesale rather than blanking field by field. The
-		// first version listed the fields to clear and missed Slug, which is
-		// built from the player's name — "l-yamal" sitting in a masked row
-		// named him as plainly as the name field would have. Rebuilding from
-		// an empty struct means a field added later is withheld by default
-		// instead of leaking until someone remembers to add it here.
-		masked[i] = domain.PlayerWithScore{Locked: true}
+		if filtered {
+			continue
+		}
+		// Rebuild from an empty struct rather than clearing a list of fields.
+		// The first version cleared by hand and missed Slug — which is built
+		// from the player's name, so "l-yamal" sat in a row meant to hide
+		// them. Starting from zero means a field added to the model later is
+		// withheld by default instead of leaking until someone remembers it.
+		masked = append(masked, domain.PlayerWithScore{Locked: true})
 	}
 	return masked
 }
@@ -310,6 +319,46 @@ func lockedPlayerIDs(players []domain.PlayerWithScore) map[int64]bool {
 	return locked
 }
 
+// lockedPlayerNames mirrors lockedPlayerIDs for the places that only have a
+// name to go on. news_items keeps a denormalized player_name beside the
+// foreign key, and the key is only set when the seed matched a name exactly —
+// so an article can name a withheld player while its player_id is NULL, and a
+// mask keyed on the id alone waves it straight through.
+func lockedPlayerNames(players []domain.PlayerWithScore) map[string]bool {
+	locked := make(map[string]bool, lockedTopN)
+	for i, p := range players {
+		if i >= lockedTopN {
+			break
+		}
+		if key := normalizePlayerKey(p.Name); key != "" {
+			locked[key] = true
+		}
+	}
+	return locked
+}
+
+// normalizePlayerKey lowercases, folds the diacritics our roster actually
+// contains and drops punctuation, so "K. Mbappé" and "k mbappe" compare equal.
+func normalizePlayerKey(name string) string {
+	name = strings.ToLower(strings.TrimSpace(name))
+	replacer := strings.NewReplacer(
+		"á", "a", "à", "a", "â", "a", "ä", "a", "ã", "a", "å", "a",
+		"é", "e", "è", "e", "ê", "e", "ë", "e",
+		"í", "i", "ì", "i", "î", "i", "ï", "i",
+		"ó", "o", "ò", "o", "ô", "o", "ö", "o", "õ", "o",
+		"ú", "u", "ù", "u", "û", "u", "ü", "u",
+		"ñ", "n", "ç", "c", "š", "s", "ć", "c", "č", "c", "ž", "z",
+		".", " ", "-", " ", "'", " ", "’", " ",
+	)
+	return strings.Join(strings.Fields(replacer.Replace(name)), " ")
+}
+
+// ErrGateUnavailable is returned when the withheld set can't be established —
+// an empty roster, typically mid-seed. Callers answer 503 rather than serving
+// an ungated response: "we could not work out what to hide" must never quietly
+// become "nothing is hidden".
+var ErrGateUnavailable = errors.New("cannot establish leaderboard gate")
+
 // maskLockedNews blanks the identifying parts of articles about withheld
 // players. The article stays in the feed — the point is to show that coverage
 // exists and is being scored, not to hide that there is news — but the player,
@@ -318,26 +367,32 @@ func lockedPlayerIDs(players []domain.PlayerWithScore) map[int64]bool {
 //
 // The impact delta stays: it carries no identity and it is the part that makes
 // the case for signing up.
-func maskLockedNews(items []domain.NewsItem, locked map[int64]bool, signedIn bool) []domain.NewsItem {
-	if signedIn || len(locked) == 0 {
+func maskLockedNews(items []domain.NewsItem, locked map[int64]bool, lockedNames map[string]bool, signedIn bool) []domain.NewsItem {
+	if signedIn {
 		return items
 	}
 	masked := make([]domain.NewsItem, len(items))
 	copy(masked, items)
 	for i := range masked {
-		n := &masked[i]
-		if n.PlayerID == nil || !locked[*n.PlayerID] {
+		n := masked[i]
+		byID := n.PlayerID != nil && locked[*n.PlayerID]
+		byName := lockedNames[normalizePlayerKey(n.PlayerName)]
+		if !byID && !byName {
 			continue
 		}
-		n.Locked = true
-		n.PlayerID = nil
-		n.PlayerName = ""
-		n.TitleEN = ""
-		n.TitleRU = ""
-		n.SummaryEN = ""
-		n.SummaryRU = ""
-		n.Source = ""
-		n.SourceURL = ""
+		// Rebuild from an empty struct rather than clearing fields one by
+		// one. The player mask learned this the hard way — its denylist
+		// missed Slug — and the same applies here: published_at with an
+		// impact_delta is a fingerprint that identifies the article, and so
+		// the player, in one search.
+		masked[i] = domain.NewsItem{
+			Locked: true,
+			ID:     n.ID,
+			// The delta is what makes the case for signing up and names
+			// nobody. The impact type keeps the card's colour honest.
+			ImpactType:  n.ImpactType,
+			ImpactDelta: n.ImpactDelta,
+		}
 	}
 	return masked
 }
@@ -358,6 +413,13 @@ func (h *Router) lockedForCaller(c *gin.Context, playerID int64) (bool, error) {
 	if err != nil {
 		return false, err
 	}
+	if len(players) == 0 {
+		// An empty roster means we could not work out what to withhold — a
+		// seed running mid-request truncates the table inside its
+		// transaction. Treating that as "nothing is locked" would swing the
+		// gate wide open exactly when the data is in flux.
+		return false, ErrGateUnavailable
+	}
 	return lockedPlayerIDs(players)[playerID], nil
 }
 
@@ -371,22 +433,28 @@ func abortLocked(c *gin.Context) {
 // maskLockedEvents blanks the identity carried by pending rating events. The
 // event itself stays votable-looking, but PlayerName and NewsTitle both name
 // the player outright.
-func maskLockedEvents(events []domain.PendingEvent, locked map[int64]bool, signedIn bool) []domain.PendingEvent {
-	if signedIn || len(locked) == 0 {
+func maskLockedEvents(events []domain.PendingEvent, locked map[int64]bool, lockedNames map[string]bool, signedIn bool) []domain.PendingEvent {
+	if signedIn {
 		return events
 	}
 	masked := make([]domain.PendingEvent, len(events))
 	copy(masked, events)
 	for i := range masked {
-		e := &masked[i]
-		if !locked[e.PlayerID] {
+		e := masked[i]
+		if !locked[e.PlayerID] && !lockedNames[normalizePlayerKey(e.PlayerName)] {
 			continue
 		}
-		e.Locked = true
-		e.PlayerID = 0
-		e.PlayerName = ""
-		e.NewsTitle = ""
-		e.NewsItemID = nil
+		// Keep only what a vote needs. trigger_word is dropped along with the
+		// name: "doping" or "hat_trick" against a withheld place narrows the
+		// player as effectively as naming them.
+		masked[i] = domain.PendingEvent{
+			Locked:         true,
+			ID:             e.ID,
+			ProposedDelta:  e.ProposedDelta,
+			VotesCount:     e.VotesCount,
+			VotesMedian:    e.VotesMedian,
+			VotingClosesAt: e.VotingClosesAt,
+		}
 	}
 	return masked
 }

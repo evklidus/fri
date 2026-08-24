@@ -236,6 +236,15 @@ func TestListPlayersReturns500OnError(t *testing.T) {
 
 func TestGetPlayer404OnNotFound(t *testing.T) {
 	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			// The gate consults the roster to decide whether the requested id
+			// is withheld, and an empty roster now fails closed by design.
+			var top domain.PlayerWithScore
+			top.ID = 1
+			top.Name = "Someone Else"
+			top.FRI = 99
+			return []domain.PlayerWithScore{top}, nil
+		},
 		getPlayerFn: func(_ context.Context, id int64) (*domain.PlayerWithScore, error) {
 			return nil, errors.New("not found")
 		},
@@ -271,6 +280,15 @@ func TestSubmitVoteHappyPath(t *testing.T) {
 	var gotPlayerID int64
 	var gotInput domain.VoteInput
 	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			// The vote endpoint now checks whether the target is withheld, so
+			// the fake needs a roster; an empty one fails closed by design.
+			var other domain.PlayerWithScore
+			other.ID = 999
+			other.Name = "Someone Else"
+			other.FRI = 99
+			return []domain.PlayerWithScore{other}, nil
+		},
 		submitVoteFn: func(_ context.Context, id int64, input domain.VoteInput, _ string) (*domain.Score, error) {
 			gotPlayerID = id
 			gotInput = input
@@ -313,6 +331,15 @@ func TestSubmitVote400OnInvalidJSON(t *testing.T) {
 
 func TestSubmitVote429OnRateLimitError(t *testing.T) {
 	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			// The vote endpoint now checks whether the target is withheld, so
+			// the fake needs a roster; an empty one fails closed by design.
+			var other domain.PlayerWithScore
+			other.ID = 999
+			other.Name = "Someone Else"
+			other.FRI = 99
+			return []domain.PlayerWithScore{other}, nil
+		},
 		submitVoteFn: func(context.Context, int64, domain.VoteInput, string) (*domain.Score, error) {
 			return nil, errors.New("vote rate limit: already voted for this player in the last 24h")
 		},
@@ -333,6 +360,15 @@ func TestSubmitVote429OnRateLimitError(t *testing.T) {
 
 func TestSubmitVote400OnServiceValidationError(t *testing.T) {
 	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			// The vote endpoint now checks whether the target is withheld, so
+			// the fake needs a roster; an empty one fails closed by design.
+			var other domain.PlayerWithScore
+			other.ID = 999
+			other.Name = "Someone Else"
+			other.FRI = 99
+			return []domain.PlayerWithScore{other}, nil
+		},
 		submitVoteFn: func(context.Context, int64, domain.VoteInput, string) (*domain.Score, error) {
 			return nil, errors.New("rating_overall must be between 1 and 5")
 		},
@@ -427,6 +463,15 @@ func TestListNewsFeedPassesNilPlayerID(t *testing.T) {
 func TestPlayerNewsScopedToPlayer(t *testing.T) {
 	var gotPlayerID *int64
 	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			// The per-player gate needs a roster to decide what is withheld;
+			// an empty one now fails closed by design.
+			var top domain.PlayerWithScore
+			top.ID = 999
+			top.Name = "Someone Else"
+			top.FRI = 99
+			return []domain.PlayerWithScore{top}, nil
+		},
 		listNewsFn: func(_ context.Context, playerID *int64) ([]domain.NewsItem, error) {
 			gotPlayerID = playerID
 			return []domain.NewsItem{}, nil
@@ -772,7 +817,7 @@ func TestMaskedRowCarriesNothingIdentifying(t *testing.T) {
 	p.PhotoURL = "https://media.example.com/762.png"
 	p.FRI = 85.2
 
-	masked := maskLockedPlayers([]domain.PlayerWithScore{p}, false)
+	masked := maskLockedPlayers([]domain.PlayerWithScore{p}, map[int64]bool{p.ID: true}, false, false)
 	got := masked[0]
 
 	if !got.Locked {
@@ -781,5 +826,186 @@ func TestMaskedRowCarriesNothingIdentifying(t *testing.T) {
 	if got.ID != 0 || got.Slug != "" || got.Name != "" || got.Club != "" ||
 		got.ThemeBackground != "" || got.PhotoURL != "" || got.FRI != 0 {
 		t.Errorf("masked row still carries data: %+v", got)
+	}
+}
+
+func TestFiltersAreNotAnOracleForWithheldPlayers(t *testing.T) {
+	// Masking by index into a *filtered* result made the filters an oracle:
+	// ?club=Real+Madrid returned three rows where only one Real Madrid player
+	// was nameable, so exactly two of the withheld five played there, and
+	// sweeping clubs reconstructed the hidden slots. A filtered response must
+	// therefore be identical whether or not its matches happen to be withheld.
+	all := make([]domain.PlayerWithScore, 0, 8)
+	for i := 0; i < 8; i++ {
+		var p domain.PlayerWithScore
+		p.ID = int64(i + 1)
+		p.Name = "Player " + strconv.Itoa(i+1)
+		p.Club = "Visible FC"
+		p.FRI = float64(90 - i)
+		all = append(all, p)
+	}
+	// Ranks 1 and 2 (withheld) plus rank 8 (visible) share a club.
+	all[0].Club, all[1].Club, all[7].Club = "Secret FC", "Secret FC", "Secret FC"
+
+	fake := &fakeService{
+		listPlayersFn: func(_ context.Context, search, position, club string) ([]domain.PlayerWithScore, error) {
+			if club == "" && search == "" && position == "" {
+				return all, nil
+			}
+			out := make([]domain.PlayerWithScore, 0, len(all))
+			for _, p := range all {
+				if club != "" && p.Club != club {
+					continue
+				}
+				if search != "" && !strings.Contains(strings.ToLower(p.Name), strings.ToLower(search)) {
+					continue
+				}
+				out = append(out, p)
+			}
+			return out, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	get := func(query string) []domain.PlayerWithScore {
+		resp, err := stdhttp.Get(server.URL + "/api/players" + query)
+		if err != nil {
+			t.Fatalf("get %s: %v", query, err)
+		}
+		body, _ := readBody(resp)
+		var payload struct {
+			Data []domain.PlayerWithScore `json:"data"`
+		}
+		decode(t, body, &payload)
+		for _, p := range payload.Data {
+			if p.Locked {
+				t.Errorf("%s: a filtered response returned a placeholder row — its presence still counts the withheld matches", query)
+			}
+		}
+		return payload.Data
+	}
+
+	// Three players are at Secret FC but two of them are withheld: the
+	// anonymous caller must see exactly the one they are allowed to see.
+	if got := get("?club=Secret+FC"); len(got) != 1 || got[0].Name != "Player 8" {
+		names := make([]string, 0, len(got))
+		for _, p := range got {
+			names = append(names, p.Name)
+		}
+		t.Errorf("club filter returned %v, want just [Player 8]", names)
+	}
+
+	// Searching a withheld player by name must not confirm they exist.
+	if got := get("?search=Player+1"); len(got) != 0 {
+		t.Errorf("search for a withheld player returned %d rows, want 0 — a non-empty answer confirms membership", len(got))
+	}
+
+	// The unfiltered leaderboard still shows the ranks, as placeholders.
+	resp, err := stdhttp.Get(server.URL + "/api/players")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+	var payload struct {
+		Data []domain.PlayerWithScore `json:"data"`
+	}
+	decode(t, body, &payload)
+	if len(payload.Data) != len(all) {
+		t.Errorf("unfiltered response has %d rows, want %d — the withheld ranks stay visible as placeholders", len(payload.Data), len(all))
+	}
+}
+
+func TestVoteIsWriteOnlyAndGated(t *testing.T) {
+	// The legacy vote endpoint answered with the recomputed score, so a single
+	// throwaway vote read back a withheld player's full breakdown.
+	players := []domain.PlayerWithScore{}
+	for i := 0; i < 8; i++ {
+		var p domain.PlayerWithScore
+		p.ID = int64(i + 1)
+		p.Name = "Player " + strconv.Itoa(i+1)
+		p.FRI = float64(90 - i)
+		players = append(players, p)
+	}
+	voted := 0
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return players, nil
+		},
+		submitVoteFn: func(context.Context, int64, domain.VoteInput, string) (*domain.Score, error) {
+			voted++
+			return &domain.Score{PlayerID: 1, FRI: 91, Performance: 93}, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	body := `{"rating_overall":5,"rating_hype":8,"opinion":"world_class","behavior":"role_model"}`
+
+	// Withheld player: refused, and the write must not happen either.
+	resp, err := stdhttp.Post(server.URL+"/api/players/1/vote", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != stdhttp.StatusNotFound {
+		t.Errorf("vote on a withheld player: status = %d, want 404", resp.StatusCode)
+	}
+	if voted != 0 {
+		t.Error("a vote against a withheld player was recorded — an anonymous caller can nudge a hidden score")
+	}
+
+	// Visible player: accepted, but the response carries no score.
+	resp, err = stdhttp.Post(server.URL+"/api/players/7/vote", "application/json", strings.NewReader(body))
+	if err != nil {
+		t.Fatalf("post: %v", err)
+	}
+	respBody, _ := readBody(resp)
+	if resp.StatusCode != stdhttp.StatusCreated {
+		t.Fatalf("vote on a visible player: status = %d, want 201 (%s)", resp.StatusCode, respBody)
+	}
+	for _, leaked := range []string{"\"fri\"", "\"performance\"", "91", "93"} {
+		if bytes.Contains(respBody, []byte(leaked)) {
+			t.Errorf("vote response echoes the score (%s): %s", leaked, respBody)
+		}
+	}
+}
+
+func TestNewsMaskCatchesArticlesWithoutAPlayerID(t *testing.T) {
+	// news_items keeps a denormalized player_name beside the foreign key, and
+	// the seed only sets the key on an exact name match — so an article can
+	// name a withheld player with player_id NULL. A mask keyed on the id alone
+	// waves those straight through.
+	var top domain.PlayerWithScore
+	top.ID = 1
+	top.Name = "K. Mbappé"
+	top.FRI = 91
+
+	fake := &fakeService{
+		listPlayersFn: func(context.Context, string, string, string) ([]domain.PlayerWithScore, error) {
+			return []domain.PlayerWithScore{top}, nil
+		},
+		listNewsFn: func(context.Context, *int64) ([]domain.NewsItem, error) {
+			return []domain.NewsItem{{
+				ID:         11,
+				PlayerID:   nil, // no foreign key — only the name says who this is
+				PlayerName: "K. Mbappé",
+				TitleEN:    "Mbappé scores hat-trick",
+				SourceURL:  "https://espn.com/k-mbappe-hat-trick",
+			}}, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp, err := stdhttp.Get(server.URL + "/api/news/feed")
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	body, _ := readBody(resp)
+	for _, needle := range []string{"Mbappé", "Mbappe", "hat-trick", "k-mbappe"} {
+		if bytes.Contains(body, []byte(needle)) {
+			t.Errorf("news feed leaked %q for an article with a null player_id: %s", needle, body)
+		}
 	}
 }

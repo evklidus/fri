@@ -103,16 +103,45 @@ func (r *Router) health(c *gin.Context) {
 }
 
 func (r *Router) listPlayers(c *gin.Context) {
+	// The top places are the reason to create an account, so they are
+	// withheld rather than merely blurred — see maskLockedPlayers.
+	_, signedIn := r.currentUser(c)
+	filtered := c.Query("search") != "" || c.Query("position") != "" || c.Query("club") != ""
+
+	// Establish the gate before fetching what was asked for. The withheld set
+	// must come from the unfiltered roster: deciding it from the filtered
+	// slice is what turned the filters into an oracle.
+	var locked map[int64]bool
+	if !signedIn {
+		roster := []domain.PlayerWithScore(nil)
+		if filtered {
+			var err error
+			roster, err = r.svc.ListPlayers(c.Request.Context(), "", "", "")
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+				return
+			}
+			if len(roster) == 0 {
+				c.JSON(http.StatusServiceUnavailable, gin.H{"error": "temporarily unavailable"})
+				return
+			}
+			locked = lockedPlayerIDs(roster)
+		}
+	}
+
 	players, err := r.svc.ListPlayers(c.Request.Context(), c.Query("search"), c.Query("position"), c.Query("club"))
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	// The top places are the reason to create an account, so they are
-	// withheld rather than merely blurred — see maskLockedPlayers.
-	_, signedIn := r.currentUser(c)
-	players = maskLockedPlayers(players, signedIn)
+	if !signedIn {
+		// Unfiltered request: the list we just fetched is the roster.
+		if locked == nil {
+			locked = lockedPlayerIDs(players)
+		}
+		players = maskLockedPlayers(players, locked, false, filtered)
+	}
 
 	c.JSON(http.StatusOK, gin.H{
 		"data": players,
@@ -219,7 +248,11 @@ func (r *Router) listNewsFeed(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
-		items = maskLockedNews(items, lockedPlayerIDs(players), false)
+		if len(players) == 0 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "temporarily unavailable"})
+			return
+		}
+		items = maskLockedNews(items, lockedPlayerIDs(players), lockedPlayerNames(players), false)
 	}
 
 	c.JSON(http.StatusOK, gin.H{
@@ -240,8 +273,22 @@ func (r *Router) submitVote(c *gin.Context) {
 		return
 	}
 
-	score, err := r.svc.SubmitVote(c.Request.Context(), playerID, payload, c.ClientIP())
+	// A write must not double as a read. This endpoint returned the freshly
+	// recomputed score, so one throwaway vote against a withheld player's id
+	// handed back their full breakdown — the exact thing the gate withholds,
+	// and the per-IP cooldown was no help because a single request sufficed.
+	// It also let an anonymous caller nudge a hidden player's score.
+	locked, err := r.lockedForCaller(c, playerID)
 	if err != nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "temporarily unavailable"})
+		return
+	}
+	if locked {
+		abortLocked(c)
+		return
+	}
+
+	if _, err := r.svc.SubmitVote(c.Request.Context(), playerID, payload, c.ClientIP()); err != nil {
 		// Rate-limit errors get 429 so the frontend can show a cooldown UI.
 		if strings.Contains(err.Error(), "rate limit") {
 			c.JSON(http.StatusTooManyRequests, gin.H{"error": err.Error()})
@@ -251,7 +298,8 @@ func (r *Router) submitVote(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, gin.H{"data": score})
+	// Acknowledge without echoing the score back.
+	c.JSON(http.StatusCreated, gin.H{"data": gin.H{"recorded": true}})
 }
 
 func (r *Router) listComponentUpdates(c *gin.Context) {
@@ -363,7 +411,11 @@ func (r *Router) listPendingEvents(c *gin.Context) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": listErr.Error()})
 			return
 		}
-		events = maskLockedEvents(events, lockedPlayerIDs(players), false)
+		if len(players) == 0 {
+			c.JSON(http.StatusServiceUnavailable, gin.H{"error": "temporarily unavailable"})
+			return
+		}
+		events = maskLockedEvents(events, lockedPlayerIDs(players), lockedPlayerNames(players), false)
 	}
 	if events == nil {
 		events = []domain.PendingEvent{}
@@ -396,7 +448,7 @@ func (r *Router) getPendingEvent(c *gin.Context) {
 		return
 	}
 	if locked {
-		masked := maskLockedEvents([]domain.PendingEvent{*event}, map[int64]bool{event.PlayerID: true}, false)
+		masked := maskLockedEvents([]domain.PendingEvent{*event}, map[int64]bool{event.PlayerID: true}, nil, false)
 		c.JSON(http.StatusOK, gin.H{"data": masked[0]})
 		return
 	}

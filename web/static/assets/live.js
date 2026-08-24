@@ -289,6 +289,8 @@
   };
 
   function renderLiveData() {
+    // Sections live on separate routes now, so any of these may be absent
+    // from the document. Each renderer checks for its own container.
     const newsGrid = document.getElementById("news-grid");
     if (newsGrid) {
       newsGrid.innerHTML = "";
