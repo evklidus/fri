@@ -160,3 +160,34 @@ func TestAddPlayerRefusesDuplicatesBeforeCallingTheProvider(t *testing.T) {
 		t.Error("insert attempted for an existing player")
 	}
 }
+
+func TestUnknownPlayerGetsNoInventedFollowers(t *testing.T) {
+	// Rafael Leão was added on 2026-08-24 and immediately scored 74.4 on
+	// Social — a number derived from the letters of his name by the old hash
+	// fallback. Stable across syncs, so it looked like a measurement.
+	snapshot, err := demoSocialProvider{}.FetchSocialSnapshot(
+		context.Background(),
+		domain.PlayerSyncTarget{ID: 99, Name: "Nobody We Track", Club: "Some FC"},
+	)
+	if err != nil {
+		t.Fatalf("fetch: %v", err)
+	}
+	if snapshot.Followers != 0 {
+		t.Errorf("followers = %d, want 0 — a follower count nobody measured is fiction", snapshot.Followers)
+	}
+	if snapshot.NormalizedScore != neutralComponentScore {
+		t.Errorf("score = %v, want the neutral %v", snapshot.NormalizedScore, neutralComponentScore)
+	}
+
+	// A player we do have data for must still be scored on it.
+	known, err := demoSocialProvider{}.FetchSocialSnapshot(
+		context.Background(),
+		domain.PlayerSyncTarget{ID: 8, Name: "L. Yamal", Club: "FC Barcelona"},
+	)
+	if err != nil {
+		t.Fatalf("fetch known: %v", err)
+	}
+	if known.Followers <= 0 {
+		t.Error("a player in realSocialOverrides lost their follower count")
+	}
+}

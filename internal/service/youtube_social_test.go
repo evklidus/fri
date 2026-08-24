@@ -47,7 +47,10 @@ func TestYouTubeProviderAggregatesViewCounts(t *testing.T) {
 	defer server.Close()
 
 	provider := newYouTubeSocialProvider("test-key", server.URL, time.Second, demoSocialProvider{})
-	target := domain.PlayerSyncTarget{ID: 1, Name: "Lionel Messi", Club: "Inter Miami", Position: "RW"}
+	// A player the demo provider has follower data for. Since 2026-08-24 an
+	// unknown name no longer gets a hash-derived follower count — it scores
+	// neutral and says so — so this test needs someone real to layer views on.
+	target := domain.PlayerSyncTarget{ID: 1, Name: "L. Yamal", Club: "FC Barcelona", Position: "FWD"}
 
 	snapshot, err := provider.FetchSocialSnapshot(context.Background(), target)
 	if err != nil {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"hash/fnv"
+	"log"
 	"math"
 	"strings"
 	"time"
@@ -112,6 +113,12 @@ var realSocialOverrides = map[string]struct {
 	"Fermín López": {followers: 7_000_000, engagementRate: 5.5, mentionsGrowth: 55},
 	"P. Cubarsí":   {followers: 6_000_000, engagementRate: 7.0, mentionsGrowth: 78},
 	"R. Asencio":   {followers: 6_000_000, engagementRate: 5.0, mentionsGrowth: 60},
+
+	// Added to the roster on 2026-08-24. Counts checked at the time; the
+	// numbers below are the reason the add-player endpoint is not yet a
+	// complete story — see the fallback note in FetchSocialSnapshot.
+	"J. Álvarez":   {followers: 20_000_000, engagementRate: 5.0, mentionsGrowth: 60},
+	"R. Leão":      {followers: 8_000_000, engagementRate: 5.5, mentionsGrowth: 55},
 	"D. Rice":      {followers: 6_000_000, engagementRate: 4.0, mentionsGrowth: 45},
 	"M. Olise":     {followers: 5_000_000, engagementRate: 5.8, mentionsGrowth: 72},
 	"Vitinha":      {followers: 5_000_000, engagementRate: 4.5, mentionsGrowth: 48},
@@ -133,14 +140,23 @@ func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain
 		engagementRate = override.engagementRate
 		mentionsGrowth = override.mentionsGrowth
 	} else {
-		// Unknown player — fall back to deterministic-hash placeholder so
-		// scores stay stable across syncs instead of being random.
-		popularity := deterministicPercent(player.Name + ":social:popularity")
-		engagementSeed := deterministicPercent(player.Name + ":social:engagement")
-		mentionsSeed := deterministicPercent(player.Name + ":social:mentions")
-		followers = int64(math.Round(math.Pow(10, 4.7+(popularity/100*3.9))))
-		engagementRate = round1(1.5 + (engagementSeed / 100 * 5.5))
-		mentionsGrowth = round1(mentionsSeed)
+		// Nobody has measured this player's reach, so say so rather than
+		// inventing it. The old fallback hashed the name into a follower
+		// count — stable across syncs, which made it look like data: Rafael
+		// Leão was added on 2026-08-24 and immediately scored 74.4 on Social,
+		// a number derived from the letters of his name.
+		//
+		// A neutral score is what this codebase already means by "no evidence
+		// yet", and it leaves the gap visible instead of dressed up. Add the
+		// player to realSocialOverrides, or wait for a real social API.
+		log.Printf("social: no follower data for %q — scoring neutral; add them to realSocialOverrides", player.Name)
+		return domain.SocialSnapshot{
+			PlayerID:        player.ID,
+			PlayerName:      player.Name,
+			Provider:        socialProviderName,
+			NormalizedScore: neutralComponentScore,
+			SnapshotAt:      time.Now().UTC(),
+		}, nil
 	}
 
 	youtubeViews := int64(math.Round(float64(followers)*0.08 + math.Pow(mentionsGrowth+10, 3.15)))
