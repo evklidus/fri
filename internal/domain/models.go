@@ -440,3 +440,11 @@ type ResolvedPlayer struct {
 	PhotoURL         string
 	Age              int
 }
+
+// CharacterBaseline is the neutral starting point for a player's Character
+// score before any events have fired. 80, not 50: a footballer with nothing
+// recorded against them is a good citizen, not a half-bad one. Migration 010
+// recomputes every existing player on this basis, and ApplyCharacterSync
+// keeps them there — so anything that creates a player has to start from the
+// same number, or the new arrival carries a 30-point penalty for being new.
+const CharacterBaseline = 80.0

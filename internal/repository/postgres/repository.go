@@ -843,7 +843,10 @@ func clamp0to100(v float64) float64 {
 //
 // Aligns with the partner's "baseline + grows/falls" model (chat 2026-05-09).
 // No more inherited seed values — Character is fully events-driven.
-const characterBaseline = 80.0
+//
+// Defined in domain so the add-player path starts new arrivals from the same
+// number; it used to have its own idea of neutral and gave them 50.
+const characterBaseline = domain.CharacterBaseline
 
 // sumCharacterEventsForPlayer returns the algebraic sum of *final* delta
 // across all character-targeted events for a player. Pending-vote events

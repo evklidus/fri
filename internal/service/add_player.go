@@ -125,12 +125,17 @@ func (s *Service) addPlayerWithStore(ctx context.Context, input domain.AddPlayer
 	player.PhotoURL = resolved.PhotoURL
 	player.Emoji = "⚽"
 
-	// Every component starts neutral; the inline Performance sync below
-	// replaces its own within the same request when it can.
+	// Unmeasured components start neutral, and the syncs replace them.
+	//
+	// Character is the exception: its neutral is 80, not 50. The whole
+	// component is "baseline plus what people did", so a player with nothing
+	// recorded against them is clean by definition — every existing player
+	// sits at 80 or above. Starting a new signing at 50 was not neutral, it
+	// was a 30-point penalty for being new, and it cost them 4.5 FRI outright.
 	player.Performance = neutralComponentScore
 	player.Social = neutralComponentScore
 	player.Media = neutralComponentScore
-	player.Character = neutralComponentScore
+	player.Character = domain.CharacterBaseline
 	player.Fan = neutralComponentScore
 	player.FanBase = neutralComponentScore
 	player.FRI = round1(

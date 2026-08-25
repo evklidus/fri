@@ -69,15 +69,45 @@ func TestRosterPositionForMapsProviderLabels(t *testing.T) {
 	}
 }
 
+func TestNewPlayerStartsAtTheCharacterBaseline(t *testing.T) {
+	// Character is "baseline plus what people did", and its baseline is 80 —
+	// a player with nothing recorded against them is clean. Starting a new
+	// signing at the generic neutral 50 was a 30-point penalty for being new,
+	// worth 4.5 FRI at Character's 15% weight. It is what the partner noticed
+	// about Leão and Álvarez.
+	born := time.Date(1999, 6, 10, 0, 0, 0, 0, time.UTC)
+	resolver := &fakeResolver{resolved: domain.ResolvedPlayer{
+		ProviderPlayerID: 22236, ProviderTeamID: 489,
+		Name: "R. Leão", Position: "Attacker", BirthDate: &born, Age: 27,
+	}}
+	roster := &fakeRoster{}
+	svc := &Service{performanceProvider: resolver}
+
+	got, err := svc.addPlayerWithStore(context.Background(), domain.AddPlayerInput{
+		Name: "R. Leão", Club: "AC Milan",
+	}, roster)
+	if err != nil {
+		t.Fatalf("add player: %v", err)
+	}
+	if got.Character != domain.CharacterBaseline {
+		t.Errorf("character = %v, want the baseline %v — every existing player sits there",
+			got.Character, domain.CharacterBaseline)
+	}
+	// The components nobody has measured stay at the generic neutral.
+	if got.Social != neutralComponentScore || got.Media != neutralComponentScore {
+		t.Errorf("unmeasured components moved: social %v media %v", got.Social, got.Media)
+	}
+}
+
 func TestNewPlayerCannotReachTheWithheldTopFive(t *testing.T) {
 	// A new player starts with three components at the neutral 50 and only
 	// Performance measured. Even a perfect Performance leaves them below the
 	// top of the table, so placeholder data cannot push somebody into the
 	// five places the leaderboard withholds — which would hand an anonymous
 	// visitor a blank row where a real player used to be.
-	best := 100*0.40 + neutralComponentScore*0.25 + neutralComponentScore*0.20 + neutralComponentScore*0.15
-	if best != 70 {
-		t.Fatalf("best reachable FRI on placeholder components = %v, want 70", best)
+	best := 100*0.40 + neutralComponentScore*0.25 + neutralComponentScore*0.20 + domain.CharacterBaseline*0.15
+	if best != 74.5 {
+		t.Fatalf("best reachable FRI on placeholder components = %v, want 74.5", best)
 	}
 }
 
