@@ -117,8 +117,12 @@ var realSocialOverrides = map[string]struct {
 	// Added to the roster on 2026-08-24. Counts checked at the time; the
 	// numbers below are the reason the add-player endpoint is not yet a
 	// complete story — see the fallback note in FetchSocialSnapshot.
-	"J. Álvarez":   {followers: 20_000_000, engagementRate: 5.0, mentionsGrowth: 60},
-	"R. Leão":      {followers: 8_000_000, engagementRate: 5.5, mentionsGrowth: 55},
+	"J. Álvarez": {followers: 20_000_000, engagementRate: 5.0, mentionsGrowth: 60},
+	"R. Leão":    {followers: 8_000_000, engagementRate: 5.5, mentionsGrowth: 55},
+
+	// Added 2026-08-25. 1.8M read off the account itself — a young winger
+	// whose following is still well behind his standing on the pitch.
+	"B. Barcola":   {followers: 1_800_000, engagementRate: 6.0, mentionsGrowth: 62},
 	"D. Rice":      {followers: 6_000_000, engagementRate: 4.0, mentionsGrowth: 45},
 	"M. Olise":     {followers: 5_000_000, engagementRate: 5.8, mentionsGrowth: 72},
 	"Vitinha":      {followers: 5_000_000, engagementRate: 4.5, mentionsGrowth: 48},
