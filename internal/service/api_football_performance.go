@@ -77,6 +77,9 @@ type apiFootballPerformanceProvider struct {
 	formMu       sync.Mutex
 	formByPlayer map[int]formCacheEntry // external player ID -> form
 
+	fixturesMu    sync.Mutex
+	fixturesByKey map[string]fixturesCacheEntry // team/season/league -> finished fixtures
+
 	// Outbound pacing. A performance sync spends ~9 requests per player with
 	// no natural gaps, so 22 players emit nearly 200 calls in under 20
 	// seconds — enough to trip the per-minute ceiling on a Pro plan and get
@@ -97,15 +100,16 @@ func newAPIFootballPerformanceProvider(key, baseURL string, store externalIDsSto
 	}
 
 	return &apiFootballPerformanceProvider{
-		key:          strings.TrimSpace(key),
-		baseURL:      baseURL,
-		client:       &http.Client{Timeout: timeout},
-		store:        store,
-		fallback:     fallback,
-		seasonByTeam: make(map[int]seasonCacheEntry),
-		topNByLeague: make(map[int]map[string]topNRanks),
-		formByPlayer: make(map[int]formCacheEntry),
-		minGap:       apiFootballMinRequestGap,
+		key:           strings.TrimSpace(key),
+		baseURL:       baseURL,
+		client:        &http.Client{Timeout: timeout},
+		store:         store,
+		fallback:      fallback,
+		seasonByTeam:  make(map[int]seasonCacheEntry),
+		topNByLeague:  make(map[int]map[string]topNRanks),
+		formByPlayer:  make(map[int]formCacheEntry),
+		fixturesByKey: make(map[string]fixturesCacheEntry),
+		minGap:        apiFootballMinRequestGap,
 	}
 }
 
@@ -213,8 +217,11 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 
 	rankPos, rankTotal := p.topNRankFor(ctx, info.LeagueID, info.Season, positionGroup(player.Position), externalPlayerID)
 	form, _ := p.formFor(ctx, externalPlayerID, currentTeamID)
+	pooled := poolClubStatistics(apiPlayer.Statistics)
+	fixtureMinutes := p.fixtureMinutesFor(ctx, pooled, info.Season)
+	logPooledCompetitions(player, pooled, fixtureMinutes)
 
-	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)
 	// Phase 4.3 MVP: stats-derived performance events. Right now this only
 	// catches goal droughts for attacking positions — full per-fixture
@@ -275,8 +282,11 @@ func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, 
 	// info already resolved above for selectClubStatistic; reuse it.
 	rankPos, rankTotal := p.topNRankFor(ctx, info.LeagueID, info.Season, positionGroup(player.Position), apiPlayer.Player.ID)
 	form, _ := p.formFor(ctx, apiPlayer.Player.ID, team.ID)
+	pooled := poolClubStatistics(apiPlayer.Statistics)
+	fixtureMinutes := p.fixtureMinutesFor(ctx, pooled, info.Season)
+	logPooledCompetitions(player, pooled, fixtureMinutes)
 
-	snapshot := buildAPIFootballSnapshot(player, stat, rankPos, rankTotal, form)
+	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)
 	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
 	return snapshot, nil
@@ -412,7 +422,7 @@ func (p *apiFootballPerformanceProvider) playedFixtures(ctx context.Context, tea
 	params := url.Values{
 		"team":   []string{strconv.Itoa(teamID)},
 		"season": []string{strconv.Itoa(season)},
-		"status": []string{"FT"},
+		"status": []string{"FT-AET-PEN"},
 	}
 	if leagueID > 0 {
 		params.Set("league", strconv.Itoa(leagueID))
@@ -1226,22 +1236,31 @@ func performanceWeightsFor(position string) performanceWeights {
 	}
 }
 
-func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballStatistic, rankPos, rankTotal int, form formSnapshot) domain.PerformanceSnapshot {
-	minutes := float64(stat.Games.Minutes)
-	appearances := float64(stat.Games.Appearances)
-	goals := float64(stat.Goals.Total)
-	assists := float64(stat.Goals.Assists)
-	keyPasses := float64(stat.Passes.Key)
-	shotsOn := float64(stat.Shots.On)
+// buildAPIFootballSnapshot turns a season into a Performance snapshot. The
+// anchor row identifies the player — club, position, the league their rank
+// is read in — and the pooled rows measure them across every competition
+// that counts. When pooling found nothing (rows without league ids, or a
+// club whose competitions are not in the table) the anchor alone is the
+// measure, which is exactly what this function did before competitions
+// pooled.
+func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, anchor apiFootballStatistic, pooled pooledStats, rankPos, rankTotal int, fixtureMinutes float64, form formSnapshot) domain.PerformanceSnapshot {
+	if len(pooled.Competitions) == 0 {
+		pooled = poolFromAnchor(anchor)
+	}
+	minutes := float64(pooled.RawMinutes)
+	appearances := float64(pooled.RawAppearances)
 
-	averageRating := parseAPIFootballRating(stat.Games.Rating)
+	averageRating := pooled.Rating
+	if averageRating <= 0 {
+		averageRating = parseAPIFootballRating(anchor.Games.Rating)
+	}
 	if averageRating <= 0 {
 		averageRating = 5.8
 	}
 
-	goalsAssistsPer90 := per90(goals+assists, minutes)
-	keyPassesPer90 := per90(keyPasses, minutes)
-	shotsOnPer90 := per90(shotsOn, minutes)
+	goalsAssistsPer90 := pooled.GoalsAssistsPer90
+	keyPassesPer90 := pooled.KeyPassesPer90
+	shotsOnPer90 := pooled.ShotsOnPer90
 
 	// API-Football's budget plan does not expose xG/xA; this is a transparent proxy from available attacking actions.
 	xgXaProxyPer90 := round2((goalsAssistsPer90 * 0.70) + (keyPassesPer90 * 0.08) + (shotsOnPer90 * 0.05))
@@ -1259,9 +1278,15 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, stat apiFootballSt
 		positionRankScore = normalizeLinear(averageRating, 5.5, 7.8)
 	}
 
-	minutesShare := normalizeLinear(minutes, 0, 3420)
+	// Availability is judged against the fixtures the club actually played
+	// in the competitions being counted, not a fixed domestic season — see
+	// fixtureMinutesFor. Zero means nobody looked it up.
+	if fixtureMinutes <= 0 {
+		fixtureMinutes = domesticSeasonMinutes
+	}
+	minutesShare := normalizeLinear(minutes, 0, fixtureMinutes)
 	if appearances > 0 && minutesShare == 0 {
-		minutesShare = normalizeLinear(appearances, 0, 38)
+		minutesShare = normalizeLinear(appearances, 0, fixtureMinutes/90)
 	}
 
 	formScore := buildFormScore(player.Position, form)

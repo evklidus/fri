@@ -1171,14 +1171,15 @@ func TestAPIFootballFormUsesLastFixturesAndCaches(t *testing.T) {
 			},
 		})
 	})
-	// /fixtures serves two callers: the season-rollover guard (status=FT, to
-	// count played matches) and the form window (last=N). Count the form
+	// /fixtures serves two callers: the played-fixtures count (any status
+	// filter — the season guard and the availability denominator) and the
+	// form window (last=N). Count the form
 	// calls separately so this test keeps asserting what it is about — that
 	// the form cache prevents a refetch — instead of drifting whenever the
 	// season guard changes how often it asks.
 	var formFixtureCalls int
 	handler.on("/fixtures", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Query().Get("status") == "FT" {
+		if r.URL.Query().Get("status") != "" {
 			// Season guard: report a full season so no rollback happens.
 			response := make([]any, 0, 30)
 			for i := 0; i < 30; i++ {
