@@ -681,6 +681,7 @@ var knownClubTeamIDs = map[string]int{
 	"fenerbahce":  611,
 	"galatasaray": 645,
 	"besiktas":    549,
+	"trabzonspor": 998, // Salah, from 2026-08-03
 
 	// MLS
 	"inter miami": 1614,
