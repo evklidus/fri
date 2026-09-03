@@ -1,6 +1,9 @@
 package service
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"fri.local/football-reputation-index/internal/domain"
@@ -149,5 +152,56 @@ func TestComputeBaselineScorePureDefenderAlsoNotPenalised(t *testing.T) {
 	defScore := computeBaselineScore(vanDijkLike, "DEF", false)
 	if defScore < 50 {
 		t.Errorf("solid defender baseline %.1f too low — rating + minutes weight may be insufficient", defScore)
+	}
+}
+
+// TestCareerBaselineSitsOnTheSeasonScale is the regression for what got the
+// career weight cut in May. Mbappé's stored career — 23,321 minutes, 244
+// goals, 63 assists, rating 7.7, 29 trophies — scored 77 while his season
+// scored 89, so blending the two read as a penalty. On one scale, a career
+// like that is elite and says so.
+func TestCareerBaselineSitsOnTheSeasonScale(t *testing.T) {
+	mbappe := domain.PlayerCareerBaseline{
+		SeasonsPlayed: 5, CareerMinutes: 23_321, CareerGoals: 244, CareerAssists: 63,
+		CareerAvgRating: 7.7, CareerTrophiesCount: 29,
+	}
+	if got := computeBaselineScore(mbappe, "FWD", true); got < 90 {
+		t.Errorf("Mbappé's career = %.1f, want an elite 90+ — the scale is still harsher than the season's", got)
+	}
+	salah := domain.PlayerCareerBaseline{
+		SeasonsPlayed: 5, CareerMinutes: 24_056, CareerGoals: 158, CareerAssists: 85,
+		CareerAvgRating: 7.4, CareerTrophiesCount: 22,
+	}
+	if got := computeBaselineScore(salah, "FWD", true); got < 78 {
+		t.Errorf("Salah's career = %.1f, want 78+ — a star in an off year should hold in the 70s", got)
+	}
+}
+
+// TestAssistsCountAsOutputNotAgainstAGoalsCeiling: a playmaker who splits
+// output between goals and assists is worth the same as a scorer with the
+// same total. Judging each channel against the combined ceiling made the
+// playmaker structurally worse.
+func TestAssistsCountAsOutputNotAgainstAGoalsCeiling(t *testing.T) {
+	scorer := domain.PlayerCareerBaseline{SeasonsPlayed: 5, CareerMinutes: 18_000, CareerGoals: 120, CareerAssists: 0, CareerAvgRating: 7.3}
+	playmaker := domain.PlayerCareerBaseline{SeasonsPlayed: 5, CareerMinutes: 18_000, CareerGoals: 60, CareerAssists: 60, CareerAvgRating: 7.3}
+	a, b := computeBaselineScore(scorer, "FWD", false), computeBaselineScore(playmaker, "FWD", false)
+	if a != b {
+		t.Errorf("same output, different scores: scorer %.1f playmaker %.1f", a, b)
+	}
+}
+
+// TestAboutPagePromiseMatchesTheCode: the About page tells visitors
+// Performance is "blended 60/40 with a career baseline". For four months the
+// code did 75/25. Whoever changes one has to change the other.
+func TestAboutPagePromiseMatchesTheCode(t *testing.T) {
+	page, err := os.ReadFile(filepath.Join("..", "..", "web", "static", "index.html"))
+	if err != nil {
+		t.Skipf("about page not available here: %v", err)
+	}
+	if !strings.Contains(string(page), "60/40") {
+		t.Fatal("the About page no longer promises a 60/40 blend — update this test and the constant together")
+	}
+	if careerBaselineWeight != 0.40 {
+		t.Errorf("careerBaselineWeight = %v, but the About page promises 60/40", careerBaselineWeight)
 	}
 }

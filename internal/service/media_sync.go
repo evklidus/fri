@@ -361,6 +361,12 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 	}
 }
 
+// articlesForFullCoverage is how many articles count as full coverage. The
+// sync asks the provider for three per player (MEDIA_ARTICLES_PER_PLAYER),
+// but volume used to saturate at four — ten of the forty volume points were
+// unreachable for everyone by construction.
+const articlesForFullCoverage = 3.0
+
 // mediaScoreFromArticles is the Media formula: 40% how much coverage there
 // is, 40% its tone, 20% who wrote it. Pure, and fed only by what every news
 // row stores, so the sync and a moderator's delete arrive at the same number
@@ -377,7 +383,7 @@ func mediaScoreFromArticles(stats []domain.ArticleStats) (float64, bool) {
 		tierSum += s.SourceTier
 	}
 	n := float64(len(stats))
-	mentionVolume := math.Min(100, n*25)
+	mentionVolume := math.Min(100, n*(100/articlesForFullCoverage))
 	avgSentiment := normalizeSentiment(sentimentSum / n)
 	avgTier := tierSum / n
 	return round1((mentionVolume * 0.4) + (avgSentiment * 0.4) + (avgTier * 0.2)), true

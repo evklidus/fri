@@ -139,15 +139,23 @@ func (s *Service) SyncCareerBaseline(ctx context.Context) (*domain.ComponentSync
 	)
 }
 
-// blendBaselineIntoPerformance mixes the persistent career baseline (25%)
-// into the snapshot's current-season normalized score (75%). When no
-// baseline exists yet — first run, or a player we just added — the snapshot
-// passes through unchanged.
+// careerBaselineWeight is the share of Performance that comes from the
+// career rather than the current season. 40% is what the partner asked for
+// on 2026-05-09 and what the About page promises visitors ("blended 60/40").
 //
-// Weight dropped 0.40 → 0.25 on 2026-05-15: the 40% blend was pulling top
-// in-form players down toward their career average, capping FRI scores in
-// the high-60s when partner/investor expectations were 85+. Career remains
-// a meaningful drag against one-hit-wonder seasons but no longer dominates.
+// It was cut to 25% on 2026-05-15 because the blend dragged in-form players
+// down. The diagnosis was wrong: the career score was computed on a harsher
+// scale than the season score (assists against a goals-plus-assists
+// ceiling, minutes against an unreachable 50,000), so mixing it in was a
+// penalty at any weight. With the scale fixed, the blend does what it was
+// meant to — a star in an off year holds in the 70s instead of falling
+// into the 60s.
+const careerBaselineWeight = 0.40
+
+// blendBaselineIntoPerformance mixes the persistent career baseline into
+// the snapshot's current-season normalized score. When no baseline exists
+// yet — first run, or a player we just added — the snapshot passes through
+// unchanged.
 //
 // We intentionally only blend NormalizedScore (the final 0–100 score the
 // repository writes to fri_scores.performance). The raw stat fields are
@@ -165,8 +173,7 @@ func (s *Service) blendBaselineIntoPerformance(ctx context.Context, snapshot dom
 	if baseline == nil || baseline.BaselineScore <= 0 {
 		return snapshot
 	}
-	const baselineWeight = 0.25
-	blended := (1-baselineWeight)*snapshot.NormalizedScore + baselineWeight*baseline.BaselineScore
+	blended := (1-careerBaselineWeight)*snapshot.NormalizedScore + careerBaselineWeight*baseline.BaselineScore
 	snapshot.NormalizedScore = clampScore(round1(blended))
 	return snapshot
 }
@@ -224,6 +231,15 @@ func weightsFor(position string) baselineWeights {
 // failed or returned nothing), the trophy weight is reallocated proportionally
 // to the other signals — we don't want to under-rank everyone just because
 // the API call timed out.
+// careerMinutesFull is the playing time that earns full credit for
+// availability over the five-season window: five seasons of roughly fifty
+// matches counting cups and Europe. The old anchor was 50,000, which nobody
+// reaches in five seasons — an ever-present regular scored 66.
+const (
+	careerMinutesFloor = 5_000.0
+	careerMinutesFull  = 25_000.0
+)
+
 func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophiesAvailable bool) float64 {
 	if b.SeasonsPlayed == 0 || b.CareerMinutes == 0 {
 		return 0
@@ -231,8 +247,15 @@ func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophi
 
 	w := weightsFor(position)
 	minutes := float64(b.CareerMinutes)
-	goalsPer90 := per90(float64(b.CareerGoals), minutes)
-	assistsPer90 := per90(float64(b.CareerAssists), minutes)
+
+	// Goals and assists are judged together against the position's
+	// goals-plus-assists ceiling, exactly as the season formula does. They
+	// used to be judged separately against that same combined ceiling, which
+	// no single channel can approach: a forward's assists came out at 15–20
+	// of 100 by construction, and the career score sat a dozen points below
+	// the season score for the same player. That gap is what made blending
+	// look like a penalty and got the career weight cut in May.
+	goalsAssistsPer90 := per90(float64(b.CareerGoals+b.CareerAssists), minutes)
 
 	gaMax := positionGAMax(position)
 	if gaMax <= 0 {
@@ -242,13 +265,11 @@ func computeBaselineScore(b domain.PlayerCareerBaseline, position string, trophi
 	// Range tightened 8.5 → 7.8 on 2026-05-15 to match the new Performance
 	// scale. Career averages 7.5+ are rare and unambiguously elite.
 	ratingScore := normalizeLinear(b.CareerAvgRating, 6.0, 7.8)
-	goalsScore := normalizeLinear(goalsPer90, 0, gaMax)
-	assistsScore := normalizeLinear(assistsPer90, 0, gaMax)
-	minutesScore := normalizeLog(minutes, 5_000, 50_000)
+	outputScore := normalizeLinear(goalsAssistsPer90, 0, gaMax)
+	minutesScore := normalizeLog(minutes, careerMinutesFloor, careerMinutesFull)
 
 	score := ratingScore*w.rating +
-		goalsScore*w.goals +
-		assistsScore*w.assists +
+		outputScore*(w.goals+w.assists) +
 		minutesScore*w.minutes
 
 	if trophiesAvailable {

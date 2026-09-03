@@ -166,7 +166,7 @@ func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain
 	youtubeViews := int64(math.Round(float64(followers)*0.08 + math.Pow(mentionsGrowth+10, 3.15)))
 
 	followersNormalized := normalizeLog(float64(followers), 50_000, 500_000_000)
-	engagementNormalized := normalizeLinear(engagementRate, 1, 8)
+	engagementNormalized := normalizeLinear(engagementRate/expectedEngagementRate(followers), 0.5, 3.0)
 	youtubeNormalized := normalizeLog(float64(youtubeViews), 1_000, 80_000_000)
 
 	normalizedScore := clampScore(
@@ -450,6 +450,21 @@ func defaultPositionMetric(values map[string]float64, position string, fallback 
 		return value
 	}
 	return fallback
+}
+
+// expectedEngagementRate is the engagement an account of this size
+// typically gets. Engagement falls with audience: roughly 8% at ten
+// thousand followers, 4–5% at a hundred thousand, under 3% at a million,
+// about 1% at a hundred million. Against a flat 1–8% scale the biggest
+// stars looked lazy — Mbappé's 3.8% at 130M and Cubarsí's 7% at 6M came
+// out at the same Social score — when 3.8% at that size is exceptional.
+// Scoring the ratio to the norm says how engaged an audience is relative
+// to what an audience that size normally manages.
+func expectedEngagementRate(followers int64) float64 {
+	if followers < 10_000 {
+		followers = 10_000
+	}
+	return 8.0 * math.Pow(float64(followers)/10_000, -0.226)
 }
 
 func normalizeLinear(value, minValue, maxValue float64) float64 {

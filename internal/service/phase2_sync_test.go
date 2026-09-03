@@ -82,3 +82,26 @@ func assertScoreRange(t *testing.T, score float64) {
 		t.Fatalf("expected score in 0..100, got %.1f", score)
 	}
 }
+
+func TestEngagementIsJudgedAgainstAccountSize(t *testing.T) {
+	// Before: Mbappé (130M followers, 3.8% engagement) and Cubarsí (6M, 7%)
+	// both scored 68.8 on Social. A flat 1–8% engagement scale read the
+	// biggest audience in football as half-asleep, when 3.8% at that size is
+	// exceptional and 7% at six million is merely good.
+	ctx := context.Background()
+	mbappe, err := demoSocialProvider{}.FetchSocialSnapshot(ctx, domain.PlayerSyncTarget{ID: 1, Name: "K. Mbappé"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cubarsi, err := demoSocialProvider{}.FetchSocialSnapshot(ctx, domain.PlayerSyncTarget{ID: 2, Name: "P. Cubarsí"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if mbappe.NormalizedScore <= cubarsi.NormalizedScore+10 {
+		t.Errorf("Mbappé %.1f vs Cubarsí %.1f — 130M followers should clearly outscore 6M", mbappe.NormalizedScore, cubarsi.NormalizedScore)
+	}
+	// The norm itself: engagement falls as audiences grow.
+	if expectedEngagementRate(100_000_000) >= expectedEngagementRate(1_000_000) {
+		t.Error("expected engagement should fall with audience size")
+	}
+}

@@ -317,14 +317,15 @@ func (p fixedArticlesProvider) FetchPlayerArticles(context.Context, domain.Playe
 }
 
 func TestMediaScoreIsOneFormulaForSyncAndDelete(t *testing.T) {
-	// Three tier-90 articles at a mildly positive tone: volume min(100,75)=75,
-	// tone normalize(0.2)=60, tier 90 → 30 + 24 + 18 = 72. The sync and the
-	// moderator's delete must both land here from the same rows, or a delete
-	// would "rescore" a player onto a different scale.
+	// Three tier-90 articles at a mildly positive tone: three articles is
+	// full coverage (volume 100), tone normalize(0.2)=60, tier 90 →
+	// 40 + 24 + 18 = 82. The sync and the moderator's delete must both land
+	// here from the same rows, or a delete would "rescore" a player onto a
+	// different scale.
 	stats := []domain.ArticleStats{{Sentiment: 0.2, SourceTier: 90}, {Sentiment: 0.2, SourceTier: 90}, {Sentiment: 0.2, SourceTier: 90}}
 	got, ok := mediaScoreFromArticles(stats)
-	if !ok || got != 72 {
-		t.Fatalf("score = %v ok=%v, want 72", got, ok)
+	if !ok || got != 82 {
+		t.Fatalf("score = %v ok=%v, want 82", got, ok)
 	}
 	if _, ok := mediaScoreFromArticles(nil); ok {
 		t.Error("no coverage reported as a measurement")
