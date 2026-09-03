@@ -16,6 +16,7 @@ import (
 // interface used by Service. Each method is overridable per test through a
 // function field; nil fields fall back to a sensible default.
 type mockRepo struct {
+	suppressions            []domain.NewsSuppression
 	playerCount             int
 	playerCountErr          error
 	replaceAllErr           error
@@ -64,6 +65,9 @@ func (m *mockRepo) ListNews(ctx context.Context, playerID *int64) ([]domain.News
 		return m.listNewsFn(ctx, playerID)
 	}
 	return nil, nil
+}
+func (m *mockRepo) ListNewsSuppressions(context.Context) ([]domain.NewsSuppression, error) {
+	return m.suppressions, nil
 }
 func (m *mockRepo) CreateVoteAndRefreshScore(ctx context.Context, vote domain.Vote) (*domain.Score, error) {
 	m.createdVote = &vote

@@ -230,7 +230,7 @@ func (h *Router) userCount(c *gin.Context) {
 // NewsAdminService is the moderation surface. Kept separate from
 // AuthService so a fake in tests can implement one without the other.
 type NewsAdminService interface {
-	DeleteNewsItem(ctx context.Context, id int64) (bool, error)
+	DeleteNewsItem(ctx context.Context, id int64) (*domain.NewsDeletion, error)
 }
 
 func (h *Router) deleteNewsItem(c *gin.Context) {
@@ -246,16 +246,17 @@ func (h *Router) deleteNewsItem(c *gin.Context) {
 		return
 	}
 
-	deleted, err := admin.DeleteNewsItem(c.Request.Context(), id)
+	deletion, err := admin.DeleteNewsItem(c.Request.Context(), id)
+	if errors.Is(err, service.ErrNewsNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no such article"})
+		return
+	}
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not delete article"})
 		return
 	}
-	if !deleted {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no such article"})
-		return
-	}
-	c.JSON(http.StatusOK, gin.H{"data": gin.H{"deleted": id}})
+	// The moderator sees what the removal did to the score, not a bare OK.
+	c.JSON(http.StatusOK, gin.H{"data": deletion})
 }
 
 // lockedTopN is how many leaderboard places are hidden from visitors without

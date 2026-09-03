@@ -38,7 +38,7 @@ const (
 	// seeded placeholder survives for months while looking like live data.
 	// At 180 days every player has coverage: Vitinha 10 articles, Cubarsí
 	// 14, Pedri 20.
-	mediaStackLookbackDays   = 180
+	mediaStackLookbackDays = 180
 	// 500ms keeps us well under any documented per-second cap on Standard/Pro
 	// plans while still surviving free-tier throttling (where retry kicks in).
 	mediaStackDefaultMinGap   = 500 * time.Millisecond
@@ -109,6 +109,7 @@ func (p *mediaStackMediaProvider) FetchPlayerArticles(ctx context.Context, playe
 	candidates = applyDomainDenylist(candidates)
 	candidates = filterTitleMentionsPlayer(candidates, player.Name)
 	candidates = filterOtherSports(candidates)
+	candidates = filterLiveBlogs(candidates)
 	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
@@ -240,6 +241,37 @@ var otherSportsTextMarkers = []string{
 	"stanley cup", "world series", "super bowl", "grand slam",
 	"home run", "touchdown", "innings", "quarterback", "pitcher",
 	"yankees", "oilers", "blackhawks", "lakers", "celtics",
+}
+
+// liveBlogMarkers flag rolling transfer blogs and match-day live pages.
+// They are not articles about a player: a "Transfer news LIVE" page names
+// twenty players once each, and the sync filed one under Barcola at +1.3
+// for a single line about him. Its tone means nothing for any one of them,
+// and the same page surfacing under four players is most of what made the
+// feed look random. Title only — summaries of ordinary articles say "live"
+// often enough ("saw it live", "live in Madrid") to be no guide.
+var liveBlogMarkers = []string{" live ", " live:", " live,", "live blog", "liveblog", "as it happened"}
+
+func isLiveBlog(title string) bool {
+	padded := " " + strings.ToLower(strings.TrimSpace(title)) + " "
+	for _, marker := range liveBlogMarkers {
+		if strings.Contains(padded, marker) {
+			return true
+		}
+	}
+	return false
+}
+
+// filterLiveBlogs drops the live pages; see liveBlogMarkers.
+func filterLiveBlogs(items []domain.MediaArticleCandidate) []domain.MediaArticleCandidate {
+	out := make([]domain.MediaArticleCandidate, 0, len(items))
+	for _, item := range items {
+		if isLiveBlog(item.Title) {
+			continue
+		}
+		out = append(out, item)
+	}
+	return out
 }
 
 // filterOtherSports drops articles about a same-surname athlete in another

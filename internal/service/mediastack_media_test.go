@@ -455,3 +455,34 @@ func TestNewMediaProviderFactoryFallsBackToGDELTWithoutKey(t *testing.T) {
 		t.Errorf("provider = %q, want gdelt fallback", p.Name())
 	}
 }
+
+func TestLiveBlogsAreNotArticlesAboutAPlayer(t *testing.T) {
+	// Every one of these was in the live feed on 2026-09-02, most of them
+	// filed under two or three players each for a one-line mention.
+	drop := []string{
+		"Transfer news LIVE: Alvarez to miss Atletico game before Arsenal deadline",
+		"Arsenal vs Manchester City LIVE: Saka and Rice left on bench",
+		"Football transfer deadline day: latest on Fernández, Alvarez, Ndiaye and more – live",
+		"Man United transfer news LIVE: Gavi decision, £34m blow, Rafael Leao update",
+		"Deadline day as it happened",
+	}
+	keep := []string{
+		"Leao: I Will Give My All To Help AC Milan",
+		"Kylian Mbappe makes Real Madrid claim ahead of new season",
+		"Liverpool to deliver Salah verdict",
+	}
+	for _, title := range drop {
+		if !isLiveBlog(title) {
+			t.Errorf("kept a live page: %q", title)
+		}
+	}
+	for _, title := range keep {
+		if isLiveBlog(title) {
+			t.Errorf("dropped a real article: %q", title)
+		}
+	}
+	items := []domain.MediaArticleCandidate{{Title: drop[0]}, {Title: keep[0]}}
+	if out := filterLiveBlogs(items); len(out) != 1 || out[0].Title != keep[0] {
+		t.Errorf("filterLiveBlogs = %+v", out)
+	}
+}

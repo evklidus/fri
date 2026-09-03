@@ -1320,7 +1320,7 @@ func (r *Repository) ApplyMediaSync(ctx context.Context, results []domain.MediaS
 	// stale articles from earlier providers in the feed.
 	if _, err := tx.Exec(ctx, `
 		DELETE FROM news_items
-		WHERE source IN ('mediastack', 'gdelt', 'google-news-rss', 'legacy-html')
+		WHERE source IN (`+mediaNewsSourcesSQL+`)
 	`); err != nil {
 		return nil, err
 	}

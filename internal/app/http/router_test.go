@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	stdhttp "net/http"
 	"net/http/httptest"
 	"strconv"
@@ -14,6 +15,7 @@ import (
 
 	"fri.local/football-reputation-index/internal/app/config"
 	"fri.local/football-reputation-index/internal/domain"
+	"fri.local/football-reputation-index/internal/service"
 	"github.com/gin-gonic/gin"
 )
 
@@ -32,11 +34,22 @@ type fakeService struct {
 	syncCharacterFn        func(context.Context) (*domain.ComponentSyncResult, error)
 	syncCareerBaselineFn   func(context.Context) (*domain.ComponentSyncResult, error)
 	syncAllFn              func(context.Context) ([]domain.ComponentSyncResult, error)
+	deleteNewsFn           func(context.Context, int64) (*domain.NewsDeletion, error)
 
 	// Accounts. sessionUser, when set, is the user a request carrying the
 	// session cookie resolves to — enough to exercise the signed-in branch of
 	// the gates without a database.
 	sessionUser *domain.User
+}
+
+// The fake implements NewsAdminService so the moderation handler can be
+// exercised without a database; tests that leave deleteNewsFn nil get the
+// "not found" answer, the same as a row a sync already rotated out.
+func (f *fakeService) DeleteNewsItem(ctx context.Context, id int64) (*domain.NewsDeletion, error) {
+	if f.deleteNewsFn == nil {
+		return nil, service.ErrNewsNotFound
+	}
+	return f.deleteNewsFn(ctx, id)
 }
 
 // The fake implements AuthService so the handlers can tell a signed-in caller
@@ -630,8 +643,8 @@ func TestNewsFeedWithholdsArticlesAboutLockedPlayers(t *testing.T) {
 		players = append(players, p)
 	}
 
-	lockedID := int64(1)   // rank 1 — withheld
-	visibleID := int64(7)  // rank 7 — freely visible
+	lockedID := int64(1)  // rank 1 — withheld
+	visibleID := int64(7) // rank 7 — freely visible
 	news := []domain.NewsItem{
 		{ID: 10, PlayerID: &lockedID, PlayerName: "Player 1", TitleEN: "Player 1 signs new deal",
 			SummaryEN: "Details of the Player 1 contract", SourceURL: "https://example.com/player-1", ImpactDelta: 2.5},
@@ -1007,5 +1020,72 @@ func TestNewsMaskCatchesArticlesWithoutAPlayerID(t *testing.T) {
 		if bytes.Contains(body, []byte(needle)) {
 			t.Errorf("news feed leaked %q for an article with a null player_id: %s", needle, body)
 		}
+	}
+}
+
+func deleteAsAdmin(t *testing.T, url string) *stdhttp.Response {
+	t.Helper()
+	req, err := stdhttp.NewRequest(stdhttp.MethodDelete, url, nil)
+	if err != nil {
+		t.Fatalf("build request: %v", err)
+	}
+	req.Header.Set(adminTokenHeader, testAdminToken)
+	resp, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("delete %s: %v", url, err)
+	}
+	return resp
+}
+
+func TestDeletingAnArticleReportsWhatItDidToTheScore(t *testing.T) {
+	// The partner deleted articles and watched nothing move. The handler now
+	// hands back the rescored player, so the UI can show the change instead
+	// of asking the moderator to trust that it happened.
+	var askedFor int64
+	fake := &fakeService{
+		deleteNewsFn: func(_ context.Context, id int64) (*domain.NewsDeletion, error) {
+			askedFor = id
+			return &domain.NewsDeletion{
+				NewsID: id, PlayerID: 25, PlayerName: "B. Barcola", Title: "Transfer news LIVE",
+				OldMedia: 74.8, NewMedia: 61.2, OldFRI: 62.9, NewFRI: 60.2, Remaining: 2,
+			}, nil
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp := deleteAsAdmin(t, server.URL+"/api/news/4242")
+	defer resp.Body.Close()
+	if resp.StatusCode != stdhttp.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.StatusCode)
+	}
+	if askedFor != 4242 {
+		t.Errorf("deleted id %d, want 4242", askedFor)
+	}
+	body, _ := io.ReadAll(resp.Body)
+	var payload struct {
+		Data domain.NewsDeletion `json:"data"`
+	}
+	decode(t, body, &payload)
+	if payload.Data.PlayerName != "B. Barcola" || payload.Data.NewFRI != 60.2 || payload.Data.OldMedia != 74.8 {
+		t.Errorf("payload lost the score change: %+v", payload.Data)
+	}
+}
+
+func TestDeletingAnArticleThatIsAlreadyGoneIs404(t *testing.T) {
+	// Syncs rotate the feed twice a day; an id from a stale tab may be gone.
+	// That is a 404, not a 500 — nothing broke.
+	fake := &fakeService{
+		deleteNewsFn: func(context.Context, int64) (*domain.NewsDeletion, error) {
+			return nil, service.ErrNewsNotFound
+		},
+	}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp := deleteAsAdmin(t, server.URL+"/api/news/1")
+	defer resp.Body.Close()
+	if resp.StatusCode != stdhttp.StatusNotFound {
+		t.Errorf("status = %d, want 404", resp.StatusCode)
 	}
 }

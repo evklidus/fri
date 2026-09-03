@@ -279,6 +279,15 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 	// few minutes; less popular players get refreshed on subsequent runs.
 	targets = topByFRI(targets, mediaSyncBatchSize)
 
+	suppressed, err := s.repo.ListNewsSuppressions(ctx)
+	if err != nil {
+		return finish("failed", err.Error(), 0, nil, err)
+	}
+	suppressedSet := make(map[domain.NewsSuppression]struct{}, len(suppressed))
+	for _, entry := range suppressed {
+		suppressedSet[entry] = struct{}{}
+	}
+
 	var syncResults []domain.MediaSyncPlayerResult
 	var articlesSeen int
 
@@ -287,6 +296,7 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		if fetchErr != nil {
 			continue
 		}
+		articles = dropSuppressed(articles, player.ID, suppressedSet)
 
 		syncResult := s.buildMediaSyncResult(player, articles)
 		articlesSeen += syncResult.ArticlesCount
@@ -315,15 +325,13 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 		}
 	}
 
-	var sentimentSum float64
-	var tierSum float64
+	stats := make([]domain.ArticleStats, 0, len(articles))
 	syncArticles := make([]domain.MediaSyncArticle, 0, len(articles))
 
 	for _, article := range articles {
 		sentiment := sentimentScore(article.Title + " " + article.Summary)
 		tier := sourceTier(article.Source)
-		sentimentSum += sentiment
-		tierSum += tier
+		stats = append(stats, domain.ArticleStats{Sentiment: sentiment, SourceTier: tier})
 
 		syncArticles = append(syncArticles, domain.MediaSyncArticle{
 			PlayerID:     player.ID,
@@ -343,11 +351,7 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 		})
 	}
 
-	mentionVolume := math.Min(100, float64(len(syncArticles))*25)
-	avgSentiment := normalizeSentiment(sentimentSum / float64(len(syncArticles)))
-	avgTier := tierSum / float64(len(syncArticles))
-
-	mediaScore := round1((mentionVolume * 0.4) + (avgSentiment * 0.4) + (avgTier * 0.2))
+	mediaScore, _ := mediaScoreFromArticles(stats)
 	return domain.MediaSyncPlayerResult{
 		PlayerID:      player.ID,
 		PlayerName:    player.Name,
@@ -355,6 +359,47 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 		Articles:      syncArticles,
 		ArticlesCount: len(syncArticles),
 	}
+}
+
+// mediaScoreFromArticles is the Media formula: 40% how much coverage there
+// is, 40% its tone, 20% who wrote it. Pure, and fed only by what every news
+// row stores, so the sync and a moderator's delete arrive at the same number
+// from the same articles. With nothing to read it reports the neutral score
+// and false; the caller decides whether that means "unchanged" (a sync that
+// found nothing) or "no signal" (the last article was removed).
+func mediaScoreFromArticles(stats []domain.ArticleStats) (float64, bool) {
+	if len(stats) == 0 {
+		return neutralComponentScore, false
+	}
+	var sentimentSum, tierSum float64
+	for _, s := range stats {
+		sentimentSum += s.Sentiment
+		tierSum += s.SourceTier
+	}
+	n := float64(len(stats))
+	mentionVolume := math.Min(100, n*25)
+	avgSentiment := normalizeSentiment(sentimentSum / n)
+	avgTier := tierSum / n
+	return round1((mentionVolume * 0.4) + (avgSentiment * 0.4) + (avgTier * 0.2)), true
+}
+
+// dropSuppressed removes the articles a moderator deleted from this
+// player's feed. Applied before scoring, not merely before insert: an
+// article the operators judged wrong must not count toward the score
+// either, or the delete only hides the evidence.
+func dropSuppressed(articles []domain.MediaArticleCandidate, playerID int64, suppressed map[domain.NewsSuppression]struct{}) []domain.MediaArticleCandidate {
+	if len(suppressed) == 0 {
+		return articles
+	}
+	out := make([]domain.MediaArticleCandidate, 0, len(articles))
+	for _, article := range articles {
+		key := domain.NewsSuppression{PlayerID: playerID, ArticleKey: domain.NewsArticleKey(article.SourceURL, article.Title)}
+		if _, gone := suppressed[key]; gone {
+			continue
+		}
+		out = append(out, article)
+	}
+	return out
 }
 
 // sentimentScore wraps the package-level analyzer so that the rest of

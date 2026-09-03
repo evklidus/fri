@@ -838,9 +838,10 @@
     renderLiveData();
   };
 
-  // Admin-only: drop an article the filters let through. Removing it also
-  // removes any rating event it triggered (FK cascade), which is the point —
-  // a wrong article shouldn't leave its score change behind.
+  // Admin-only: drop an article the filters let through. The server
+  // remembers the deletion so the next sync doesn't bring the article back,
+  // and rescores the player from what remains — then tells us what moved,
+  // so the moderator sees the number change rather than taking it on trust.
   window.deleteNewsItem = async function deleteNewsItem(newsID, cardEl) {
     if (!newsID || !window.friIsAdmin) return;
     const label = (window.T && window.T[window.lang] && window.T[window.lang].news_delete) || "Delete";
@@ -851,10 +852,17 @@
         const payload = await r.json().catch(() => ({}));
         throw new Error(payload.error || "HTTP " + r.status);
       }
+      const payload = await r.json().catch(() => ({}));
+      const d = payload.data || {};
       if (cardEl && cardEl.parentNode) cardEl.parentNode.removeChild(cardEl);
       // The article fed a player's Media score, so refresh the table too.
       await Promise.all([loadPlayers(), loadNews()]);
       renderLiveData();
+      if (d.player_name && typeof d.new_fri === "number") {
+        window.alert(d.player_name + ": Media " + d.old_media + " → " + d.new_media +
+          ", FRI " + d.old_fri + " → " + d.new_fri +
+          (d.remaining_articles === 0 ? " (no articles left — neutral)" : ""));
+      }
     } catch (err) {
       console.error("delete news failed", err);
       window.alert("Delete failed: " + err.message);

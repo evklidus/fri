@@ -25,6 +25,7 @@ type repository interface {
 	ListSyncTargets(ctx context.Context) ([]domain.PlayerSyncTarget, error)
 	GetHistory(ctx context.Context, playerID int64) ([]domain.HistoryPoint, error)
 	ListNews(ctx context.Context, playerID *int64) ([]domain.NewsItem, error)
+	ListNewsSuppressions(ctx context.Context) ([]domain.NewsSuppression, error)
 	CreateVoteAndRefreshScore(ctx context.Context, vote domain.Vote) (*domain.Score, error)
 	StartComponentUpdate(ctx context.Context, component, provider string) (int64, error)
 	FinishComponentUpdate(ctx context.Context, updateID int64, status, message string, recordsSeen int) error

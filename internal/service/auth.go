@@ -165,16 +165,45 @@ func (s *Service) CountUsers(ctx context.Context) (int64, error) {
 	return s.auth.CountUsers(ctx)
 }
 
-// DeleteNewsItem removes an article the operators judged off-topic. The
-// automated filters catch the obvious cases (other sports, non-football
-// namesakes) but a wrong article still slips through occasionally, and its
-// sentiment feeds a player's Media score until someone removes it.
-func (s *Service) DeleteNewsItem(ctx context.Context, id int64) (bool, error) {
-	store, ok := s.auth.(interface {
-		DeleteNewsItem(ctx context.Context, id int64) (bool, error)
-	})
+// ErrNewsNotFound is returned when the article to delete does not exist —
+// usually because a sync already rotated it out.
+var ErrNewsNotFound = errors.New("no such article")
+
+// newsModerator is the part of the store that removes an article and
+// rescores the player it was filed under, in one transaction. The store
+// hands back the articles that remain; the service owns the formula.
+type newsModerator interface {
+	DeleteNewsItem(ctx context.Context, id int64, rescore func(remaining []domain.ArticleStats) float64) (*domain.NewsDeletion, error)
+}
+
+// DeleteNewsItem removes an article the operators judged off-topic and takes
+// its effect on the player's score with it. The automated filters catch the
+// obvious cases (other sports, namesakes, live blogs) but a wrong article
+// still slips through, and until 2026-08-26 deleting one changed nothing:
+// the score kept the article's plus/minus, and the next sync brought the
+// article back. Now the deletion is remembered and Media is rebuilt from
+// what remains.
+func (s *Service) DeleteNewsItem(ctx context.Context, id int64) (*domain.NewsDeletion, error) {
+	store, ok := s.auth.(newsModerator)
 	if !ok {
-		return false, errors.New("news deletion unavailable")
+		return nil, errors.New("news deletion unavailable")
 	}
-	return store.DeleteNewsItem(ctx, id)
+	deletion, err := store.DeleteNewsItem(ctx, id, mediaScoreAfterRemoval)
+	if err != nil {
+		return nil, err
+	}
+	if deletion == nil {
+		return nil, ErrNewsNotFound
+	}
+	return deletion, nil
+}
+
+// mediaScoreAfterRemoval scores what is left of a player's coverage once an
+// article is gone. When nothing is left there is no media signal, and the
+// player sits at the neutral score like a newcomer. Keeping the old number
+// instead would keep the deleted article's influence — which is the
+// complaint this exists to answer.
+func mediaScoreAfterRemoval(remaining []domain.ArticleStats) float64 {
+	score, _ := mediaScoreFromArticles(remaining)
+	return score
 }

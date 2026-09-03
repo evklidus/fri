@@ -304,3 +304,81 @@ func TestSyncMediaEndToEndWithGDELT(t *testing.T) {
 		t.Error("ApplyMediaSync not called — pipeline broke before persistence")
 	}
 }
+
+// fixedArticlesProvider hands every player the same articles. It stands in
+// for MediaStack in tests about what happens to articles after they arrive.
+type fixedArticlesProvider struct {
+	articles []domain.MediaArticleCandidate
+}
+
+func (fixedArticlesProvider) Name() string { return mediaProviderName }
+func (p fixedArticlesProvider) FetchPlayerArticles(context.Context, domain.PlayerSyncTarget) ([]domain.MediaArticleCandidate, error) {
+	return p.articles, nil
+}
+
+func TestMediaScoreIsOneFormulaForSyncAndDelete(t *testing.T) {
+	// Three tier-90 articles at a mildly positive tone: volume min(100,75)=75,
+	// tone normalize(0.2)=60, tier 90 → 30 + 24 + 18 = 72. The sync and the
+	// moderator's delete must both land here from the same rows, or a delete
+	// would "rescore" a player onto a different scale.
+	stats := []domain.ArticleStats{{Sentiment: 0.2, SourceTier: 90}, {Sentiment: 0.2, SourceTier: 90}, {Sentiment: 0.2, SourceTier: 90}}
+	got, ok := mediaScoreFromArticles(stats)
+	if !ok || got != 72 {
+		t.Fatalf("score = %v ok=%v, want 72", got, ok)
+	}
+	if _, ok := mediaScoreFromArticles(nil); ok {
+		t.Error("no coverage reported as a measurement")
+	}
+	if got := mediaScoreAfterRemoval(nil); got != neutralComponentScore {
+		t.Errorf("deleting the last article left %v, want the neutral %v — the old score would keep the deleted article's influence", got, neutralComponentScore)
+	}
+}
+
+func TestSyncMediaSkipsWhatModeratorsDeleted(t *testing.T) {
+	// The feed is rebuilt from scratch twice a day. Without a memory of the
+	// deletion, the article the partner removed came back within twelve
+	// hours — and it kept counting toward the score in between.
+	liveBlog := domain.MediaArticleCandidate{Title: "Atletico sign a defender", Summary: "", Source: "bbc", SourceURL: "https://example.com/blog", PublishedAt: time.Now()}
+	real := domain.MediaArticleCandidate{Title: "Alvarez scores twice", Summary: "", Source: "bbc", SourceURL: "https://example.com/real", PublishedAt: time.Now()}
+
+	var got []domain.MediaSyncPlayerResult
+	repo := &mockRepo{
+		listSyncTargetsFn: func(context.Context) ([]domain.PlayerSyncTarget, error) {
+			return []domain.PlayerSyncTarget{
+				{ID: 7, Name: "B. Barcola", Score: domain.Score{Media: 60}},
+				{ID: 8, Name: "J. Álvarez", Score: domain.Score{Media: 60}},
+			}, nil
+		},
+		// Removed from Barcola's feed only: the same page under Álvarez is a
+		// separate editorial call.
+		suppressions: []domain.NewsSuppression{{PlayerID: 7, ArticleKey: "https://example.com/blog"}},
+		applyMediaSyncFn: func(_ context.Context, results []domain.MediaSyncPlayerResult, _ string) ([]domain.PlayerSyncDelta, error) {
+			got = results
+			return nil, nil
+		},
+	}
+	svc := newServiceWithMedia(repo, fixedArticlesProvider{articles: []domain.MediaArticleCandidate{liveBlog, real}})
+	if _, err := svc.SyncMedia(context.Background()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	byPlayer := map[int64]domain.MediaSyncPlayerResult{}
+	for _, r := range got {
+		byPlayer[r.PlayerID] = r
+	}
+	barcola, alvarez := byPlayer[7], byPlayer[8]
+	if barcola.ArticlesCount != 1 || barcola.Articles[0].SourceURL != real.SourceURL {
+		t.Fatalf("Barcola still has the deleted article: %+v", barcola.Articles)
+	}
+	if alvarez.ArticlesCount != 2 {
+		t.Errorf("Álvarez lost an article nobody deleted from his feed: %d", alvarez.ArticlesCount)
+	}
+	// And it is out of the score, not just out of the feed.
+	one, _ := mediaScoreFromArticles([]domain.ArticleStats{{Sentiment: barcola.Articles[0].Sentiment, SourceTier: barcola.Articles[0].SourceTier}})
+	if barcola.MediaScore != one {
+		t.Errorf("Barcola scored %v, want %v — the deleted article is still counted", barcola.MediaScore, one)
+	}
+	if alvarez.MediaScore <= barcola.MediaScore {
+		t.Errorf("two articles (%v) should outscore one (%v) on volume", alvarez.MediaScore, barcola.MediaScore)
+	}
+}

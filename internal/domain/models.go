@@ -1,6 +1,9 @@
 package domain
 
-import "time"
+import (
+	"strings"
+	"time"
+)
 
 type Player struct {
 	ID        int64      `json:"id"`
@@ -448,3 +451,45 @@ type ResolvedPlayer struct {
 // keeps them there — so anything that creates a player has to start from the
 // same number, or the new arrival carries a 30-point penalty for being new.
 const CharacterBaseline = 80.0
+
+// ArticleStats is what the Media formula needs from one article; everything
+// else about it is presentation. Every news row stores both, so a player's
+// Media score can be rebuilt from the database without asking the provider
+// again — which is what makes deleting an article reversible.
+type ArticleStats struct {
+	Sentiment  float64
+	SourceTier float64
+}
+
+// NewsSuppression records that a moderator removed an article from one
+// player's feed. The media sync consults these before it scores, so the
+// article neither reappears nor counts.
+type NewsSuppression struct {
+	PlayerID   int64
+	ArticleKey string
+}
+
+// NewsArticleKey identifies an article across syncs. Rows are recreated with
+// fresh ids twice a day, so the id is useless for this; the URL is stable,
+// and the title stands in for the rare row without one.
+func NewsArticleKey(sourceURL, title string) string {
+	if u := strings.TrimSpace(sourceURL); u != "" {
+		return u
+	}
+	return "title:" + strings.ToLower(strings.TrimSpace(title))
+}
+
+// NewsDeletion reports what removing an article did to the player it was
+// filed under, so the moderator sees the score move rather than being told
+// it did.
+type NewsDeletion struct {
+	NewsID     int64   `json:"news_id"`
+	PlayerID   int64   `json:"player_id"`
+	PlayerName string  `json:"player_name"`
+	Title      string  `json:"title"`
+	OldMedia   float64 `json:"old_media"`
+	NewMedia   float64 `json:"new_media"`
+	OldFRI     float64 `json:"old_fri"`
+	NewFRI     float64 `json:"new_fri"`
+	Remaining  int     `json:"remaining_articles"`
+}

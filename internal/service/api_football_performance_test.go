@@ -1396,14 +1396,14 @@ func TestBestPlayerMatchDistinguishesSameSurname(t *testing.T) {
 
 func TestRosterInitial(t *testing.T) {
 	cases := map[string]string{
-		"J. García":     "j",
-		"E. Haaland":    "e",
-		"M. Salah":      "m",
-		"V. van Dijk":   "v",
-		"N'Golo Kanté":  "", // full first name, no initial to check
-		"Vinicius Jr":   "",
-		"Pedri":         "",
-		"Fermín López":  "",
+		"J. García":    "j",
+		"E. Haaland":   "e",
+		"M. Salah":     "m",
+		"V. van Dijk":  "v",
+		"N'Golo Kanté": "", // full first name, no initial to check
+		"Vinicius Jr":  "",
+		"Pedri":        "",
+		"Fermín López": "",
 	}
 	for name, want := range cases {
 		if got := rosterInitial(name); got != want {
@@ -1433,7 +1433,7 @@ func TestPositionsContradictOnlyAcrossTheGoalkeeperLine(t *testing.T) {
 
 	// Two steps along the GK-DEF-MID-ATT line is a different footballer.
 	for _, c := range []struct{ a, b string }{
-		{"Defender", "FWD"},   // a defender cannot stand in for our striker
+		{"Defender", "FWD"}, // a defender cannot stand in for our striker
 		{"Attacker", "DEF"},
 	} {
 		if !positionsContradict(c.a, c.b) {
@@ -1447,7 +1447,7 @@ func TestPositionsContradictOnlyAcrossTheGoalkeeperLine(t *testing.T) {
 		{"Forward", "FWD"},    // Raphinha — "Forward" must map to ATT at all
 		{"Defender", "MID"},
 		{"Goalkeeper", "GK"},
-		{"", "FWD"},           // unknown on either side decides nothing
+		{"", "FWD"}, // unknown on either side decides nothing
 		{"Attacker", ""},
 	}
 	for _, c := range compatible {

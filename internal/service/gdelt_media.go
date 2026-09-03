@@ -81,6 +81,7 @@ func (p *gdeltMediaProvider) FetchPlayerArticles(ctx context.Context, player dom
 	// Same other-sport guard the MediaStack path uses — a surname query finds
 	// the NHL's Kane and the Yankees' Garcia here too.
 	candidates = filterOtherSports(candidates)
+	candidates = filterLiveBlogs(candidates)
 	// Same football-context whitelist the MediaStack provider uses. GDELT
 	// matches on the player's name alone, so a surname query pulls in the
 	// biotech firm "Kane", the golfer Sergio García, and a park named after
