@@ -32,17 +32,25 @@ type competition struct {
 // roughly six points of expected result; nothing published supports more
 // than ~1.15, and the same club plays Europe with its strongest eleven,
 // which pulls the other way. The order below the UCL follows UEFA's own
-// coefficient bonuses. Cups sit lowest: lower-division opposition inflates
-// output. Domestic leagues all sit at 1.00 — the two best public strength
-// estimates disagree on their order, and an effect smaller than the
-// method noise is not worth encoding.
+// coefficient bonuses. Domestic cups sit lowest: lower-division opposition
+// inflates output. Domestic leagues all sit at 1.00 — the two best public
+// strength estimates disagree on their order, and an effect smaller than
+// the method noise is not worth encoding.
 //
-// Missing on purpose: super cups (531 UEFA, 556 Spain, 547 Italy), the
-// Club World Cup (15) and friendlies — one to three matches is never a
-// sample — and national-team rows, excluded by flag so international
-// minutes are not counted against a club season. Anything not listed is
-// not counted: the sync fails closed and says so once in the log, so a new
-// competition gets noticed instead of silently scored.
+// National teams count. A reputation index that ignored the World Cup
+// would be measuring the wrong thing; every competitive international
+// match is in at 1.00, with no attempt to rank a World Cup semi-final
+// against a qualifier — the domestic league mixes top and bottom too.
+// Rows are taken from the same api-football season as the club rows being
+// scored, so a summer tournament joins the season that follows it.
+//
+// One-match competitions — super cups, the Intercontinental Cup — are
+// listed rather than excluded: the credibility ramp already gives ninety
+// minutes no say in the rating, and listing them keeps "everything counts"
+// true without exceptions to explain. Friendlies are the exception: not
+// competitive, never counted. Anything not listed is not counted either —
+// the sync fails closed and says so once in the log, so a new competition
+// (or a youth one) gets noticed instead of silently scored.
 var competitionWeights = map[int]competition{
 	39:  {"Premier League", 1.00},
 	140: {"La Liga", 1.00},
@@ -62,6 +70,34 @@ var competitionWeights = map[int]competition{
 	81:  {"DFB Pokal", 0.85},
 	66:  {"Coupe de France", 0.85},
 	206: {"Türkiye Kupası", 0.85},
+
+	// One-off club competitions. Sample size is the ramp's problem.
+	15:   {"Club World Cup", 1.00},
+	1168: {"Intercontinental Cup", 1.00},
+	531:  {"UEFA Super Cup", 1.00},
+	556:  {"Supercopa de España", 1.00},
+	547:  {"Supercoppa Italiana", 1.00},
+	526:  {"Trophée des Champions", 1.00},
+	528:  {"Community Shield", 1.00},
+	529:  {"DFL-Supercup", 1.00},
+
+	// National teams — competitive matches only.
+	1:   {"World Cup", 1.00},
+	4:   {"Euro Championship", 1.00},
+	5:   {"Nations League", 1.00},
+	6:   {"Africa Cup of Nations", 1.00},
+	7:   {"Asian Cup", 1.00},
+	9:   {"Copa América", 1.00},
+	22:  {"Gold Cup", 1.00},
+	29:  {"World Cup qualification (Africa)", 1.00},
+	30:  {"World Cup qualification (Asia)", 1.00},
+	31:  {"World Cup qualification (CONCACAF)", 1.00},
+	32:  {"World Cup qualification (Europe)", 1.00},
+	33:  {"World Cup qualification (Oceania)", 1.00},
+	34:  {"World Cup qualification (South America)", 1.00},
+	36:  {"AFCON qualification", 1.00},
+	37:  {"World Cup play-offs", 1.00},
+	960: {"Euro qualification", 1.00},
 }
 
 // domesticSeasonMinutes is one full league season, 38 matches of 90. It was
@@ -124,15 +160,16 @@ type pooledStats struct {
 // how much it counts, not how good the output inside it looks.
 //
 // No team filter: after a mid-season move both clubs' rows pool at their
-// competition weights, and api-football already splits rows per (team,
-// league), so nothing is double-counted.
+// competition weights, a national team is just another row, and
+// api-football already splits rows per (team, league), so nothing is
+// double-counted.
 func poolClubStatistics(statistics []apiFootballStatistic) pooledStats {
 	type sums struct{ rating, ratingDen, ga, kp, so, den float64 }
 	var out pooledStats
 	var gated, ungated sums
 
 	for _, stat := range statistics {
-		if stat.Team.National || stat.Games.Minutes <= 0 {
+		if stat.Games.Minutes <= 0 {
 			continue
 		}
 		comp, ok := competitionWeights[stat.League.ID]

@@ -85,22 +85,46 @@ func TestPlayerWithOneCompetitionIsUnchanged(t *testing.T) {
 
 func TestOnlyCountedCompetitionsCount(t *testing.T) {
 	league := compStat(78, "Bundesliga", 157, 2500, 30, "7.9", 20, 15, 60, 70)
+	worldCup := compStat(1, "World Cup", 2, 630, 7, "8.2", 5, 2, 12, 15)
+	worldCup.Team.National = true
+	superCup := compStat(529, "DFL-Supercup", 157, 90, 1, "9.5", 2, 0, 3, 4)
 	rows := []apiFootballStatistic{
-		league,
-		compStat(15, "FIFA Club World Cup", 157, 400, 5, "9.0", 6, 2, 10, 12), // one-tournament sample
-		compStat(531, "UEFA Super Cup", 157, 90, 1, "9.5", 2, 0, 3, 4),        // one match
-		compStat(9999, "Audi Cup", 157, 180, 2, "9.9", 3, 0, 2, 2),            // type says "Cup" too
+		league, worldCup, superCup,
+		compStat(10, "Friendlies", 2, 270, 3, "9.0", 3, 1, 6, 7),          // not competitive
+		compStat(667, "Friendlies Clubs", 157, 270, 3, "9.0", 3, 1, 6, 7), // not competitive
+		compStat(9999, "Audi Cup", 157, 180, 2, "9.9", 3, 0, 2, 2),        // unknown: fail closed
 	}
-	national := compStat(4, "Euro Championship", 2, 450, 5, "8.8", 4, 1, 8, 9)
+	national := compStat(850, "UEFA U21 Championship - Qualification", 3, 450, 5, "8.8", 4, 1, 8, 9)
 	national.Team.National = true
-	rows = append(rows, national)
+	rows = append(rows, national) // youth level: not listed, not counted
 
 	pooled := poolClubStatistics(rows)
-	if len(pooled.Competitions) != 1 || pooled.Competitions[0].LeagueID != 78 {
-		t.Fatalf("counted %+v, want only the Bundesliga", pooled.Competitions)
+	counted := map[int]bool{}
+	for _, c := range pooled.Competitions {
+		counted[c.LeagueID] = true
 	}
-	if pooled.Rating != 7.9 || pooled.RawMinutes != 2500 {
-		t.Errorf("uncounted rows leaked into the measures: rating %.2f minutes %d", pooled.Rating, pooled.RawMinutes)
+	for _, want := range []int{78, 1, 529} {
+		if !counted[want] {
+			t.Errorf("competition %d should count", want)
+		}
+	}
+	for _, reject := range []int{10, 667, 9999, 850} {
+		if counted[reject] {
+			t.Errorf("competition %d must not count", reject)
+		}
+	}
+	// A World Cup is a national-team row and it counts like any other.
+	if pooled.Rating <= 7.9 {
+		t.Errorf("rating = %.3f — the World Cup run moved nothing", pooled.Rating)
+	}
+	// Ninety minutes of super cup are playing time but have no say in the
+	// rating: the ramp, not an exclusion list, is what keeps it quiet.
+	if pooled.RawMinutes != 2500+630+90 {
+		t.Errorf("availability = %d′, want %d", pooled.RawMinutes, 2500+630+90)
+	}
+	wantRating := (7.9*2500 + 8.2*630) / (2500 + 630) // super cup k=0
+	if math.Abs(pooled.Rating-wantRating) > 0.001 {
+		t.Errorf("rating = %.3f, want %.3f (super cup silent)", pooled.Rating, wantRating)
 	}
 }
 
