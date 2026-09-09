@@ -68,8 +68,15 @@ footballreputationindex.online, www.footballreputationindex.online {
 	#
 	# `no-cache` still stores the response — it just has to revalidate
 	# before reuse, and Last-Modified turns almost every check into a cheap
-	# 304. Assets are unhashed (live.js, logo.png), so they get a few
-	# minutes of reuse and then revalidate too.
+	# 304.
+	#
+	# Assets revalidate too, and they have to: their names carry no content
+	# hash, so /assets/live.js means something different after every deploy.
+	# They were given five minutes of free reuse when this block was written,
+	# and within the hour that served a fresh index.html alongside a stale
+	# live.js — a mismatched pair, which renders as a page that loads and
+	# does nothing. The cost of revalidating is one conditional request per
+	# asset, answered 304. Worth it until asset names carry a hash.
 	# Every request matches exactly one of these. A matcherless `header`
 	# block would have been simpler and was wrong: Caddy applied it to
 	# assets and API responses too, so the config said three things and did
@@ -77,7 +84,7 @@ footballreputationindex.online, www.footballreputationindex.online {
 	@assets path /assets/*
 	@api path /api/*
 	@page not path /assets/* /api/*
-	header @assets Cache-Control "public, max-age=300, must-revalidate"
+	header @assets Cache-Control "no-cache"
 	header @api Cache-Control "no-store"
 	header @page Cache-Control "no-cache"
 

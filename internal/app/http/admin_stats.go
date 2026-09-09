@@ -78,14 +78,18 @@ func (h *Router) recordTraffic(c *gin.Context) {
 	tracker.RecordView(section, visitor)
 }
 
-// clientAddress digs the caller's address out from behind Caddy. Gin
-// resolves X-Forwarded-For itself, but the header is checked first so a
-// misconfigured trusted-proxy list cannot quietly turn every visitor into
-// the proxy's own address — which would report one unique visitor a day
-// forever.
+// clientAddress digs the caller's address out from behind Caddy.
+//
+// Reading the left-most X-Forwarded-For entry is only safe because Caddy
+// overwrites that header with the address it actually saw — it appends to a
+// client-supplied value only for proxies listed in `trusted_proxies`, and we
+// list none. Verified on 2026-09-09 by sending three requests with forged
+// X-Forwarded-For values and confirming none of them reached the visitor
+// table. If a proxy is ever trusted, or something like Cloudflare goes back
+// in front, this has to read the right-most entry instead or the visitor
+// count becomes anyone's to inflate.
 func clientAddress(c *gin.Context) string {
 	if forwarded := strings.TrimSpace(c.GetHeader("X-Forwarded-For")); forwarded != "" {
-		// Left-most entry is the original client; the rest are proxies.
 		if first := strings.TrimSpace(strings.Split(forwarded, ",")[0]); first != "" {
 			return first
 		}

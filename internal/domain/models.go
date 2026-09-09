@@ -537,11 +537,17 @@ type ContentTotals struct {
 
 // TrafficStats is the whole admin dashboard payload.
 //
-// A caveat worth keeping in front of whoever reads it: pages are switched
-// in the browser by the History-API router, so moving from the leaderboard
-// to the about page never reaches the server. PageLoads counts documents
-// actually served — arrivals and refreshes — and EntryPoints says which
-// address people landed on. Visitors is the honest headline number.
+// Two caveats worth keeping in front of whoever reads it.
+//
+// Pages are switched in the browser by the History-API router, so moving
+// from the leaderboard to the about page never reaches the server.
+// PageLoads counts documents actually served — arrivals and refreshes — and
+// EntryPoints says which address people landed on, not everywhere they went.
+//
+// Visitors counts addresses, not people. A mobile network or a rotating
+// home address makes one person several visitors in a day; an office or a
+// carrier NAT makes several people one. It is the right number to watch
+// for a trend and the wrong one to quote as an audience size.
 type TrafficStats struct {
 	Users       UserTotals        `json:"users"`
 	Content     ContentTotals     `json:"content"`
