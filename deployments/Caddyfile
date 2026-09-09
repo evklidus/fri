@@ -57,6 +57,26 @@ footballreputationindex.online, www.footballreputationindex.online {
 	# Compress text responses.
 	encode zstd gzip
 
+	# Cache policy. The Go static server sends only Last-Modified and no
+	# Cache-Control at all, which leaves browsers free to reuse a page
+	# heuristically without asking. That is fine for a picture and bad for
+	# this one: index.html carries the i18n dictionary, the History-API
+	# router and the data loaders inline, so a visitor holding a broken copy
+	# keeps holding it. When an apostrophe in the About copy killed that
+	# script on 2026-09-03, the deployed fix still would not have reached
+	# anyone whose browser had already stored the broken page.
+	#
+	# `no-cache` still stores the response — it just has to revalidate
+	# before reuse, and Last-Modified turns almost every check into a cheap
+	# 304. Assets are unhashed (live.js, logo.png), so they get a few
+	# minutes of reuse and then revalidate too.
+	@assets path /assets/*
+	header @assets Cache-Control "public, max-age=300, must-revalidate"
+	header /api/* Cache-Control "no-store"
+	header {
+		Cache-Control "no-cache"
+	}
+
 	# Access log to stdout — captured by docker logs.
 	log {
 		output stdout
