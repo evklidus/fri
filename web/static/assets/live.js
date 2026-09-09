@@ -991,7 +991,7 @@
 
     return '<div class="admin-note">' + escapeHtml(adminText("admin_traffic_sub", "")) + "</div>" +
       kpis +
-      adminPanel("admin_traffic", "Traffic", "admin_traffic_sub", "", adminTrafficChart(stats.days)) +
+      adminPanel("admin_traffic", "Traffic", "admin_traffic_short", "Per day, last 14 days.", adminTrafficChart(stats.days)) +
       adminPanel("admin_entry", "Entry points", "admin_entry_sub", "",
         adminTable([adminText("admin_section", "Section"), adminText("admin_loads", "Page loads")], entryRows)) +
       adminPanel("admin_signups", "Registrations", "admin_signups_sub", "",
