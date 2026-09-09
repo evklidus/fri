@@ -70,12 +70,16 @@ footballreputationindex.online, www.footballreputationindex.online {
 	# before reuse, and Last-Modified turns almost every check into a cheap
 	# 304. Assets are unhashed (live.js, logo.png), so they get a few
 	# minutes of reuse and then revalidate too.
+	# Every request matches exactly one of these. A matcherless `header`
+	# block would have been simpler and was wrong: Caddy applied it to
+	# assets and API responses too, so the config said three things and did
+	# one.
 	@assets path /assets/*
+	@api path /api/*
+	@page not path /assets/* /api/*
 	header @assets Cache-Control "public, max-age=300, must-revalidate"
-	header /api/* Cache-Control "no-store"
-	header {
-		Cache-Control "no-cache"
-	}
+	header @api Cache-Control "no-store"
+	header @page Cache-Control "no-cache"
 
 	# Access log to stdout — captured by docker logs.
 	log {
