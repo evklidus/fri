@@ -161,7 +161,10 @@ func (f *fakeService) SyncAll(ctx context.Context) ([]domain.ComponentSyncResult
 // invitation to burn someone else's quota.
 const testAdminToken = "test-admin-token"
 
-func newServerWithFake(t *testing.T, fake *fakeService) *httptest.Server {
+// newServerWithFake takes the Service interface rather than *fakeService so
+// a test can wrap the fake to add an optional surface — the traffic
+// recorder does exactly that.
+func newServerWithFake(t *testing.T, fake Service) *httptest.Server {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
 	router := NewRouter(config.Config{WebDir: ".", AdminAPIToken: testAdminToken}, fake)

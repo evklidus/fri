@@ -493,3 +493,62 @@ type NewsDeletion struct {
 	NewFRI     float64 `json:"new_fri"`
 	Remaining  int     `json:"remaining_articles"`
 }
+
+// TrafficDay is one day of traffic: how many times a page was served and
+// how many separate people it was served to.
+type TrafficDay struct {
+	Day       string `json:"day"` // YYYY-MM-DD, UTC
+	PageLoads int64  `json:"page_loads"`
+	APICalls  int64  `json:"api_calls"`
+	Visitors  int64  `json:"visitors"`
+}
+
+// EntryPoint counts how often visitors arrived on a given section. Pages
+// are switched in the browser after that first load, so this measures where
+// people come in, not everywhere they go — see the note on TrafficStats.
+type EntryPoint struct {
+	Section string `json:"section"`
+	Views   int64  `json:"views"`
+}
+
+// SignupDay is how many accounts were created on one day.
+type SignupDay struct {
+	Day   string `json:"day"` // YYYY-MM-DD, UTC
+	Users int64  `json:"users"`
+}
+
+// UserTotals is the account picture the founders report.
+type UserTotals struct {
+	Total           int64 `json:"total"`
+	NewLast7Days    int64 `json:"new_last_7_days"`
+	NewLast30Days   int64 `json:"new_last_30_days"`
+	ActiveLast7Days int64 `json:"active_last_7_days"`
+	Admins          int64 `json:"admins"`
+}
+
+// ContentTotals is what the system currently holds, so an empty dashboard
+// can be told apart from a broken sync.
+type ContentTotals struct {
+	Players       int64 `json:"players"`
+	NewsItems     int64 `json:"news_items"`
+	PendingEvents int64 `json:"pending_events"`
+	VotesAllTime  int64 `json:"votes_all_time"`
+}
+
+// TrafficStats is the whole admin dashboard payload.
+//
+// A caveat worth keeping in front of whoever reads it: pages are switched
+// in the browser by the History-API router, so moving from the leaderboard
+// to the about page never reaches the server. PageLoads counts documents
+// actually served — arrivals and refreshes — and EntryPoints says which
+// address people landed on. Visitors is the honest headline number.
+type TrafficStats struct {
+	Users       UserTotals        `json:"users"`
+	Content     ContentTotals     `json:"content"`
+	Days        []TrafficDay      `json:"days"`
+	EntryPoints []EntryPoint      `json:"entry_points"`
+	Signups     []SignupDay       `json:"signups"`
+	Syncs       []ComponentUpdate `json:"syncs"`
+	WindowDays  int               `json:"window_days"`
+	GeneratedAt time.Time         `json:"generated_at"`
+}

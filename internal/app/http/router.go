@@ -49,6 +49,11 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		svc: svc,
 	}
 
+	// Count traffic for the admin dashboard. Registered before the routes so
+	// it also sees the static-file and not-found paths, which is where every
+	// page load lands.
+	router.Use(handler.recordTraffic)
+
 	api := router.Group("/api")
 	{
 		api.GET("/health", handler.health)
@@ -71,7 +76,6 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		api.POST("/auth/login", handler.login)
 		api.POST("/auth/logout", handler.logout)
 		api.GET("/auth/me", handler.me)
-		api.GET("/stats/users", handler.userCount)
 
 		// Everything that changes data sits behind an admin session. These
 		// were open to the internet until now: anyone who knew the paths
@@ -88,6 +92,11 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 			admin.POST("/sync/performance", handler.runPerformanceSync)
 			admin.POST("/sync/character", handler.runCharacterSync)
 			admin.POST("/sync/all", handler.runAllSync)
+			admin.GET("/stats", handler.adminStats)
+			// How many accounts exist is a business number, not public
+			// information. It answered anyone who asked until 2026-09-09,
+			// and nothing on the site was reading it.
+			admin.GET("/stats/users", handler.userCount)
 		}
 	}
 

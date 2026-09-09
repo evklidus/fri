@@ -165,6 +165,10 @@ func (s *Service) CountUsers(ctx context.Context) (int64, error) {
 	return s.auth.CountUsers(ctx)
 }
 
+// ErrTrafficUnavailable is returned when the store cannot record traffic,
+// which is how the router's fakes and any cut-down deployment behave.
+var ErrTrafficUnavailable = errors.New("traffic statistics unavailable")
+
 // ErrNewsNotFound is returned when the article to delete does not exist —
 // usually because a sync already rotated it out.
 var ErrNewsNotFound = errors.New("no such article")

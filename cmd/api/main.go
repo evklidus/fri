@@ -58,6 +58,11 @@ func main() {
 		})
 	}
 
+	// Traffic counters flush on their own timer and once more on shutdown.
+	// Started regardless of AUTO_SYNC_ENABLED: a deployment with the syncs
+	// off still has visitors worth counting.
+	svc.StartTrafficCollector(ctx)
+
 	router := apphttp.NewRouter(cfg, svc)
 
 	server := &http.Server{

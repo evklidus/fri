@@ -736,6 +736,16 @@
     if (adminTools) {
       adminTools.style.display = window.friIsAdmin ? "" : "none";
     }
+    renderAdminNav();
+    // Signing in or out changes what the dashboard is allowed to show, so a
+    // page already on screen is refetched rather than left stale.
+    const adminBody = document.getElementById("admin-body");
+    const onAdminPage = document.querySelector('.page[data-route="/admin"]');
+    if (adminBody && onAdminPage && !onAdminPage.hidden) {
+      loadAdminStats(true);
+    } else if (adminBody) {
+      adminBody.removeAttribute("data-loaded");
+    }
   }
   window.renderAuthControls = renderAuthControls;
 
@@ -868,6 +878,165 @@
       window.alert("Delete failed: " + err.message);
     }
   };
+
+  // ── ADMIN DASHBOARD ───────────────────────────────────────
+  // Accounts, traffic and sync health. The endpoint is admin-gated, so this
+  // renders a polite refusal rather than an error for everyone else.
+  let adminStatsPending = false;
+
+  function adminText(key, fallback) {
+    const t = (window.T && window.T[window.lang]) || {};
+    return t[key] || fallback;
+  }
+
+  function adminKpi(value, labelKey, labelFallback) {
+    return '<div class="admin-kpi"><div class="admin-kpi-value">' +
+      Number(value || 0).toLocaleString() +
+      '</div><div class="admin-kpi-label">' + escapeHtml(adminText(labelKey, labelFallback)) +
+      "</div></div>";
+  }
+
+  function adminPanel(titleKey, titleFallback, subKey, subFallback, body) {
+    return '<div class="admin-panel"><h3>' + escapeHtml(adminText(titleKey, titleFallback)) + "</h3>" +
+      '<div class="admin-panel-sub">' + escapeHtml(adminText(subKey, subFallback)) + "</div>" +
+      body + "</div>";
+  }
+
+  // Two bars per day: visitors and documents served. Scaled to whichever is
+  // largest across the window so a quiet week still shows shape.
+  function adminTrafficChart(days) {
+    const rows = Array.isArray(days) ? days : [];
+    if (!rows.length || !rows.some((d) => d.visitors || d.page_loads)) {
+      return '<div class="admin-empty">' +
+        escapeHtml(adminText("admin_no_traffic", "No traffic recorded yet.")) + "</div>";
+    }
+    const peak = Math.max.apply(null, rows.map((d) => Math.max(d.visitors || 0, d.page_loads || 0))) || 1;
+    const height = (value) => Math.max(2, Math.round(((value || 0) / peak) * 110));
+    const cols = rows.map((d) => {
+      const label = String(d.day || "").slice(5); // MM-DD
+      const title = label + " · " + adminText("admin_visitors", "Visitors") + ": " + (d.visitors || 0) +
+        " · " + adminText("admin_loads", "Page loads") + ": " + (d.page_loads || 0);
+      return '<div class="admin-chart-col" title="' + escapeAttr(title) + '">' +
+        '<div class="admin-chart-stack">' +
+        '<div class="admin-chart-bar visitors" style="height:' + height(d.visitors) + 'px"></div>' +
+        '<div class="admin-chart-bar loads" style="height:' + height(d.page_loads) + 'px"></div>' +
+        "</div>" +
+        '<div class="admin-chart-day">' + escapeHtml(label) + "</div></div>";
+    }).join("");
+    const totals = rows.reduce((acc, d) => {
+      acc.visitors += d.visitors || 0;
+      acc.loads += d.page_loads || 0;
+      acc.api += d.api_calls || 0;
+      return acc;
+    }, { visitors: 0, loads: 0, api: 0 });
+    return '<div class="admin-chart">' + cols + "</div>" +
+      '<div class="admin-legend">' +
+      '<span class="k-visitors">' + escapeHtml(adminText("admin_visitors", "Visitors")) + ": " + totals.visitors.toLocaleString() + "</span>" +
+      '<span class="k-loads">' + escapeHtml(adminText("admin_loads", "Page loads")) + ": " + totals.loads.toLocaleString() + "</span>" +
+      "<span>" + escapeHtml(adminText("admin_api", "API calls")) + ": " + totals.api.toLocaleString() + "</span>" +
+      "</div>";
+  }
+
+  function adminTable(headers, rows) {
+    if (!rows.length) {
+      return '<div class="admin-empty">—</div>';
+    }
+    return '<table class="admin-table"><thead><tr>' +
+      headers.map((h) => "<th>" + escapeHtml(h) + "</th>").join("") +
+      "</tr></thead><tbody>" +
+      rows.map((cells) => "<tr>" + cells.join("") + "</tr>").join("") +
+      "</tbody></table>";
+  }
+
+  function adminRenderStats(stats) {
+    const users = stats.users || {};
+    const content = stats.content || {};
+
+    const kpis = '<div class="admin-kpis">' +
+      adminKpi(users.total, "admin_total", "Total") +
+      adminKpi(users.new_last_7_days, "admin_new7", "New, 7d") +
+      adminKpi(users.new_last_30_days, "admin_new30", "New, 30d") +
+      adminKpi(users.active_last_7_days, "admin_active7", "Signed in, 7d") +
+      adminKpi(users.admins, "admin_admins", "Admins") +
+      "</div>";
+
+    const contentKpis = '<div class="admin-kpis">' +
+      adminKpi(content.players, "admin_players", "Players") +
+      adminKpi(content.news_items, "admin_news", "News items") +
+      adminKpi(content.pending_events, "admin_events", "Open events") +
+      adminKpi(content.votes_all_time, "admin_votes", "Votes") +
+      "</div>";
+
+    const entryRows = (stats.entry_points || []).map((e) => [
+      "<td>" + escapeHtml(e.section || "—") + "</td>",
+      '<td class="num">' + Number(e.views || 0).toLocaleString() + "</td>",
+    ]);
+
+    const signupRows = (stats.signups || []).filter((d) => d.users > 0).map((d) => [
+      "<td>" + escapeHtml(d.day || "") + "</td>",
+      '<td class="num">' + Number(d.users || 0).toLocaleString() + "</td>",
+    ]);
+
+    const syncRows = (stats.syncs || []).map((sync) => {
+      const ok = String(sync.status || "").toLowerCase() === "completed";
+      const when = sync.finished_at || sync.started_at || "";
+      return [
+        "<td>" + escapeHtml(sync.component || "") + "</td>",
+        '<td class="' + (ok ? "admin-ok" : "admin-bad") + '">' + escapeHtml(sync.status || "") + "</td>",
+        "<td>" + escapeHtml(String(when).replace("T", " ").slice(0, 16)) + "</td>",
+        '<td class="num">' + Number(sync.records_seen || 0).toLocaleString() + "</td>",
+        "<td>" + escapeHtml(String(sync.message || "").slice(0, 70)) + "</td>",
+      ];
+    });
+
+    return '<div class="admin-note">' + escapeHtml(adminText("admin_traffic_sub", "")) + "</div>" +
+      kpis +
+      adminPanel("admin_traffic", "Traffic", "admin_traffic_sub", "", adminTrafficChart(stats.days)) +
+      adminPanel("admin_entry", "Entry points", "admin_entry_sub", "",
+        adminTable([adminText("admin_section", "Section"), adminText("admin_loads", "Page loads")], entryRows)) +
+      adminPanel("admin_signups", "Registrations", "admin_signups_sub", "",
+        adminTable([adminText("admin_day", "Day"), adminText("admin_users", "Accounts")], signupRows)) +
+      contentKpis +
+      adminPanel("admin_syncs", "Data syncs", "admin_syncs_sub", "",
+        adminTable([
+          adminText("admin_component", "Component"), adminText("admin_status", "Status"),
+          adminText("admin_when", "When"), adminText("admin_records", "Records"),
+          adminText("admin_message", "Message"),
+        ], syncRows));
+  }
+
+  async function loadAdminStats(force) {
+    const host = document.getElementById("admin-body");
+    if (!host || adminStatsPending) return;
+    if (!force && host.getAttribute("data-loaded") === "1") return;
+
+    adminStatsPending = true;
+    host.innerHTML = '<div class="admin-empty">' + escapeHtml(adminText("admin_loading", "Loading…")) + "</div>";
+    try {
+      const payload = await fetchJSON("/api/stats");
+      host.innerHTML = adminRenderStats(payload.data || {});
+      host.setAttribute("data-loaded", "1");
+    } catch (err) {
+      // 401 and 403 are the ordinary answer for a visitor who opened the
+      // address without an admin account, not a fault worth a stack trace.
+      const denied = /401|403|sign in|admin/i.test(String(err.message || ""));
+      host.innerHTML = '<div class="admin-empty">' +
+        escapeHtml(adminText(denied ? "admin_denied" : "admin_failed", err.message)) + "</div>";
+      host.removeAttribute("data-loaded");
+      if (!denied) console.error("admin stats failed", err);
+    } finally {
+      adminStatsPending = false;
+    }
+  }
+  window.loadAdminStats = loadAdminStats;
+
+  // The nav entry only appears for admins; the data behind it is gated
+  // server-side regardless.
+  function renderAdminNav() {
+    const link = document.getElementById("nav-admin");
+    if (link) link.hidden = !window.friIsAdmin;
+  }
+  window.renderAdminNav = renderAdminNav;
 
   async function hydrate() {
     try {

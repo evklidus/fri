@@ -64,6 +64,9 @@ type Service struct {
 	// than panicking.
 	auth authStore
 
+	// traffic buffers request counters between flushes; see traffic.go.
+	traffic trafficBuffer
+
 	// Per-component sync locks prevent overlapping scheduled and ad-hoc HTTP
 	// runs of the same component. We use TryLock so a concurrent caller
 	// returns immediately with status=skipped instead of queueing.

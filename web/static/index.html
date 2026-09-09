@@ -212,6 +212,33 @@
   .formula-box { background:var(--card); border:1px solid var(--border); border-radius:16px; padding:40px; margin-bottom:32px; font-family:'Space Mono',monospace; text-align:center; }
   .formula-main { font-size:18px; color:var(--gold); margin-bottom:16px; display:block; line-height:1.6; }
   .formula-note { font-size:13px; color:var(--muted); line-height:1.8; }
+  /* Admin dashboard. Same card language as the rest of the page. */
+  .admin-note { font-size:12px; color:var(--muted); line-height:1.6; margin-bottom:28px; padding:12px 16px; border-left:2px solid var(--gold); background:rgba(245,200,66,0.04); }
+  .admin-kpis { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; margin-bottom:32px; }
+  .admin-kpi { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:18px 20px; }
+  .admin-kpi-value { font-family:'Bebas Neue',sans-serif; font-size:34px; line-height:1; color:var(--gold); }
+  .admin-kpi-label { font-size:11px; font-family:'Space Mono',monospace; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); margin-top:8px; }
+  .admin-panel { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:20px; overflow-x:auto; }
+  .admin-panel h3 { font-family:'Bebas Neue',sans-serif; font-size:20px; letter-spacing:1px; margin-bottom:4px; }
+  .admin-panel-sub { font-size:12px; color:var(--muted); margin-bottom:20px; }
+  .admin-chart { display:flex; align-items:flex-end; gap:6px; min-height:130px; min-width:420px; }
+  .admin-chart-col { flex:1; display:flex; flex-direction:column; align-items:center; gap:6px; }
+  .admin-chart-stack { display:flex; align-items:flex-end; gap:2px; height:110px; width:100%; justify-content:center; }
+  .admin-chart-bar { width:11px; border-radius:3px 3px 0 0; min-height:2px; }
+  .admin-chart-bar.visitors { background:var(--gold); }
+  .admin-chart-bar.loads { background:rgba(255,255,255,0.16); }
+  .admin-chart-day { font-size:9px; font-family:'Space Mono',monospace; color:var(--muted); white-space:nowrap; }
+  .admin-legend { display:flex; gap:18px; margin-top:16px; font-size:11px; color:var(--muted); font-family:'Space Mono',monospace; }
+  .admin-legend span::before { content:''; display:inline-block; width:9px; height:9px; border-radius:2px; margin-right:6px; vertical-align:middle; }
+  .admin-legend .k-visitors::before { background:var(--gold); }
+  .admin-legend .k-loads::before { background:rgba(255,255,255,0.16); }
+  .admin-table { width:100%; border-collapse:collapse; font-size:13px; min-width:420px; }
+  .admin-table th { text-align:left; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--muted); padding:0 12px 10px 0; font-weight:400; }
+  .admin-table td { padding:9px 12px 9px 0; border-top:1px solid var(--border); }
+  .admin-table td.num { font-family:'Space Mono',monospace; color:var(--gold); }
+  .admin-ok { color:var(--green); }
+  .admin-bad { color:var(--red); }
+  .admin-empty { font-size:13px; color:var(--muted); }
   .pillars-detail { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
   .pillar-detail-card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:24px; }
   .pillar-detail-card h4 { font-family:'Bebas Neue',sans-serif; font-size:22px; letter-spacing:1px; margin-bottom:6px; }
@@ -428,6 +455,9 @@
     <li><a href="/leaderboard" data-route-link data-i18n="nav_rankings">FRI Leaderboard</a></li>
     <li><a href="/vote" data-route-link data-i18n="nav_events">Vote on Events</a></li>
     <li><a href="/about" data-route-link data-i18n="nav_about">About Us</a></li>
+    <!-- Shown only to admins; the endpoint behind the page rejects everyone
+         else anyway, so this is tidiness rather than a control. -->
+    <li id="nav-admin" hidden><a href="/admin" data-route-link data-i18n="nav_admin">Dashboard</a></li>
   </ul>
   <div class="nav-right">
     <!-- Account controls. Anonymous visitors see sign in / sign up; a signed-in
@@ -618,6 +648,19 @@
 </section>
 </div>
 
+<div class="page" data-route="/admin" hidden>
+<section id="admin-dashboard" class="formula-section">
+  <div class="section-header">
+    <div class="section-eyebrow" data-i18n="admin_eye">Admin</div>
+    <h2 class="section-title" data-i18n="admin_title">Dashboard</h2>
+    <p class="section-sub" data-i18n="admin_sub">Accounts, traffic and the health of the data syncs. Visible only with an admin account.</p>
+  </div>
+  <div id="admin-body">
+    <div class="admin-empty" data-i18n="admin_loading">Loading…</div>
+  </div>
+</section>
+</div>
+
 
 <footer>
   <div class="footer-grid">
@@ -746,6 +789,25 @@ const T = {
     news_pos:'↑ Positive', news_neg:'↓ Negative', news_neu:'— Neutral', news_impact:'FRI Impact:', news_auto:'pts (auto-applied)',
     form_eye:'Methodology', form_title:'The Formula', form_sub:'Fair, transparent, and position-neutral. Every component is publicly auditable.',
     form_note:'All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation',
+    nav_admin:'Dashboard',
+    admin_eye:'Admin', admin_title:'Dashboard',
+    admin_sub:'Accounts, traffic and the health of the data syncs. Visible only with an admin account.',
+    admin_loading:'Loading…',
+    admin_users:'Accounts', admin_traffic:'Traffic', admin_entry:'Entry points',
+    admin_signups:'Registrations', admin_syncs:'Data syncs', admin_content:'Content',
+    admin_total:'Total', admin_new7:'New, 7d', admin_new30:'New, 30d',
+    admin_active7:'Signed in, 7d', admin_admins:'Admins',
+    admin_visitors:'Visitors', admin_loads:'Page loads', admin_api:'API calls',
+    admin_players:'Players', admin_news:'News items', admin_events:'Open events', admin_votes:'Votes',
+    admin_traffic_sub:"Unique visitors and documents served per day, last 14 days. Pages are switched in the browser, so moving between them never reaches the server: this counts arrivals and refreshes, not every page someone looks at.",
+    admin_entry_sub:'Which address visitors landed on.',
+    admin_signups_sub:'Accounts created per day.',
+    admin_syncs_sub:'Most recent run of each component.',
+    admin_day:'Day', admin_section:'Section', admin_component:'Component',
+    admin_status:'Status', admin_when:'When', admin_records:'Records', admin_message:'Message',
+    admin_denied:'This page needs an admin account.',
+    admin_failed:'Could not load statistics.',
+    admin_no_traffic:'No traffic recorded yet. Counting started with this deploy.',
     pil1_t:'Field Performance', pil1_d:"Every competitive match counts — league, domestic cups, Europe and the national team — weighted by minutes played, with Champions League minutes worth a little more. Stats normalized by position. GK measured by saves, DEF by tackles/interceptions, MID by key passes, FWD by goals per 90. Blended 60/40 with a career baseline so stars don't crater during an off year.",
     pil2_t:'Social Influence', pil2_d:'Log-scaled follower count across Instagram, X, TikTok. Weighted by engagement rate and 30-day follower growth. Prevents megastars from crowding out everyone else.',
     pil3_t:'Fan Sentiment', pil3_d:'Rolling weekly polls + per-match fan ratings. Verified voters only (no bots). Blended 60/40 between structured polls and post-match crowd ratings.',
@@ -799,6 +861,25 @@ const T = {
     news_pos:'↑ Позитив', news_neg:'↓ Негатив', news_neu:'— Нейтрально', news_impact:'Влияние на FRI:', news_auto:'пт (применено автоматически)',
     form_eye:'Методология', form_title:'Формула', form_sub:'Справедливая, прозрачная, нейтральная к позиции. Каждый компонент открыт для проверки.',
     form_note:'Все компоненты нормализованы по шкале 0–100 · Обновляется каждые 24 часа · Новостные события запускают немедленный перерасчёт',
+    nav_admin:'Панель',
+    admin_eye:'Админ', admin_title:'Панель',
+    admin_sub:'Аккаунты, трафик и состояние синхронизаций. Видно только с админского аккаунта.',
+    admin_loading:'Загрузка…',
+    admin_users:'Аккаунты', admin_traffic:'Трафик', admin_entry:'Точки входа',
+    admin_signups:'Регистрации', admin_syncs:'Синхронизации', admin_content:'Содержимое',
+    admin_total:'Всего', admin_new7:'Новых за 7 дней', admin_new30:'Новых за 30 дней',
+    admin_active7:'Заходили за 7 дней', admin_admins:'Админов',
+    admin_visitors:'Посетители', admin_loads:'Загрузки страниц', admin_api:'Запросы к API',
+    admin_players:'Игроков', admin_news:'Новостей', admin_events:'Открытых событий', admin_votes:'Голосов',
+    admin_traffic_sub:'Уникальные посетители и отданные документы по дням за 14 дней. Страницы переключаются в браузере, поэтому переход между ними до сервера не доходит: здесь считаются приходы и обновления страницы, а не все просмотры.',
+    admin_entry_sub:'На какой адрес посетители попадали.',
+    admin_signups_sub:'Созданные аккаунты по дням.',
+    admin_syncs_sub:'Последний запуск каждого компонента.',
+    admin_day:'День', admin_section:'Раздел', admin_component:'Компонент',
+    admin_status:'Статус', admin_when:'Когда', admin_records:'Записей', admin_message:'Сообщение',
+    admin_denied:'Страница доступна только с админского аккаунта.',
+    admin_failed:'Не удалось загрузить статистику.',
+    admin_no_traffic:'Трафик пока не записан. Подсчёт начался с этого обновления.',
     pil1_t:'Полевые показатели', pil1_d:'Учитываются все официальные матчи — чемпионат, национальные кубки, еврокубки и сборная — с весом по сыгранным минутам; минуты в Лиге чемпионов ценятся чуть выше. Статистика нормализована по позиции. Вратари — по сейвам, защитники — по отборам и перехватам, полузащитники — по ключевым передачам, нападающие — по голам за 90 минут. Смешано 60/40 с карьерной базой, чтобы звёзды не проваливались в неудачный сезон.',
     pil2_t:'Социальное влияние', pil2_d:'Количество подписчиков в Instagram, X, TikTok по логарифмической шкале. Учитывается вовлечённость и рост подписчиков за 30 дней. Исключает монополизацию топ-звёздами.',
     pil3_t:'Мнение болельщиков', pil3_d:'Еженедельные опросы + оценки по итогам матчей. Только верифицированные голоса (без ботов). Смешение 60/40 между структурированными опросами и оценками болельщиков.',
@@ -1192,7 +1273,7 @@ function submitPoll() {
 // shareable and the back button behaves; the Go server already answers any
 // unmatched path with this file, so a cold load of /leaderboard lands here
 // and showRoute picks the right page.
-const ROUTES = ['/', '/leaderboard', '/vote', '/about'];
+const ROUTES = ['/', '/leaderboard', '/vote', '/about', '/admin'];
 
 function normalizeRoute(path) {
   if (!path) return '/';
@@ -1219,6 +1300,12 @@ function showRoute(path, opts) {
   // Sections that were hidden while data loaded need their content drawn.
   if (typeof renderTable === 'function') renderTable();
   if (typeof renderPlayerCards === 'function') renderPlayerCards();
+  // The dashboard is fetched when its page is opened rather than on every
+  // load: it is one admin's screen, not something every visitor should pay
+  // a request for.
+  if (route === '/admin' && typeof window.loadAdminStats === 'function') {
+    window.loadAdminStats();
+  }
   return route;
 }
 
