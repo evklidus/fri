@@ -1243,16 +1243,38 @@ func (r *Repository) FinalizePendingEvents(ctx context.Context) (int, error) {
 				}
 				// Get the latest performance snapshot's normalized score —
 				// that's our true "current season" baseline before events.
+				//
+				// This query used to read COALESCE(MAX(normalized_score), $2)
+				// with an ORDER BY on snapshot_at, which Postgres rejects:
+				// the sort column is neither grouped nor aggregated. It also
+				// asked for the wrong thing — the highest score a player ever
+				// recorded rather than their latest.
+				//
+				// The rejection was invisible for months because nothing had
+				// ever reached this branch: it runs only when an event's
+				// voting window expires, and the first one closed on
+				// 2026-08-24. From that hour the sync failed every hour for
+				// 396 runs, and the error below hid why.
 				var baseSnapshot float64
-				if err := tx.QueryRow(ctx, `
-					SELECT COALESCE(MAX(normalized_score), $2)
+				err := tx.QueryRow(ctx, `
+					SELECT normalized_score
 					FROM performance_snapshots
 					WHERE player_id = $1
 					ORDER BY snapshot_at DESC
 					LIMIT 1
-				`, playerID, current.Performance).Scan(&baseSnapshot); err != nil {
-					// No snapshot history — keep current value
+				`, playerID).Scan(&baseSnapshot)
+				switch {
+				case errors.Is(err, pgx.ErrNoRows):
+					// Genuinely no snapshot history — a player added before
+					// their first performance sync. Their live score is the
+					// best baseline available.
 					baseSnapshot = current.Performance
+				case err != nil:
+					// Anything else is a real failure. Swallowing it into the
+					// same fallback is what turned a rejected query into
+					// "current transaction is aborted" on the next statement,
+					// three lines further down, every hour for seventeen days.
+					return 0, fmt.Errorf("performance baseline for player %d: %w", playerID, err)
 				}
 				current.Performance = clamp0to100(round1(baseSnapshot + sumPerf))
 				current.PerformanceUpdatedAt = now

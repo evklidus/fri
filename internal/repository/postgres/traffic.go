@@ -170,7 +170,10 @@ func (r *Repository) ContentTotals(ctx context.Context) (domain.ContentTotals, e
 		SELECT
 			(SELECT count(*) FROM players),
 			(SELECT count(*) FROM news_items),
-			(SELECT count(*) FROM character_events WHERE voting_status = 'pending'),
+			-- 'pending_vote' is the status the event pipeline actually
+			-- writes; 'pending' matches nothing, so this read zero while
+			-- four events sat waiting to be finalized.
+			(SELECT count(*) FROM character_events WHERE voting_status = 'pending_vote'),
 			(SELECT count(*) FROM fan_votes)
 	`).Scan(&t.Players, &t.NewsItems, &t.PendingEvents, &t.VotesAllTime)
 	return t, err
