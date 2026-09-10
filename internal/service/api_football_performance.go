@@ -223,10 +223,6 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 
 	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)
-	// Phase 4.3 MVP: stats-derived performance events. Right now this only
-	// catches goal droughts for attacking positions — full per-fixture
-	// hat-trick / brace detection lands once we expose per-fixture data.
-	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
 	return snapshot, nil
 }
 
@@ -288,7 +284,6 @@ func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, 
 
 	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)
-	snapshot.PerformanceEvents = detectPerformanceEvents(player, form, info.Season)
 	return snapshot, nil
 }
 
@@ -1335,52 +1330,41 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, anchor apiFootball
 	}
 }
 
-// detectPerformanceEvents emits stats-derived rating events from a form
-// snapshot. Phase 4.3 MVP: only goal droughts (the cheap signal we already
-// have aggregated). Hat-trick / brace detection needs per-fixture goal counts
-// — that lands in Phase 4.3 full, alongside a dedicated per-fixture pull.
+// A goal-drought detector used to live here. It fired when a player had no
+// goal or assist across their last five matches and charged Performance -1,
+// keyed by ISO week — so a drought that ran for a month produced four
+// separate penalties that stacked, with no ceiling and no expiry once the
+// player scored again. N'Golo Kanté, a holding midfielder, accumulated four.
 //
-// Idempotency strategy: source_ref bakes in season + ISO week so the same
-// drought across re-runs of the same week is one event. When the player
-// finally scores or the week rolls over, the source_ref changes and a fresh
-// detection can fire.
-func detectPerformanceEvents(player domain.PlayerSyncTarget, form formSnapshot, season int) []domain.CharacterEventCandidate {
-	// Only attacking positions get drought-flagged. A 5-match scoreless run
-	// from a centre-back isn't a story.
-	if !isAttackingPosition(player.Position) {
-		return nil
-	}
-	// Need a full 5-game window with zero goals AND zero assists. A
-	// dry-on-goals creator who's still racking up assists isn't in a drought.
-	if form.Games < formMatches || form.Goals != 0 || form.Assists != 0 {
-		return nil
-	}
-
-	now := time.Now().UTC()
-	isoYear, isoWeek := now.ISOWeek()
-	sourceRef := fmt.Sprintf("drought:%d:%d-W%02d", season, isoYear, isoWeek)
-
-	return []domain.CharacterEventCandidate{
-		{
-			PlayerID:        player.ID,
-			TriggerWord:     "goal_drought_5_stats",
-			Delta:           -1.0, // half the keyword-detected drought_5 — stats is precise, fires reliably
-			TargetComponent: "performance",
-			SourceRef:       sourceRef,
-		},
-	}
-}
-
-// isAttackingPosition returns true for the player positions where a 5-match
-// goalless run is newsworthy. Defenders and goalkeepers aren't expected to
-// score, so we don't flag droughts for them.
-func isAttackingPosition(position string) bool {
-	switch strings.ToUpper(strings.TrimSpace(position)) {
-	case "FWD", "FW", "ST", "CF", "LW", "RW", "ATT", "MID", "AM", "CAM":
-		return true
-	}
-	return false
-}
+// It was removed on 2026-09-10 because the thing it measured was already
+// measured, twice over:
+//
+//   - buildFormScore below computes goals+assists per 90 over the same last
+//     five matches and normalises it against positionGAMax. A player with
+//     nothing in five games already scores zero on that channel. That is the
+//     full penalty the data supports, it is bounded, it is recomputed every
+//     sync rather than accumulated, it is scaled to the position, and it
+//     clears itself the moment he scores.
+//   - the season aggregate carries the same fact again over a longer window.
+//
+// The wider survey agrees: no published rating system — WhoScored,
+// Sofascore, FotMob, Opta, CIES, Goalimpact — applies a separate drought
+// penalty. A drought is expressed by the rate being low, not by a deduction
+// on top of it. And an unbounded penalty against a bounded statistic
+// eventually dominates the component it sits in.
+//
+// The deeper defect was in the shape rather than the number. The idempotency
+// key named the week the check ran, so it identified the evaluation instead
+// of the condition — the equivalent of an alerting system opening a new
+// incident on every poll instead of holding one open. Deleting the events
+// table and replaying the pipeline would produce a different score, because
+// the score depended on how often the cron fired rather than on what
+// happened on the pitch.
+//
+// The plumbing that carried these — PerformanceSnapshot.PerformanceEvents
+// and the routing in SyncPerformance — is left in place. It is the right
+// path for a genuine discrete event such as a hat-trick, which happens once,
+// in one match, and has a natural identity to key on.
 
 // buildFormScore turns the last-N aggregate into a 0..100 normalized form
 // indicator. When we have no usable form data (start of season, lower-tier

@@ -82,8 +82,18 @@ var characterTriggers = []characterTrigger{
 	{concept: "trophy_won", delta: 4.0, target: "performance", words: []string{"won the champions league", "champions league trophy", "league title clinched", "won the league", "выиграл лигу чемпионов", "выиграл чемпионат"}},
 
 	// ── Performance: negatives — press framing varies, fans vote ───────
-	{concept: "goal_drought_5", delta: -1.5, target: "performance", words: []string{"five games without scoring", "5 games without scoring", "5-game scoring drought", "scoring drought", "fifth game without", "5 матчей без гола", "пять матчей без гола"}},
-	{concept: "goal_drought_10", delta: -3.0, target: "performance", words: []string{"ten games without scoring", "10 games without scoring", "10-game drought", "tenth game without", "10 матчей без гола", "десять матчей без гола"}},
+	//
+	// goal_drought_5 (-1.5) and goal_drought_10 (-3.0) were removed on
+	// 2026-09-10 along with the stats-based detector. Three separate charges
+	// were being made for one dry spell: the form channel scores it, the
+	// season rate scores it again, and these fired once per ARTICLE that used
+	// the phrase — so the penalty grew with how much the press wrote about
+	// the drought rather than with how long it lasted. "scoring drought" was
+	// broad enough to match an article about someone else's.
+	//
+	// What remains here are things that HAPPENED — a hat-trick, an award, an
+	// injury, a missed penalty. Those have a moment and an identity. A
+	// drought is a state, and the rate already carries it.
 	// Injury is objective (player can't perform). Auto-apply.
 	{concept: "injury_serious", delta: -1.5, target: "performance", autoApply: true, words: []string{"long-term injury", "season-ending injury", "out for the season", "out for several months", "тяжёлая травма", "выбыл до конца сезона"}},
 	{concept: "penalty_miss_key", delta: -1.0, target: "performance", words: []string{"missed crucial penalty", "missed a penalty in the", "penalty miss costs", "промазал решающий пенальти"}},

@@ -199,7 +199,6 @@ func TestScanRoutesPerformanceTriggersToPerformance(t *testing.T) {
 		{"Player named Player of the Month for October", "player_of_month", "performance"},
 		{"Player wins Ballon d'Or for the second time", "ballon_dor", "performance"},
 		{"Player suffers season-ending injury", "injury_serious", "performance"},
-		{"Player goes on five games without scoring", "goal_drought_5", "performance"},
 		// Sanity check — character-flavoured trigger still routes to character.
 		{"Player wins fair play award at FIFA gala", "fair_play", "character"},
 	}
@@ -223,5 +222,76 @@ func TestScanRoutesPerformanceTriggersToPerformance(t *testing.T) {
 				t.Errorf("target = %q, want %q", actual, tc.expect)
 			}
 		})
+	}
+}
+
+func TestDroughtsAreNotScoredAsEvents(t *testing.T) {
+	// A dry spell is a state, not something that happened, and it is already
+	// priced three times over: buildFormScore normalises goals+assists per 90
+	// across the last five matches against the position's ceiling, so a
+	// player with nothing in five already scores zero there, and the season
+	// rate carries the same fact over a longer window.
+	//
+	// These triggers charged it again, once per ARTICLE that used the phrase,
+	// so the penalty tracked how much the press wrote rather than how long
+	// the run lasted. A stats-based twin charged it a third time, once per
+	// week, without limit. N'Golo Kanté — a holding midfielder, for whom a
+	// blank five-match run is roughly a coin flip — accumulated four.
+	//
+	// No published rating system (WhoScored, Sofascore, FotMob, Opta, CIES)
+	// deducts for a drought. The rate being low is the penalty.
+	droughtHeadlines := []string{
+		"Player goes on five games without scoring",
+		"Star endures 10 games without scoring for his club",
+		"Forward's scoring drought continues into a fifth month",
+		"Ten games without scoring and counting",
+		"Пять матчей без гола подряд",
+		"10 матчей без гола",
+	}
+	for _, title := range droughtHeadlines {
+		news := []domain.NewsItem{makeNews(1, 7, title, "", time.Now().UTC())}
+		if got := scanNewsForCharacterTriggers(news, time.Time{}); len(got) != 0 {
+			t.Errorf("%q produced %d event(s) — droughts are already in the rate", title, len(got))
+		}
+	}
+
+	// Things that actually happened still score.
+	for _, title := range []string{
+		"Player nets hat-trick in Champions League opener",
+		"Player suffers season-ending injury",
+	} {
+		news := []domain.NewsItem{makeNews(1, 7, title, "", time.Now().UTC())}
+		if got := scanNewsForCharacterTriggers(news, time.Time{}); len(got) != 1 {
+			t.Errorf("%q produced %d events, want 1 — real events must still fire", title, len(got))
+		}
+	}
+}
+
+func TestFormAlreadyPenalisesADryRun(t *testing.T) {
+	// The claim the removal rests on: a blank five-match window is already
+	// the maximum hit the goal-contribution channel can take, and it is
+	// bounded, position-scaled and self-clearing.
+	blank := formSnapshot{Games: 5, Minutes: 90, Goals: 0, Assists: 0, Rating: 6.9}
+	scoring := formSnapshot{Games: 5, Minutes: 90, Goals: 3, Assists: 2, Rating: 6.9}
+
+	dry := buildFormScore("FWD", blank)
+	wet := buildFormScore("FWD", scoring)
+	if dry >= wet {
+		t.Errorf("a blank run scored %v against %v for the same rating — form does not see the drought", dry, wet)
+	}
+	// Bounded: it cannot fall below zero however long the run continues.
+	if dry < 0 {
+		t.Errorf("form score went negative: %v", dry)
+	}
+	// Position-scaled: the same blank run is judged against the position's
+	// own ceiling, so a midfielder is not measured by a striker's yardstick.
+	if buildFormScore("MID", blank) < 0 || buildFormScore("DEF", blank) < 0 {
+		t.Error("position variants went negative")
+	}
+	// Self-clearing: one goal in the window and the channel recovers, with
+	// no event left behind to keep charging.
+	recovered := buildFormScore("FWD", formSnapshot{Games: 5, Minutes: 90, Goals: 1, Assists: 0, Rating: 6.9})
+	if recovered <= dry {
+		t.Errorf("scoring did not lift the form channel: %v vs %v", recovered, dry)
 	}
 }
