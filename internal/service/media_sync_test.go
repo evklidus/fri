@@ -383,3 +383,91 @@ func TestSyncMediaSkipsWhatModeratorsDeleted(t *testing.T) {
 		t.Errorf("two articles (%v) should outscore one (%v) on volume", alvarez.MediaScore, barcola.MediaScore)
 	}
 }
+
+// cappedProvider hands back a fixed list and declares a feed size, the way
+// the real providers do.
+type cappedProvider struct {
+	articles  []domain.MediaArticleCandidate
+	perPlayer int
+}
+
+func (cappedProvider) Name() string { return mediaProviderName }
+func (p cappedProvider) FetchPlayerArticles(context.Context, domain.PlayerSyncTarget) ([]domain.MediaArticleCandidate, error) {
+	return p.articles, nil
+}
+func (p cappedProvider) ArticlesPerPlayer() int { return p.perPlayer }
+
+func TestDeletingAnArticlePromotesTheNextOne(t *testing.T) {
+	// The provider used to trim to the feed size before the sync removed
+	// what moderators had deleted. Deleting the three articles on a player's
+	// page therefore removed the only three the sync would ever look at: the
+	// next run found nothing, the player fell to a neutral Media score, and
+	// fresh coverage could not bring them back. By 2026-09-15 ten players
+	// were stuck there — Vinícius Júnior, Salah, Raphinha among them — with
+	// twenty usable stories about each going unread.
+	var articles []domain.MediaArticleCandidate
+	for i := 1; i <= 10; i++ {
+		articles = append(articles, domain.MediaArticleCandidate{
+			Title:     fmt.Sprintf("Vinicius Jr story %d", i),
+			Source:    "bbc",
+			SourceURL: fmt.Sprintf("https://example.com/%d", i),
+		})
+	}
+	// The moderator deleted exactly the three that were on the page.
+	suppressed := []domain.NewsSuppression{
+		{PlayerID: 9, ArticleKey: "https://example.com/1"},
+		{PlayerID: 9, ArticleKey: "https://example.com/2"},
+		{PlayerID: 9, ArticleKey: "https://example.com/3"},
+	}
+
+	var got []domain.MediaSyncPlayerResult
+	repo := &mockRepo{
+		listSyncTargetsFn: func(context.Context) ([]domain.PlayerSyncTarget, error) {
+			return []domain.PlayerSyncTarget{{ID: 9, Name: "Vinicius Jr", Score: domain.Score{Media: 72.8}}}, nil
+		},
+		suppressions: suppressed,
+		applyMediaSyncFn: func(_ context.Context, results []domain.MediaSyncPlayerResult, _ string) ([]domain.PlayerSyncDelta, error) {
+			got = results
+			return nil, nil
+		},
+	}
+	svc := newServiceWithMedia(repo, cappedProvider{articles: articles, perPlayer: 3})
+	if _, err := svc.SyncMedia(context.Background()); err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+
+	if len(got) != 1 {
+		t.Fatalf("results = %d, want 1", len(got))
+	}
+	feed := got[0]
+	if feed.ArticlesCount != 3 {
+		t.Fatalf("feed holds %d articles, want 3 — deleting three should promote the next three, not empty the page", feed.ArticlesCount)
+	}
+	for _, a := range feed.Articles {
+		for _, s := range suppressed {
+			if a.SourceURL == s.ArticleKey {
+				t.Errorf("a deleted article came back: %s", a.SourceURL)
+			}
+		}
+	}
+	if feed.Articles[0].SourceURL != "https://example.com/4" {
+		t.Errorf("feed starts at %s, want the fourth story", feed.Articles[0].SourceURL)
+	}
+	if feed.MediaScore == neutralComponentScore {
+		t.Error("player fell to the neutral score despite having coverage")
+	}
+}
+
+func TestCapArticles(t *testing.T) {
+	five := make([]domain.MediaArticleCandidate, 5)
+	if got := capArticles(five, 3); len(got) != 3 {
+		t.Errorf("len = %d, want 3", len(got))
+	}
+	if got := capArticles(five, 0); len(got) != defaultArticlesPerPlayer {
+		t.Errorf("a missing limit should fall back to the default, got %d", len(got))
+	}
+	two := make([]domain.MediaArticleCandidate, 2)
+	if got := capArticles(two, 3); len(got) != 2 {
+		t.Errorf("len = %d, want 2 — a short feed must not be padded", len(got))
+	}
+}

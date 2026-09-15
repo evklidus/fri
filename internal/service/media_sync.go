@@ -39,6 +39,16 @@ type mediaProvider interface {
 	FetchPlayerArticles(ctx context.Context, player domain.PlayerSyncTarget) ([]domain.MediaArticleCandidate, error)
 }
 
+// articleCapper is a provider that knows how many articles a player's feed
+// should hold. SyncMedia applies the cut, not the provider, so that deleted
+// articles are removed first.
+type articleCapper interface {
+	ArticlesPerPlayer() int
+}
+
+// defaultArticlesPerPlayer is used when a provider does not say.
+const defaultArticlesPerPlayer = 3
+
 type googleNewsRSSProvider struct {
 	client            *http.Client
 	articlesPerPlayer int
@@ -310,7 +320,22 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		if fetchErr != nil {
 			continue
 		}
+		// Drop what the moderators deleted BEFORE trimming to the feed size.
+		//
+		// The provider used to trim first, and the effect was severe: a
+		// moderator deleting the three articles showing on a player's page
+		// removed the only three the sync would ever look at, so the next run
+		// found nothing, the player fell to a neutral Media score, and no
+		// amount of fresh coverage brought them back. Ten players were
+		// sitting there by 2026-09-15 — Vinícius Júnior, Salah and Raphinha
+		// among them — while MediaStack still offered twenty-odd usable
+		// stories about each. Deleting a story should promote the next one.
 		articles = dropSuppressed(articles, player.ID, suppressedSet)
+		limit := defaultArticlesPerPlayer
+		if capper, ok := s.mediaProvider.(articleCapper); ok {
+			limit = capper.ArticlesPerPlayer()
+		}
+		articles = capArticles(articles, limit)
 
 		syncResult := s.buildMediaSyncResult(player, articles)
 		articlesSeen += syncResult.ArticlesCount
@@ -401,6 +426,17 @@ func mediaScoreFromArticles(stats []domain.ArticleStats) (float64, bool) {
 	avgSentiment := normalizeSentiment(sentimentSum / n)
 	avgTier := tierSum / n
 	return round1((mentionVolume * 0.4) + (avgSentiment * 0.4) + (avgTier * 0.2)), true
+}
+
+// capArticles trims a player's feed to its configured size.
+func capArticles(articles []domain.MediaArticleCandidate, limit int) []domain.MediaArticleCandidate {
+	if limit <= 0 {
+		limit = defaultArticlesPerPlayer
+	}
+	if len(articles) > limit {
+		return articles[:limit]
+	}
+	return articles
 }
 
 // dropSuppressed removes the articles a moderator deleted from this

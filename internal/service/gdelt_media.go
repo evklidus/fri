@@ -91,9 +91,6 @@ func (p *gdeltMediaProvider) FetchPlayerArticles(ctx context.Context, player dom
 	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
-	if len(candidates) > p.articlesPerPlayer {
-		candidates = candidates[:p.articlesPerPlayer]
-	}
 	return candidates, nil
 }
 
@@ -263,3 +260,5 @@ type gdeltArticle struct {
 	Language      string `json:"language"`
 	SourceCountry string `json:"sourcecountry"`
 }
+
+func (p *gdeltMediaProvider) ArticlesPerPlayer() int { return p.articlesPerPlayer }

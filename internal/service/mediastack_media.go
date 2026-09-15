@@ -113,11 +113,14 @@ func (p *mediaStackMediaProvider) FetchPlayerArticles(ctx context.Context, playe
 	candidates = filterFootballContext(candidates)
 	candidates = dedupeArticles(candidates)
 
-	if len(candidates) > p.articlesPerPlayer {
-		candidates = candidates[:p.articlesPerPlayer]
-	}
+	// Deliberately NOT trimmed to articlesPerPlayer here. The caller drops
+	// the articles a moderator deleted, and that has to happen before the
+	// cut — otherwise a deletion leaves a hole instead of promoting the next
+	// story. See SyncMedia.
 	return candidates, nil
 }
+
+func (p *mediaStackMediaProvider) ArticlesPerPlayer() int { return p.articlesPerPlayer }
 
 // filterTitleMentionsPlayer drops articles where the player's name (full or
 // surname) doesn't appear in the title. MediaStack matches on body text too,
