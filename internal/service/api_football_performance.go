@@ -692,9 +692,12 @@ var knownClubTeamIDs = map[string]int{
 	"inter miami": 1614,
 
 	// Saudi Pro League
-	"al nassr":   2939,
-	"al ittihad": 2932,
-	"al hilal":   2925,
+	"al nassr":        2939,
+	"al ittihad":      2932,
+	"al-qadisiyah":    2933, // Julián Quiñones, Ballon d'Or 2026 nominee
+	"al qadisiyah":    2933,
+	"al-qadisiyah fc": 2933,
+	"al hilal":        2925,
 }
 
 func (p *apiFootballPerformanceProvider) searchTeam(ctx context.Context, query, originalClub string) (apiFootballTeam, error) {
