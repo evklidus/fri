@@ -6,7 +6,9 @@ import (
 	"hash/fnv"
 	"log"
 	"math"
+	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"fri.local/football-reputation-index/internal/domain"
@@ -80,9 +82,15 @@ func (demoPerformanceProvider) Name() string {
 // season, Yamal year-round buzz). They feed three of four Social-score
 // sub-signals; YouTube views (4th) comes from the real YT API.
 //
-// Match is by exact PlayerSyncTarget.Name. Unknown players fall through
-// to the deterministic hash-based placeholder below — so adding a new
-// roster member doesn't silently break, just gets a stable random.
+// Match is by exact PlayerSyncTarget.Name. A player who is not listed is
+// scored neutral and logged, rather than given an invented number.
+//
+// engagementRate and mentionsGrowth may be left at zero, which means "not
+// measured". They are then filled with the median of the players who do
+// have them, so an entry with a real follower count is neither rewarded
+// nor punished for the two figures nobody has gathered. The alternative —
+// typing a plausible-looking rate next to a measured one — is how the old
+// hash fallback came to look like data.
 var realSocialOverrides = map[string]struct {
 	followers      int64
 	engagementRate float64
@@ -129,6 +137,47 @@ var realSocialOverrides = map[string]struct {
 	"H. Ekitike":   {followers: 4_000_000, engagementRate: 4.8, mentionsGrowth: 50},
 	"J. García":    {followers: 3_000_000, engagementRate: 5.0, mentionsGrowth: 50},
 	"Rayan Cherki": {followers: 3_000_000, engagementRate: 6.0, mentionsGrowth: 62},
+
+	// Ballon d'Or 2026 nominees, added 2026-09-15. Follower counts read off
+	// each profile that day and matched to the player by verified badge and
+	// the club or national-team handles in the bio; several convincing
+	// impostor accounts were rejected on the way. Engagement and mentions
+	// are left unmeasured — see the note above.
+	"L. Messi":          {followers: 517_000_000},
+	"A. Hakimi":         {followers: 25_300_000},
+	"O. Dembélé":        {followers: 22_400_000},
+	"S. Mané":           {followers: 17_300_000},
+	"L. Martínez":       {followers: 13_300_000},
+	"B. Fernandes":      {followers: 11_600_000},
+	"F. Torres":         {followers: 11_100_000},
+	"K. Kvaratskhelia":  {followers: 9_100_000},
+	"M. Cucurella":      {followers: 8_700_000},
+	"L. Díaz":           {followers: 8_600_000},
+	"Marquinhos":        {followers: 7_600_000},
+	"N. Mendes":         {followers: 4_300_000},
+	"Gabriel Magalhães": {followers: 4_200_000},
+	"J. Quiñones":       {followers: 4_000_000},
+	"J. Neves":          {followers: 3_400_000},
+	"W. Saliba":         {followers: 3_200_000},
+	"F. Ruiz":           {followers: 2_000_000},
+	"D. Upamecano":      {followers: 1_600_000},
+	"W. Pacho":          {followers: 870_000},
+
+	// Rodri is deliberately absent, and this comment is here so nobody
+	// spends an afternoon looking for him again. He has no Instagram
+	// account and no social media at all — when Barcelona signed him in
+	// August 2026 there was nowhere for fans to post, so they filled the
+	// comments of a singer with a similar name instead. The handle
+	// @rodrigo belongs to a Brazilian video editor and must never be
+	// attached to him.
+	//
+	// That leaves a genuine question rather than a gap: a Ballon d'Or
+	// nominee whose social influence really is nil. Scoring him zero on a
+	// quarter of FRI would say his reputation is nil, which is false;
+	// scoring him neutral says we have not measured him, which is also not
+	// quite true. He is neutral for now because that is the smaller
+	// falsehood, and because the choice belongs to the product, not to
+	// this file.
 }
 
 func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain.PlayerSyncTarget) (domain.SocialSnapshot, error) {
@@ -143,6 +192,16 @@ func (demoSocialProvider) FetchSocialSnapshot(ctx context.Context, player domain
 		followers = override.followers
 		engagementRate = override.engagementRate
 		mentionsGrowth = override.mentionsGrowth
+		// Zero means nobody has measured it. Stand the roster's median in
+		// its place so the player is treated as ordinary on that signal
+		// rather than as having none of it.
+		medianEngagement, medianMentions := socialMedians()
+		if engagementRate <= 0 {
+			engagementRate = medianEngagement
+		}
+		if mentionsGrowth <= 0 {
+			mentionsGrowth = medianMentions
+		}
 	} else {
 		// Nobody has measured this player's reach, so say so rather than
 		// inventing it. The old fallback hashed the name into a follower
@@ -450,6 +509,35 @@ func defaultPositionMetric(values map[string]float64, position string, fallback 
 		return value
 	}
 	return fallback
+}
+
+// socialMedians returns the median engagement rate and mention growth among
+// the players somebody has actually measured. Computed once: the table is a
+// compile-time constant in everything but name.
+var socialMedians = sync.OnceValues(func() (float64, float64) {
+	var engagement, mentions []float64
+	for _, o := range realSocialOverrides {
+		if o.engagementRate > 0 {
+			engagement = append(engagement, o.engagementRate)
+		}
+		if o.mentionsGrowth > 0 {
+			mentions = append(mentions, o.mentionsGrowth)
+		}
+	}
+	return medianOf(engagement, 5.0), medianOf(mentions, 55)
+})
+
+func medianOf(values []float64, fallback float64) float64 {
+	if len(values) == 0 {
+		return fallback
+	}
+	sorted := append([]float64(nil), values...)
+	sort.Float64s(sorted)
+	mid := len(sorted) / 2
+	if len(sorted)%2 == 1 {
+		return sorted[mid]
+	}
+	return (sorted[mid-1] + sorted[mid]) / 2
 }
 
 // expectedEngagementRate is the engagement an account of this size

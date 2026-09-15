@@ -105,3 +105,69 @@ func TestEngagementIsJudgedAgainstAccountSize(t *testing.T) {
 		t.Error("expected engagement should fall with audience size")
 	}
 }
+
+func TestMeasuredFollowersAreNotPunishedForUnmeasuredEngagement(t *testing.T) {
+	// The Ballon d'Or nominees were added with real follower counts and
+	// nothing else. Scoring the two missing signals as zero would have made
+	// a measured 22M-follower account rank below a guessed 3M one — the same
+	// failure as the hash fallback, arrived at from the other direction.
+	ctx := context.Background()
+	dembele, err := demoSocialProvider{}.FetchSocialSnapshot(ctx, domain.PlayerSyncTarget{ID: 26, Name: "O. Dembélé"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cherki, err := demoSocialProvider{}.FetchSocialSnapshot(ctx, domain.PlayerSyncTarget{ID: 12, Name: "Rayan Cherki"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if dembele.Followers != 22_400_000 {
+		t.Errorf("followers = %d, want the measured 22.4M", dembele.Followers)
+	}
+	if dembele.NormalizedScore <= cherki.NormalizedScore {
+		t.Errorf("Dembélé %.1f (22.4M, engagement unmeasured) scored at or below Cherki %.1f (3M, fully specified)",
+			dembele.NormalizedScore, cherki.NormalizedScore)
+	}
+
+	// The medians come from the players somebody measured, and sit inside
+	// the range of those values rather than at either end.
+	eng, mentions := socialMedians()
+	if eng < 3.2 || eng > 7.5 {
+		t.Errorf("median engagement %.2f is outside the measured range", eng)
+	}
+	if mentions < 38 || mentions > 88 {
+		t.Errorf("median mentions %.1f is outside the measured range", mentions)
+	}
+}
+
+func TestMedianOf(t *testing.T) {
+	if got := medianOf([]float64{1, 2, 3}, 0); got != 2 {
+		t.Errorf("odd-length median = %v, want 2", got)
+	}
+	if got := medianOf([]float64{1, 2, 3, 4}, 0); got != 2.5 {
+		t.Errorf("even-length median = %v, want 2.5", got)
+	}
+	if got := medianOf(nil, 9); got != 9 {
+		t.Errorf("empty median = %v, want the fallback 9", got)
+	}
+	// Order must not matter.
+	if medianOf([]float64{3, 1, 2}, 0) != medianOf([]float64{1, 2, 3}, 0) {
+		t.Error("median depends on input order")
+	}
+}
+
+func TestRodriIsNotGivenSomeoneElsesAccount(t *testing.T) {
+	// He has no social media at all. @rodrigo belongs to a Brazilian video
+	// editor; attaching it here would put a stranger's audience inside a
+	// Ballon d'Or nominee's rating.
+	if _, listed := realSocialOverrides["Rodri"]; listed {
+		t.Error("Rodri has a follower count — he has no account; check where the number came from")
+	}
+	snapshot, err := demoSocialProvider{}.FetchSocialSnapshot(context.Background(),
+		domain.PlayerSyncTarget{ID: 40, Name: "Rodri"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Followers != 0 || snapshot.NormalizedScore != neutralComponentScore {
+		t.Errorf("Rodri scored %+v, want no followers and the neutral score", snapshot)
+	}
+}
