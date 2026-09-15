@@ -16,8 +16,22 @@ import (
 )
 
 const (
-	mediaProviderName  = "gdelt"
-	mediaSyncBatchSize = 25
+	mediaProviderName = "gdelt"
+	// mediaSyncBatchSize caps how many players one run asks the provider
+	// about, taken in FRI order.
+	//
+	// It was 25 — set when the roster was 22 and the provider was GDELT at
+	// roughly three seconds a request. Adding the Ballon d'Or nominees took
+	// the roster to 45, which put twenty players permanently below the cut:
+	// they would have carried a neutral Media score forever while the ones
+	// above them were refreshed twice a day, and the ordering is by FRI, so
+	// a low score kept them there.
+	//
+	// 80 is the ceiling the MediaStack Standard plan supports on a 12-hour
+	// schedule: 80 players × 60 runs a month is 4,800 of the 10,000 request
+	// allowance, leaving room for retries and a second sync a day if we ever
+	// want one. Raise the plan before raising this.
+	mediaSyncBatchSize = 80
 )
 
 type mediaProvider interface {
