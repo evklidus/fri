@@ -393,9 +393,11 @@ var clubLeagueIndex = map[string]string{
 	"monaco":              "Ligue 1",
 
 	// Saudi Pro League
-	"al nassr":   "Saudi Pro League",
-	"al ittihad": "Saudi Pro League",
-	"al hilal":   "Saudi Pro League",
+	"al nassr":        "Saudi Pro League",
+	"al ittihad":      "Saudi Pro League",
+	"al hilal":        "Saudi Pro League",
+	"al qadisiyah":    "Saudi Pro League",
+	"al qadisiyah fc": "Saudi Pro League",
 
 	// Süper Lig
 	"fenerbahce":  "Süper Lig",

@@ -689,7 +689,11 @@ var knownClubTeamIDs = map[string]int{
 	"trabzonspor": 998, // Salah, from 2026-08-03
 
 	// MLS
-	"inter miami": 1614,
+	//
+	// 9568, not 1614. The wrong id sat here unnoticed because nobody from
+	// Miami had been added: the first attempt, Messi, was rejected with
+	// "not at Inter Miami" while his rows plainly said Inter Miami.
+	"inter miami": 9568,
 
 	// Saudi Pro League
 	"al nassr":        2939,
@@ -2056,14 +2060,37 @@ func (p *apiFootballPerformanceProvider) ResolvePlayer(ctx context.Context, name
 	// Pinned by id: fetch that player directly and confirm they are at this
 	// club, so a mistyped id can't attach someone from another squad.
 	if providerPlayerID > 0 {
-		entry, err := p.fetchPlayerByID(ctx, providerPlayerID, info.Season)
-		if err != nil {
+		// The scoring season is deliberately conservative: currentSeasonForTeam
+		// rolls back to last season while the new one is too thin to rank
+		// anyone on. Adding a player asks a different question — is this
+		// person at this club NOW — and a summer signing is exactly the case
+		// where the two answers differ. Ferran Torres joined PSG on
+		// 2026-08-14 and was refused as "not at PSG", because the rolled-back
+		// season still had him at Barcelona.
+		seasons := []int{info.Season}
+		if current := defaultCurrentSeason(); current != info.Season {
+			seasons = append(seasons, current)
+		}
+		var lastEntry apiFootballPlayerEntry
+		var found bool
+		for _, season := range seasons {
+			entry, err := p.fetchPlayerByID(ctx, providerPlayerID, season)
+			if err != nil {
+				continue
+			}
+			lastEntry = entry
+			if playsForTeam(entry, team.ID) {
+				found = true
+				break
+			}
+		}
+		if lastEntry.Player.ID == 0 {
 			return domain.ResolvedPlayer{}, fmt.Errorf("%w: provider id %d", ErrPlayerNotFound, providerPlayerID)
 		}
-		if !playsForTeam(entry, team.ID) {
+		if !found {
 			return domain.ResolvedPlayer{}, fmt.Errorf("%w: provider id %d is not at %s", ErrPlayerNotFound, providerPlayerID, club)
 		}
-		return resolvedFromEntry(entry, team.ID), nil
+		return resolvedFromEntry(lastEntry, team.ID), nil
 	}
 
 	seen := make(map[int]bool)
@@ -2124,10 +2151,40 @@ func (p *apiFootballPerformanceProvider) ResolvePlayer(ctx context.Context, name
 // entryPosition digs the position out of the statistics, where api-football
 // actually puts it — player.position is null in every response we have seen.
 func entryPosition(entry apiFootballPlayerEntry) string {
+	return entryPositionFor(entry, 0)
+}
+
+// entryPositionFor reads the position a player is listed at, preferring the
+// row for the club we are asking about.
+//
+// Taking the first row with a position filled in is what it used to do, and
+// the first row is often a national team: Julián Quiñones came back a
+// midfielder because Mexico played him there at the World Cup, while
+// Al-Qadisiyah — the club he was being added at — lists him as an attacker
+// every week. Club rows are also preferred over national ones generally,
+// since a player's club is where the season happens.
+func entryPositionFor(entry apiFootballPlayerEntry, teamID int) string {
+	var clubFallback, anyFallback string
 	for _, stat := range entry.Statistics {
-		if pos := strings.TrimSpace(stat.Games.Position); pos != "" {
+		pos := strings.TrimSpace(stat.Games.Position)
+		if pos == "" {
+			continue
+		}
+		if teamID > 0 && stat.Team.ID == teamID {
 			return pos
 		}
+		if !stat.Team.National && clubFallback == "" {
+			clubFallback = pos
+		}
+		if anyFallback == "" {
+			anyFallback = pos
+		}
+	}
+	if clubFallback != "" {
+		return clubFallback
+	}
+	if anyFallback != "" {
+		return anyFallback
 	}
 	return strings.TrimSpace(entry.Player.Position)
 }
@@ -2146,7 +2203,7 @@ func resolvedFromEntry(entry apiFootballPlayerEntry, teamID int) domain.Resolved
 		ProviderPlayerID: entry.Player.ID,
 		ProviderTeamID:   teamID,
 		Name:             entry.Player.Name,
-		Position:         entryPosition(entry),
+		Position:         entryPositionFor(entry, teamID),
 		PhotoURL:         strings.TrimSpace(entry.Player.Photo),
 		Age:              entry.Player.Age,
 	}

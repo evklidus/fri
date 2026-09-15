@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -967,7 +968,9 @@ func TestCanonicalTeamIDShortCircuitsFindTeam(t *testing.T) {
 		{"Real Madrid", 541},
 		{"FC Barcelona", 529},
 		{"PSG", 85},
-		{"Inter Miami", 1614},
+		// 9568 verified against /teams?search=Inter Miami. The map said 1614
+		// until 2026-09-15, which is why Messi could not be added.
+		{"Inter Miami", 9568},
 		{"Liverpool", 40},
 		{"Arsenal", 42},
 	}
@@ -1477,5 +1480,109 @@ func TestBestPlayerMatchKeepsOutfieldPositionDisagreements(t *testing.T) {
 	got, ok := bestPlayerMatch(target, []apiFootballPlayerEntry{olise})
 	if !ok || got.Player.ID != 19617 {
 		t.Errorf("Olise was rejected over an outfield position disagreement: ok=%v id=%d", ok, got.Player.ID)
+	}
+}
+
+func TestEntryPositionPrefersTheClubRow(t *testing.T) {
+	// Julián Quiñones came back a midfielder because the first row in his
+	// statistics was Mexico at the World Cup, where he was played there.
+	// Al-Qadisiyah, the club he was being added at, lists him as an attacker.
+	national := apiFootballStatistic{
+		Team:  apiFootballTeamRef{ID: 16, Name: "Mexico", National: true},
+		Games: apiFootballGames{Position: "Midfielder", Minutes: 414},
+	}
+	club := apiFootballStatistic{
+		Team:  apiFootballTeamRef{ID: 2933, Name: "Al-Qadisiyah FC"},
+		Games: apiFootballGames{Position: "Attacker", Minutes: 630},
+	}
+	entry := apiFootballPlayerEntry{
+		Player:     apiFootballPlayerProfile{ID: 35532, Name: "J. Quiñones"},
+		Statistics: []apiFootballStatistic{national, club},
+	}
+
+	if got := entryPositionFor(entry, 2933); got != "Attacker" {
+		t.Errorf("with the club named, position = %q, want Attacker", got)
+	}
+	// Even without a club to aim at, a club row beats a national one.
+	if got := entryPositionFor(entry, 0); got != "Attacker" {
+		t.Errorf("without a club named, position = %q, want the club row's Attacker", got)
+	}
+	// Nothing but a national row is still better than nothing.
+	onlyNational := apiFootballPlayerEntry{
+		Player:     apiFootballPlayerProfile{ID: 1, Position: "Defender"},
+		Statistics: []apiFootballStatistic{national},
+	}
+	if got := entryPositionFor(onlyNational, 0); got != "Midfielder" {
+		t.Errorf("position = %q, want the only row we have", got)
+	}
+}
+
+func TestResolvePlayerFindsASummerSigning(t *testing.T) {
+	// currentSeasonForTeam rolls back to last season while the new one is too
+	// thin to rank anyone on. Ferran Torres joined PSG on 2026-08-14 and was
+	// refused as "not at PSG", because the rolled-back season still had him
+	// at Barcelona. Adding a player asks where he is now, not where the
+	// scoring window is.
+	const (
+		psg      = 85
+		barca    = 529
+		playerID = 931
+	)
+	handler := newRecordingHandler(t)
+	handler.on("/leagues", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]any{"errors": []any{}, "response": []any{
+			map[string]any{
+				"league":  map[string]any{"id": 61, "name": "Ligue 1", "type": "League"},
+				"seasons": []any{map[string]any{"year": defaultCurrentSeason(), "current": true}},
+			},
+		}})
+	})
+	// Barely any finished fixtures this season, plenty last season: the guard
+	// rolls the scoring season back.
+	handler.on("/fixtures", func(w http.ResponseWriter, r *http.Request) {
+		n := 2
+		if r.URL.Query().Get("season") == strconv.Itoa(defaultCurrentSeason()-1) {
+			n = 38
+		}
+		items := make([]any, 0, n)
+		for i := 0; i < n; i++ {
+			items = append(items, map[string]any{"fixture": map[string]any{"id": 900 + i}})
+		}
+		writeJSON(w, map[string]any{"errors": []any{}, "response": items})
+	})
+	handler.on("/players", func(w http.ResponseWriter, r *http.Request) {
+		team, name := psg, "Paris Saint Germain"
+		if r.URL.Query().Get("season") == strconv.Itoa(defaultCurrentSeason()-1) {
+			team, name = barca, "Barcelona" // where he was before the move
+		}
+		writeJSON(w, map[string]any{"errors": []any{}, "response": []any{
+			map[string]any{
+				"player": map[string]any{
+					"id": playerID, "name": "Ferran Torres", "lastname": "Torres",
+					"age": 25, "birth": map[string]any{"date": "2000-02-29"},
+				},
+				"statistics": []any{map[string]any{
+					"team":  map[string]any{"id": team, "name": name, "national": false},
+					"games": map[string]any{"appearences": 4, "minutes": 221, "position": "Attacker"},
+				}},
+			},
+		}})
+	})
+
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	provider := newTestProvider(server, newFakeStore())
+
+	resolved, err := provider.ResolvePlayer(context.Background(), "F. Torres", "PSG", playerID, "FWD")
+	if err != nil {
+		t.Fatalf("a player who signed this summer could not be added: %v", err)
+	}
+	if resolved.ProviderTeamID != psg || resolved.Position != "Attacker" {
+		t.Errorf("resolved %+v, want PSG and Attacker", resolved)
+	}
+
+	// And the guard still works: someone genuinely elsewhere is refused.
+	if _, err := provider.ResolvePlayer(context.Background(), "F. Torres", "Arsenal", playerID, "FWD"); err == nil {
+		t.Error("a player at PSG was accepted as an Arsenal signing")
 	}
 }
