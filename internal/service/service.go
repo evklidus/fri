@@ -67,6 +67,10 @@ type Service struct {
 	// traffic buffers request counters between flushes; see traffic.go.
 	traffic trafficBuffer
 
+	// newsClassifier reads articles for the media sync; nil falls back to
+	// keyword filters. See news_classifier.go.
+	newsClassifier articleClassifier
+
 	// Per-component sync locks prevent overlapping scheduled and ad-hoc HTTP
 	// runs of the same component. We use TryLock so a concurrent caller
 	// returns immediately with status=skipped instead of queueing.

@@ -225,4 +225,19 @@ var footballNegative = map[string]float64{
 	"отстранён":             0.35,
 	"провалил тест":         0.45,
 	"скандальное поведение": 0.35,
+
+	// Headlines the word list read the wrong way round, from the feed on
+	// 2026-09-24. "Madrid Fine Valverde, Tchouameni €500,000 Each For
+	// Bust-Up" scored positive because VADER knows "fine" as a compliment.
+	// These only matter while no classifier is configured.
+	" fine ":            0.45,
+	"fined":             0.45,
+	"bust-up":           0.35,
+	"suspension":        0.30,
+	"suspended":         0.30,
+	"slams ":            0.25,
+	"blasts ":           0.25,
+	"not on same level": 0.30,
+	"goes missing":      0.30,
+	"risks ":            0.15,
 }

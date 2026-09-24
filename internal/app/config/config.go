@@ -32,6 +32,13 @@ type Config struct {
 	// session. Empty disables the header path entirely, leaving admin
 	// sessions as the only way in.
 	AdminAPIToken string
+
+	// AnthropicAPIKey enables the news classifier: Claude reads each new
+	// article and decides whether it is really about the player, what it
+	// does to their reputation, and what event it reports. Empty keeps the
+	// keyword filters. NewsClassifierModel defaults to claude-opus-5.
+	AnthropicAPIKey     string
+	NewsClassifierModel string
 }
 
 func MustLoad() Config {
@@ -58,6 +65,8 @@ func MustLoad() Config {
 		MediaStackAPIKey:       getEnv("MEDIASTACK_API_KEY", ""),
 		MediaStackBaseURL:      getEnv("MEDIASTACK_BASE_URL", "https://api.mediastack.com/v1"),
 		AdminAPIToken:          getEnv("ADMIN_API_TOKEN", ""),
+		AnthropicAPIKey:        getEnv("ANTHROPIC_API_KEY", ""),
+		NewsClassifierModel:    getEnv("NEWS_CLASSIFIER_MODEL", "claude-opus-5"),
 	}
 
 	return cfg

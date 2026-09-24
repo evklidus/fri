@@ -40,7 +40,8 @@ func main() {
 	// configured this returns nil and SyncCareerBaseline no-ops.
 	careerBaselineProvider := service.NewCareerBaselineProvider(performanceProvider)
 	svc := service.New(repo, mediaProvider, socialProvider, performanceProvider).
-		WithCareerBaselineProvider(careerBaselineProvider)
+		WithCareerBaselineProvider(careerBaselineProvider).
+		WithNewsClassifier(service.NewNewsClassifier(cfg.AnthropicAPIKey, cfg.NewsClassifierModel))
 
 	if err := svc.SeedIfEmpty(ctx, cfg.SourceHTMLPath); err != nil {
 		log.Fatalf("seed database: %v", err)

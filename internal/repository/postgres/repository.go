@@ -688,7 +688,7 @@ func (r *Repository) ApplyCharacterSync(ctx context.Context, candidates []domain
 				INSERT INTO character_events
 					(player_id, news_item_id, trigger_word, delta, status, target_component,
 					 source_ref, proposed_delta, final_delta, voting_status, voting_closes_at, auto_apply)
-				VALUES ($1, $2, $3, $4, 'auto', $5, $6, $4, NULL, 'pending_vote', NOW() + INTERVAL '24 hours', FALSE)
+				VALUES ($1, $2, $3, $4, 'auto', $5, $6, $4, NULL, 'pending_vote', NOW() + INTERVAL '72 hours', FALSE)
 			`, c.PlayerID, newsRef, c.TriggerWord, c.Delta, component, sourceRef); err != nil {
 				return nil, err
 			}

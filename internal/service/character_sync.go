@@ -169,6 +169,12 @@ func (s *Service) SyncCharacter(ctx context.Context) (*domain.ComponentSyncResul
 
 	cutoff := time.Now().UTC().AddDate(0, 0, -characterScanLookbackDay)
 	candidates := scanNewsForCharacterTriggers(news, cutoff)
+	if s.newsClassifier != nil {
+		// The media sync's classifier reads every article and reports its
+		// events itself. Running the keyword list as well would file the same
+		// red card twice under two different names.
+		candidates = nil
+	}
 
 	deltas, err := s.repo.ApplyCharacterSync(ctx, candidates, characterPerSyncCap)
 	if err != nil {

@@ -76,7 +76,7 @@ services:
       PERFORMANCE_SYNC_INTERVAL_MINUTES: 1440
       CHARACTER_SYNC_INTERVAL_MINUTES: 720
       SYNC_HTTP_TIMEOUT_SECONDS: 15
-      MEDIA_ARTICLES_PER_PLAYER: 3
+      MEDIA_ARTICLES_PER_PLAYER: 5
       API_FOOTBALL_KEY: ${API_FOOTBALL_KEY:-}
       API_FOOTBALL_BASE_URL: ${API_FOOTBALL_BASE_URL:-https://v3.football.api-sports.io}
       YOUTUBE_API_KEY: ${YOUTUBE_API_KEY:-}
@@ -88,6 +88,11 @@ services:
       # Generate with `openssl rand -hex 32`; leaving it empty disables the
       # header path and leaves sessions as the only way in.
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
+      # Claude reads each new article for the media sync: is it about this
+      # player, what does it do to their reputation, what event does it
+      # report. Empty falls back to keyword filters.
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      NEWS_CLASSIFIER_MODEL: ${NEWS_CLASSIFIER_MODEL:-claude-opus-5}
     # NOTE: there used to be an `extra_hosts` pin mapping api.mediastack.com
     # to a hardcoded IPv6 address. That was a workaround for the original
     # IPv6-only server, where DNS64 resolvers returned SERVFAIL for

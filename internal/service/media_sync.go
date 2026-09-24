@@ -313,6 +313,7 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 	}
 
 	var syncResults []domain.MediaSyncPlayerResult
+	var newsEventsFound []domain.CharacterEventCandidate
 	var articlesSeen int
 
 	for _, player := range targets {
@@ -331,6 +332,12 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		// among them — while MediaStack still offered twenty-odd usable
 		// stories about each. Deleting a story should promote the next one.
 		articles = dropSuppressed(articles, player.ID, suppressedSet)
+		// Have the classifier read what is left: namesakes and other sports
+		// drop out, the player-as-subject stories come first, and the events
+		// the articles report are collected for the Vote on Events page.
+		var events []domain.CharacterEventCandidate
+		articles, events = s.judgeArticles(ctx, player, articles)
+		newsEventsFound = append(newsEventsFound, events...)
 		limit := defaultArticlesPerPlayer
 		if capper, ok := s.mediaProvider.(articleCapper); ok {
 			limit = capper.ArticlesPerPlayer()
@@ -351,7 +358,19 @@ func (s *Service) SyncMedia(ctx context.Context) (*domain.ComponentSyncResult, e
 		return finish("failed", err.Error(), articlesSeen, nil, err)
 	}
 
-	return finish("completed", fmt.Sprintf("media sync completed for %d players", len(syncResults)), articlesSeen, deltas, nil)
+	// Events the classifier found go to the Vote on Events page (or apply
+	// directly, for the few kinds that are simply facts, like a serious
+	// injury). SourceRef makes this idempotent across syncs.
+	eventNote := ""
+	if len(newsEventsFound) > 0 {
+		if _, err := s.repo.ApplyCharacterSync(ctx, newsEventsFound, characterPerSyncCap); err != nil {
+			eventNote = fmt.Sprintf(" (events failed: %v)", err)
+		} else {
+			eventNote = fmt.Sprintf(", %d events detected", len(newsEventsFound))
+		}
+	}
+
+	return finish("completed", fmt.Sprintf("media sync completed for %d players", len(syncResults))+eventNote, articlesSeen, deltas, nil)
 }
 
 func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles []domain.MediaArticleCandidate) domain.MediaSyncPlayerResult {
@@ -369,6 +388,12 @@ func (s *Service) buildMediaSyncResult(player domain.PlayerSyncTarget, articles 
 
 	for _, article := range articles {
 		sentiment := sentimentScore(article.Title + " " + article.Summary)
+		if article.Verdict != nil {
+			// A reader's judgement of what the story means for this player,
+			// not a word count: "Madrid fine Valverde for bust-up" was scored
+			// positive by the word list because of "fine".
+			sentiment = article.Verdict.Impact / 3
+		}
 		tier := sourceTier(article.Source)
 		stats = append(stats, domain.ArticleStats{Sentiment: sentiment, SourceTier: tier})
 

@@ -338,6 +338,9 @@ type MediaArticleCandidate struct {
 	Source      string
 	SourceURL   string
 	PublishedAt time.Time
+	// Verdict is set when a classifier has read the article; its Impact
+	// then replaces the word-list sentiment.
+	Verdict *ArticleVerdict
 }
 
 type MediaSyncArticle struct {
@@ -612,4 +615,13 @@ type BreakdownEvent struct {
 	Delta     float64   `json:"delta"`
 	Status    string    `json:"status"`
 	At        time.Time `json:"at"`
+}
+
+// ArticleVerdict is a classifier's judgement of one article for one player.
+// Impact is on a -3..+3 reputation scale; Event is "" or an event type.
+type ArticleVerdict struct {
+	About  string
+	Impact float64
+	Event  string
+	Reason string
 }
