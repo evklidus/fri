@@ -231,3 +231,14 @@ func TestEarlySeasonLeansOnLastSeason(t *testing.T) {
 		t.Error("a player with no previous season was blended with nothing")
 	}
 }
+
+func TestInjuredPlayerKeepsLastSeasonInTheSnapshot(t *testing.T) {
+	// No minutes this season: the anchor row is empty, and the blended
+	// previous season must survive into the snapshot.
+	anchor := compStat(61, "Ligue 1", 85, 0, 0, "", 0, 0, 0, 0)
+	blended := shrinkTowardPrevious(poolFromAnchor(anchor), pooledStats{RawMinutes: 1750, Rating: 7.05, GoalsAssistsPer90: 0.6})
+	snap := buildAPIFootballSnapshot(domain.PlayerSyncTarget{Name: "B. Barcola", Position: "FWD"}, anchor, blended, 0, 0, 3420, formSnapshot{})
+	if snap.AverageRating != 7.1 && snap.AverageRating != 7.0 {
+		t.Errorf("rating = %v, want last season's ~7.05, not the 5.8 floor", snap.AverageRating)
+	}
+}

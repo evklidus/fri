@@ -181,8 +181,21 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 	}
 
 	stat, ok := selectClubStatistic(apiPlayer.Statistics, knownTeamID, info.LeagueID)
+	currentStats := apiPlayer.Statistics
 	if !ok {
-		return domain.PerformanceSnapshot{}, fmt.Errorf("api-football no statistic for player id %d", externalPlayerID)
+		// Nothing at all this season — a long-term injury. Take identity and
+		// the prior from last season; availability stays this season's zero.
+		// Militão was skipped every sync for this in September 2026.
+		prev, prevErr := p.fetchPlayerByID(ctx, externalPlayerID, info.Season-1)
+		if prevErr != nil {
+			return domain.PerformanceSnapshot{}, fmt.Errorf("api-football no statistic for player id %d", externalPlayerID)
+		}
+		stat, ok = selectClubStatistic(prev.Statistics, knownTeamID, 0)
+		if !ok {
+			return domain.PerformanceSnapshot{}, fmt.Errorf("api-football no statistic for player id %d", externalPlayerID)
+		}
+		apiPlayer.Player = prev.Player
+		currentStats = nil
 	}
 
 	// Re-validate the saved mapping every sync. If the persisted external_id
@@ -218,10 +231,10 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 
 	rankPos, rankTotal := p.topNRankFor(ctx, info.LeagueID, info.Season, positionGroup(player.Position), externalPlayerID)
 	form, _ := p.formFor(ctx, externalPlayerID, currentTeamID)
-	pooled := poolClubStatistics(apiPlayer.Statistics)
+	pooled := poolClubStatistics(currentStats)
 	fixtureMinutes := p.fixtureMinutesFor(ctx, pooled, info.Season)
 	logPooledCompetitions(player, pooled, fixtureMinutes)
-	if len(pooled.Competitions) == 0 {
+	if len(pooled.Competitions) == 0 && currentStats != nil {
 		pooled = poolFromAnchor(stat) // as buildAPIFootballSnapshot would, before judging how thin it is
 	}
 	pooled = p.withPreviousSeason(ctx, apiPlayer.Player.ID, info.Season, pooled)
@@ -1284,7 +1297,12 @@ func performanceWeightsFor(position string) performanceWeights {
 // measure, which is exactly what this function did before competitions
 // pooled.
 func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, anchor apiFootballStatistic, pooled pooledStats, rankPos, rankTotal int, fixtureMinutes float64, form formSnapshot) domain.PerformanceSnapshot {
-	if len(pooled.Competitions) == 0 {
+	// Fall back to the anchor row only when nothing was pooled at all. A
+	// player with no minutes this season arrives here with no competitions
+	// but with last season blended in by withPreviousSeason; overwriting that
+	// with the empty anchor row is what dropped the injured and the benched
+	// to the 5.8 floor rating — Barcola 32.8, Asencio 23.5.
+	if len(pooled.Competitions) == 0 && pooled.Rating == 0 && pooled.RawMinutes == 0 && pooled.GoalsAssistsPer90 == 0 {
 		pooled = poolFromAnchor(anchor)
 	}
 	minutes := float64(pooled.RawMinutes)
