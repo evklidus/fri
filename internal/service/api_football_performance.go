@@ -2125,6 +2125,11 @@ func (p *apiFootballPerformanceProvider) ResolvePlayer(ctx context.Context, name
 		if current := defaultCurrentSeason(); current != info.Season {
 			seasons = append(seasons, current)
 		}
+		// And last season, for a player who has not played at all yet this
+		// one. Militão, Frenkie de Jong and Rodrygo were all injured on
+		// 2026-09-24 and have no current-season rows anywhere, so they were
+		// refused as "not at" the clubs they have played for for years.
+		seasons = append(seasons, info.Season-1)
 		var lastEntry apiFootballPlayerEntry
 		var found bool
 		for _, season := range seasons {

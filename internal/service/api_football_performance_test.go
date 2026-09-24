@@ -1576,3 +1576,34 @@ func TestResolvePlayerFindsASummerSigning(t *testing.T) {
 		t.Error("a player at PSG was accepted as an Arsenal signing")
 	}
 }
+
+func TestResolvePlayerFindsAnInjuredRegular(t *testing.T) {
+	// No rows at all this season (injured since spring), last season at the
+	// club: still the club's player.
+	handler := newRecordingHandler(t)
+	handler.on("/leagues", func(w http.ResponseWriter, _ *http.Request) {
+		writeJSON(w, map[string]any{"errors": []any{}, "response": []any{map[string]any{
+			"league":  map[string]any{"id": 140, "name": "La Liga", "type": "League"},
+			"seasons": []any{map[string]any{"year": defaultCurrentSeason(), "current": true}},
+		}}})
+	})
+	handler.on("/players", func(w http.ResponseWriter, r *http.Request) {
+		stats := []any{}
+		if r.URL.Query().Get("season") == strconv.Itoa(defaultCurrentSeason()-1) {
+			stats = append(stats, map[string]any{
+				"team":  map[string]any{"id": 541, "name": "Real Madrid"},
+				"games": map[string]any{"appearences": 20, "minutes": 1600, "position": "Defender"},
+			})
+		}
+		writeJSON(w, map[string]any{"errors": []any{}, "response": []any{map[string]any{
+			"player":     map[string]any{"id": 372, "name": "Éder Militão", "age": 28},
+			"statistics": stats,
+		}}})
+	})
+	server := httptest.NewServer(handler)
+	defer server.Close()
+	provider := newTestProvider(server, newFakeStore())
+	if _, err := provider.ResolvePlayer(context.Background(), "É. Militão", "Real Madrid", 372, "DEF"); err != nil {
+		t.Fatalf("an injured regular was refused: %v", err)
+	}
+}
