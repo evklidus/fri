@@ -207,3 +207,40 @@ func TestUserCountIsNotPublic(t *testing.T) {
 		t.Error("the account count is readable without an admin account")
 	}
 }
+
+type breakdownFake struct {
+	fakeService
+}
+
+func (f *breakdownFake) PlayerBreakdown(_ context.Context, id int64) (*domain.PlayerBreakdown, error) {
+	return &domain.PlayerBreakdown{PlayerID: id, Performance: &domain.PerformanceSnapshot{Appearances: 30, Goals: 20, Assists: 9}}, nil
+}
+
+func TestFullStatisticsNeedAnAccount(t *testing.T) {
+	// The partner wants the raw numbers behind FRI to be something an
+	// account unlocks, the same as the top five.
+	fake := &breakdownFake{}
+	server := newServerWithFake(t, fake)
+	defer server.Close()
+
+	resp, err := stdhttp.Get(server.URL + "/api/players/8/breakdown")
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp.Body.Close()
+	if resp.StatusCode != stdhttp.StatusUnauthorized {
+		t.Errorf("anonymous status = %d, want 401", resp.StatusCode)
+	}
+
+	fake.sessionUser = &domain.User{ID: 5, Email: "fan@example.com"}
+	req, _ := stdhttp.NewRequest(stdhttp.MethodGet, server.URL+"/api/players/8/breakdown", nil)
+	req.AddCookie(&stdhttp.Cookie{Name: sessionCookieName, Value: "token"})
+	resp2, err := stdhttp.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp2.Body.Close()
+	if resp2.StatusCode != stdhttp.StatusOK {
+		t.Errorf("signed-in status = %d, want 200", resp2.StatusCode)
+	}
+}

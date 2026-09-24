@@ -132,6 +132,8 @@ type competitionContribution struct {
 	TeamID      int
 	Minutes     int
 	Appearances int
+	Goals       int
+	Assists     int
 	Rating      float64
 	Weight      float64
 	Credibility float64
@@ -143,6 +145,8 @@ type pooledStats struct {
 	// credibility floor. Playing time is playing time.
 	RawMinutes     int
 	RawAppearances int
+	RawGoals       int
+	RawAssists     int
 	// Measures: minutes-weighted across competitions. Rating is 0 when no
 	// counted row carried one.
 	Rating            float64
@@ -183,9 +187,12 @@ func poolClubStatistics(statistics []apiFootballStatistic) pooledStats {
 
 		out.RawMinutes += stat.Games.Minutes
 		out.RawAppearances += stat.Games.Appearances
+		out.RawGoals += stat.Goals.Total
+		out.RawAssists += stat.Goals.Assists
 		out.Competitions = append(out.Competitions, competitionContribution{
 			LeagueID: stat.League.ID, Name: comp.name, TeamID: stat.Team.ID,
 			Minutes: stat.Games.Minutes, Appearances: stat.Games.Appearances,
+			Goals: stat.Goals.Total, Assists: stat.Goals.Assists,
 			Rating: rating, Weight: comp.weight, Credibility: k,
 		})
 
@@ -236,6 +243,8 @@ func poolFromAnchor(stat apiFootballStatistic) pooledStats {
 	return pooledStats{
 		RawMinutes:        stat.Games.Minutes,
 		RawAppearances:    stat.Games.Appearances,
+		RawGoals:          stat.Goals.Total,
+		RawAssists:        stat.Goals.Assists,
 		Rating:            parseAPIFootballRating(stat.Games.Rating),
 		GoalsAssistsPer90: per90(float64(stat.Goals.Total+stat.Goals.Assists), minutes),
 		KeyPassesPer90:    per90(float64(stat.Passes.Key), minutes),

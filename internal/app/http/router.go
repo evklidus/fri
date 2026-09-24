@@ -61,6 +61,8 @@ func NewRouter(cfg config.Config, svc Service) *gin.Engine {
 		api.GET("/players/:id", handler.getPlayer)
 		api.GET("/players/:id/history", handler.getPlayerHistory)
 		api.GET("/players/:id/news", handler.getPlayerNews)
+		// Signed-in only; see playerBreakdown.
+		api.GET("/players/:id/breakdown", handler.playerBreakdown)
 		api.POST("/players/:id/vote", handler.submitVote) // legacy — kept for compat, see handler
 		api.GET("/leaderboard", handler.listPlayers)
 		api.GET("/news/feed", handler.listNewsFeed)

@@ -508,3 +508,34 @@ func (h *Router) addPlayer(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 	}
 }
+
+// BreakdownService serves the full-statistics view.
+type BreakdownService interface {
+	PlayerBreakdown(ctx context.Context, playerID int64) (*domain.PlayerBreakdown, error)
+}
+
+// playerBreakdown returns the inputs behind a player's FRI. Signed-in only,
+// like the top five: the detail is part of what an account unlocks. Anyone
+// else gets 401 with a code the page turns into a sign-in prompt.
+func (h *Router) playerBreakdown(c *gin.Context) {
+	if _, ok := h.currentUser(c); !ok {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "sign in required", "code": "sign_in_required"})
+		return
+	}
+	svc, ok := h.svc.(BreakdownService)
+	if !ok {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "statistics unavailable"})
+		return
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid player id"})
+		return
+	}
+	out, err := svc.PlayerBreakdown(c.Request.Context(), id)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "player not found"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"data": out})
+}

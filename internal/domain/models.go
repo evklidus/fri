@@ -313,6 +313,15 @@ type PerformanceSnapshot struct {
 	BirthDate *time.Time `json:"birth_date,omitempty"`
 	PhotoURL  string     `json:"photo_url,omitempty"`
 
+	// Raw season counts behind the rates above, summed over every counted
+	// competition, with the per-competition split. Zero on snapshots taken
+	// before 2026-09-24, when these started being kept.
+	Appearances  int               `json:"appearances"`
+	Minutes      int               `json:"minutes"`
+	Goals        int               `json:"goals"`
+	Assists      int               `json:"assists"`
+	Competitions []CompetitionLine `json:"competitions,omitempty"`
+
 	// PerformanceEvents are stats-derived rating events the provider chose
 	// to emit alongside the snapshot — e.g. "5-match scoring drought" for an
 	// attacker. The sync orchestrator forwards them to ApplyCharacterSync
@@ -557,4 +566,50 @@ type TrafficStats struct {
 	Syncs       []ComponentUpdate `json:"syncs"`
 	WindowDays  int               `json:"window_days"`
 	GeneratedAt time.Time         `json:"generated_at"`
+}
+
+// CompetitionLine is one tournament's share of a player's season.
+type CompetitionLine struct {
+	Name        string  `json:"name"`
+	Appearances int     `json:"appearances"`
+	Minutes     int     `json:"minutes"`
+	Goals       int     `json:"goals"`
+	Assists     int     `json:"assists"`
+	Rating      float64 `json:"rating"`
+	Weight      float64 `json:"weight"`
+}
+
+// PlayerBreakdown is everything a player's FRI was computed from, for the
+// signed-in "full statistics" view.
+type PlayerBreakdown struct {
+	PlayerID    int64                 `json:"player_id"`
+	Score       Score                 `json:"score"`
+	Performance *PerformanceSnapshot  `json:"performance,omitempty"`
+	Career      *PlayerCareerBaseline `json:"career,omitempty"`
+	Social      *SocialSnapshot       `json:"social,omitempty"`
+	Media       MediaBreakdown        `json:"media"`
+	Character   CharacterBreakdown    `json:"character"`
+	Weights     map[string]float64    `json:"weights"`
+	CareerShare float64               `json:"career_share"`
+}
+
+type MediaBreakdown struct {
+	Articles     int     `json:"articles"`
+	Positive     int     `json:"positive"`
+	Negative     int     `json:"negative"`
+	AvgSentiment float64 `json:"avg_sentiment"`
+	AvgTier      float64 `json:"avg_source_tier"`
+}
+
+type CharacterBreakdown struct {
+	Baseline float64          `json:"baseline"`
+	Events   []BreakdownEvent `json:"events"`
+}
+
+type BreakdownEvent struct {
+	Trigger   string    `json:"trigger"`
+	Component string    `json:"component"`
+	Delta     float64   `json:"delta"`
+	Status    string    `json:"status"`
+	At        time.Time `json:"at"`
 }

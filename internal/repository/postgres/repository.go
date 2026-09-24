@@ -482,8 +482,9 @@ func (r *Repository) ApplyPerformanceSync(ctx context.Context, snapshots []domai
 			INSERT INTO performance_snapshots (
 				player_id, provider, average_rating, goals_assists_per90, xg_xa_per90, position_rank_score, minutes_share,
 				form_score, last5_goals, last5_assists, last5_rating,
-				normalized_score, snapshot_at
-			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
+				normalized_score, snapshot_at,
+				appearances, minutes, goals, assists, competitions
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)
 		`,
 			snapshot.PlayerID,
 			snapshotProvider,
@@ -498,6 +499,11 @@ func (r *Repository) ApplyPerformanceSync(ctx context.Context, snapshots []domai
 			snapshot.Last5Rating,
 			snapshot.NormalizedScore,
 			snapshot.SnapshotAt,
+			snapshot.Appearances,
+			snapshot.Minutes,
+			snapshot.Goals,
+			snapshot.Assists,
+			competitionsJSON(snapshot.Competitions),
 		); err != nil {
 			return nil, err
 		}

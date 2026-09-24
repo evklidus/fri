@@ -1347,7 +1347,23 @@ func buildAPIFootballSnapshot(player domain.PlayerSyncTarget, anchor apiFootball
 		Last5Rating:       round1(form.Rating),
 		NormalizedScore:   normalizedScore,
 		SnapshotAt:        time.Now().UTC(),
+		Appearances:       pooled.RawAppearances,
+		Minutes:           pooled.RawMinutes,
+		Goals:             pooled.RawGoals,
+		Assists:           pooled.RawAssists,
+		Competitions:      competitionLines(pooled.Competitions),
 	}
+}
+
+func competitionLines(in []competitionContribution) []domain.CompetitionLine {
+	out := make([]domain.CompetitionLine, 0, len(in))
+	for _, c := range in {
+		out = append(out, domain.CompetitionLine{
+			Name: c.Name, Appearances: c.Appearances, Minutes: c.Minutes,
+			Goals: c.Goals, Assists: c.Assists, Rating: round2(c.Rating), Weight: c.Weight,
+		})
+	}
+	return out
 }
 
 // A goal-drought detector used to live here. It fired when a player had no

@@ -247,10 +247,16 @@
   /* MODAL */
   .modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.8); backdrop-filter:blur(8px); z-index:200; display:none; align-items:center; justify-content:center; padding:24px; }
   .modal-overlay.open { display:flex; }
-  .player-modal { background:var(--card); border:1px solid var(--border); border-radius:16px; width:100%; max-width:860px; max-height:90vh; overflow-y:auto; }
+  /* Player profile. Black and gold like the rest of the site — it used to sit
+     on the navy --card with blue, cyan and purple component colours, which
+     the partner rightly said looked like a different product. */
+  .player-modal { background:radial-gradient(120% 55% at 50% 0%,rgba(245,200,66,0.10),transparent 62%),#0B0C10;
+                  border:1px solid rgba(245,200,66,0.22); border-radius:20px; width:100%; max-width:860px; max-height:90vh; overflow-y:auto;
+                  box-shadow:0 30px 90px rgba(0,0,0,0.65), inset 0 1px 0 rgba(255,255,255,0.04); }
   .modal-header { padding:32px 32px 0; display:flex; align-items:flex-start; gap:24px; margin-bottom:28px; flex-wrap:wrap; }
-  .modal-avatar { width:80px; height:80px; border-radius:50%; font-size:36px; display:flex; align-items:center; justify-content:center; flex-shrink:0; border:3px solid var(--border); }
-  .modal-player-info h2 { font-size:28px; font-weight:700; margin-bottom:6px; }
+  .modal-avatar { width:88px; height:88px; border-radius:50%; font-size:36px; display:flex; align-items:center; justify-content:center; flex-shrink:0;
+                  background:#16181D; box-shadow:0 0 0 3px #0B0C10, 0 0 0 5px var(--gold), 0 10px 34px rgba(245,200,66,0.28); overflow:hidden; }
+  .modal-player-info h2 { font-family:'Bebas Neue',sans-serif; font-size:40px; letter-spacing:1px; font-weight:400; line-height:1; margin-bottom:8px; }
   .modal-player-info p { color:var(--muted); font-size:14px; }
   .modal-close { margin-left:auto; background:rgba(255,255,255,0.06); border:none; color:var(--muted); width:36px; height:36px; border-radius:50%; cursor:pointer; font-size:18px; transition:background 0.2s; }
   .modal-close:hover { background:rgba(255,255,255,0.12); }
@@ -260,9 +266,39 @@
   .big-num { font-family:'Bebas Neue',sans-serif; font-size:72px; line-height:1; background:linear-gradient(135deg,var(--gold),var(--gold2)); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
   .big-label { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:3px; color:var(--muted); text-transform:uppercase; margin-top:4px; }
   .pillar-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:12px; flex:2; }
-  .pillar-card { background:rgba(255,255,255,0.03); border:1px solid var(--border); border-radius:10px; padding:16px; }
-  .pillar-card-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:1px; margin-bottom:8px; font-family:'Space Mono',monospace; }
-  .pillar-card-score { font-family:'Bebas Neue',sans-serif; font-size:32px; line-height:1; margin-bottom:6px; }
+  .pillar-card { background:linear-gradient(180deg,rgba(255,255,255,0.055),rgba(255,255,255,0.02)); border:1px solid rgba(255,255,255,0.08);
+                 border-radius:14px; padding:16px; box-shadow:inset 0 1px 0 rgba(255,255,255,0.06); }
+  .pillar-card-label { font-size:11px; color:rgba(245,200,66,0.8); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:8px; font-family:'Space Mono',monospace; }
+  .pillar-card-score { font-family:'Bebas Neue',sans-serif; font-size:36px; line-height:1; margin-bottom:8px; color:#fff; }
+  .player-modal .pillar-fill { background:linear-gradient(90deg,#FFE38A,var(--gold),var(--gold2)); box-shadow:0 0 12px rgba(245,200,66,0.45); }
+  .modal-actions { display:flex; gap:10px; flex-wrap:wrap; margin:-8px 0 24px; }
+  .modal-action { font-family:'Space Mono',monospace; font-size:11px; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer;
+                  padding:11px 16px; border-radius:10px; border:1px solid rgba(245,200,66,0.35); background:rgba(245,200,66,0.08); color:var(--gold);
+                  transition:background .15s,border-color .15s; }
+  .modal-action:hover { background:rgba(245,200,66,0.16); border-color:rgba(245,200,66,0.6); }
+  .modal-action.primary { background:linear-gradient(135deg,var(--gold),var(--gold2)); color:#0B0C10; border-color:transparent; font-weight:700; }
+  .modal-action .lock { margin-left:6px; opacity:.7; }
+  /* Full statistics panel */
+  .fs-panel { margin-bottom:24px; }
+  .fs-panel[hidden] { display:none; }
+  .fs-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(180px,1fr)); gap:10px; }
+  .fs-block { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:12px; padding:14px 16px; }
+  .fs-block h4 { font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1.5px; text-transform:uppercase; color:var(--gold); margin-bottom:10px; font-weight:400; }
+  .fs-row { display:flex; justify-content:space-between; gap:10px; font-size:12px; padding:4px 0; border-top:1px solid rgba(255,255,255,0.04); }
+  .fs-row:first-of-type { border-top:none; }
+  .fs-row span:first-child { color:var(--muted); }
+  .fs-row span:last-child { color:var(--text); font-family:'Space Mono',monospace; }
+  .fs-table { width:100%; border-collapse:collapse; font-size:12px; margin-top:10px; }
+  .fs-table th { text-align:left; color:var(--muted); font-weight:400; font-family:'Space Mono',monospace; font-size:10px; letter-spacing:1px; text-transform:uppercase; padding:6px 8px 6px 0; }
+  .fs-table td { padding:6px 8px 6px 0; border-top:1px solid rgba(255,255,255,0.05); font-family:'Space Mono',monospace; }
+  .fs-note { font-size:11px; color:var(--muted); line-height:1.6; margin-top:10px; }
+  /* Card preview */
+  .card-preview { position:fixed; inset:0; z-index:260; background:rgba(0,0,0,0.88); backdrop-filter:blur(10px); display:none;
+                  align-items:center; justify-content:center; flex-direction:column; gap:18px; padding:20px; }
+  .card-preview.open { display:flex; }
+  .card-preview img { max-height:72vh; max-width:88vw; border-radius:18px; box-shadow:0 30px 90px rgba(0,0,0,0.7), 0 0 0 1px rgba(245,200,66,0.25); }
+  .card-preview-status { color:var(--muted); font-family:'Space Mono',monospace; font-size:12px; letter-spacing:1px; }
+  .card-preview-actions { display:flex; gap:10px; }
   .pillar-track { height:4px; background:rgba(255,255,255,0.06); border-radius:10px; overflow:hidden; }
   .pillar-fill { height:100%; border-radius:10px; }
   .modal-section { padding-top:20px; border-top:1px solid var(--border); }
@@ -452,6 +488,7 @@
     <img src="/assets/logo.png" srcset="/assets/logo.png 1x, /assets/logo@2x.png 2x" alt="FRI" />
   </a>
   <ul class="nav-links">
+    <li><a href="/" data-route-link data-i18n="nav_main">Main</a></li>
     <li><a href="/leaderboard" data-route-link data-i18n="nav_rankings">FRI Leaderboard</a></li>
     <li><a href="/vote" data-route-link data-i18n="nav_events">Vote on Events</a></li>
     <li><a href="/about" data-route-link data-i18n="nav_about">About Us</a></li>
@@ -666,6 +703,7 @@
   <div class="footer-grid">
     <div class="footer-col">
       <h5 data-i18n="foot_nav">Navigate</h5>
+      <a href="/" data-route-link data-i18n="nav_main">Main</a>
       <a href="/leaderboard" data-route-link data-i18n="nav_rankings">FRI Leaderboard</a>
       <a href="/vote" data-route-link data-i18n="nav_events">Vote on Events</a>
       <a href="/about" data-route-link data-i18n="nav_about">About Us</a>
@@ -702,6 +740,16 @@
 </footer>
 
 <!-- MODAL -->
+<div class="card-preview" id="card-preview" role="dialog" aria-modal="true">
+  <div class="card-preview-status"></div>
+  <img alt="FRI player card" hidden />
+  <div class="card-preview-actions">
+    <button class="modal-action primary" type="button" data-card-share hidden>Share</button>
+    <button class="modal-action primary" type="button" data-card-download>Download</button>
+    <button class="modal-action" type="button" data-card-close>Close</button>
+  </div>
+</div>
+
 <div class="modal-overlay" id="modal" onclick="closeModal(event)">
   <div class="player-modal">
     <div class="modal-header">
@@ -717,12 +765,17 @@
           <div id="modal-tier" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:1.5px;margin-top:6px;color:var(--gold)"></div>
         </div>
         <div class="pillar-grid">
-          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_perf">Performance</div><div class="pillar-card-score" id="m-perf" style="color:#F5C842"></div><div class="pillar-track"><div class="pillar-fill" id="m-perf-bar" style="background:linear-gradient(90deg,#F5C842,#E8A820)"></div></div></div>
-          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_social">Social</div><div class="pillar-card-score" id="m-social" style="color:#3B82F6"></div><div class="pillar-track"><div class="pillar-fill" id="m-social-bar" style="background:#3B82F6"></div></div></div>
-          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_media">Media</div><div class="pillar-card-score" id="m-media" style="color:#06B6D4"></div><div class="pillar-track"><div class="pillar-fill" id="m-media-bar" style="background:#06B6D4"></div></div></div>
-          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_char">Character</div><div class="pillar-card-score" id="m-char" style="color:#A855F7"></div><div class="pillar-track"><div class="pillar-fill" id="m-char-bar" style="background:#A855F7"></div></div></div>
+          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_perf">Performance</div><div class="pillar-card-score" id="m-perf"></div><div class="pillar-track"><div class="pillar-fill" id="m-perf-bar"></div></div></div>
+          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_social">Social</div><div class="pillar-card-score" id="m-social"></div><div class="pillar-track"><div class="pillar-fill" id="m-social-bar"></div></div></div>
+          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_media">Media</div><div class="pillar-card-score" id="m-media"></div><div class="pillar-track"><div class="pillar-fill" id="m-media-bar"></div></div></div>
+          <div class="pillar-card"><div class="pillar-card-label" data-i18n="p_char">Character</div><div class="pillar-card-score" id="m-char"></div><div class="pillar-track"><div class="pillar-fill" id="m-char-bar"></div></div></div>
         </div>
       </div>
+      <div class="modal-actions">
+        <button class="modal-action primary" type="button" onclick="openFullStats()"><span data-i18n="fs_open">Full statistics</span><span class="lock" id="fs-lock">🔒</span></button>
+        <button class="modal-action" type="button" onclick="openPlayerCard()" data-i18n="card_open">Player card</button>
+      </div>
+      <div class="fs-panel" id="fs-panel" hidden></div>
       <p style="font-size:13px;color:var(--muted);line-height:1.7" id="modal-summary"></p>
       <div id="char-warning" style="display:none;margin-top:16px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.25);border-left:3px solid #EF4444;border-radius:8px;padding:14px 16px;">
         <div style="font-size:11px;font-family:'Space Mono',monospace;letter-spacing:1.5px;color:#EF4444;text-transform:uppercase;margin-bottom:6px">⚠ Character Index Alert</div>
@@ -769,7 +822,7 @@ const T = {
     about_intro:'FRI is the first universal, data-driven reputation score for football players — combining on-field performance, social influence, media coverage, and character into one transparent number. Every component is computed from public data on a fixed schedule, and the formula below is the whole of it.',
     foot_nav:'Navigate', foot_contact:'Contact', foot_social:'Social',
     news_delete:'Delete',
-    news_locked:'Sign in to see full breakdown',
+    news_locked:'Sign in to unlock',
     events_eye:'Community Voice', events_title:'Vote on Events', events_sub:'Each rating event has a proposed delta. Drag the slider to suggest a fairer value. The median of community votes becomes the final change to the player\'s score.', events_empty:'No events pending votes right now. Check back after the next sync.',
     th_media:'Media', th_char:'Character',
     hero_eyebrow:'The Global Standard for Player Reputation', hero_line1:'FOOTBALL', hero_line2:'REPUTATION', hero_line3:'INDEX',
@@ -789,6 +842,7 @@ const T = {
     news_pos:'↑ Positive', news_neg:'↓ Negative', news_neu:'— Neutral', news_impact:'FRI Impact:', news_auto:'pts (auto-applied)',
     form_eye:'Methodology', form_title:'The Formula', form_sub:'Fair, transparent, and position-neutral. Every component is publicly auditable.',
     form_note:'All components normalized to 0–100 scale · Updated every 24 hours · Live news events trigger immediate recalculation',
+    nav_main:'Main', fs_open:'Full statistics', card_open:'Player card',
     nav_admin:'Dashboard',
     admin_eye:'Admin', admin_title:'Dashboard',
     admin_sub:'Accounts, traffic and the health of the data syncs. Visible only with an admin account.',
@@ -842,7 +896,7 @@ const T = {
     about_intro:'FRI — первый универсальный индекс репутации футболистов на основе данных: игровые показатели, влияние в соцсетях, медиаосвещение и характер сведены в одно прозрачное число. Каждый компонент считается из публичных данных по расписанию, а формула ниже — это всё, что за ним стоит.',
     foot_nav:'Разделы', foot_contact:'Контакты', foot_social:'Соцсети',
     news_delete:'Удалить',
-    news_locked:'Войдите, чтобы увидеть полностью',
+    news_locked:'Войдите, чтобы открыть',
     events_eye:'Голос болельщиков', events_title:'Голосование за события', events_sub:'У каждого события есть предложенная дельта. Двигайте ползунок, чтобы предложить более справедливое значение. Медиана голосов сообщества становится финальным изменением рейтинга игрока.', events_empty:'Сейчас нет событий, ожидающих голосования. Загляните после следующего sync.',
     th_media:'Медиа', th_char:'Характер',
     hero_eyebrow:'Мировой стандарт репутации футболистов', hero_line1:'ФУТБОЛ', hero_line2:'РЕПУТАЦИЯ', hero_line3:'ИНДЕКС',
@@ -862,6 +916,7 @@ const T = {
     news_pos:'↑ Позитив', news_neg:'↓ Негатив', news_neu:'— Нейтрально', news_impact:'Влияние на FRI:', news_auto:'пт (применено автоматически)',
     form_eye:'Методология', form_title:'Формула', form_sub:'Справедливая, прозрачная, нейтральная к позиции. Каждый компонент открыт для проверки.',
     form_note:'Все компоненты нормализованы по шкале 0–100 · Обновляется каждые 24 часа · Новостные события запускают немедленный перерасчёт',
+    nav_main:'Главная', fs_open:'Полная статистика', card_open:'Карточка игрока',
     nav_admin:'Панель',
     admin_eye:'Админ', admin_title:'Панель',
     admin_sub:'Аккаунты, трафик и состояние синхронизаций. Видно только с админского аккаунта.',
@@ -1105,7 +1160,7 @@ function openModal(p) {
   } else {
     mavEl.textContent = p.emoji;
   }
-  mavEl.style.background = p.bg;
+  mavEl.style.background = '#16181D';
   document.getElementById('modal-name').textContent = p.name;
   document.getElementById('modal-meta').textContent = `${p.pos} · ${p.club} · ${t.age_label} ${p.age}`;
   document.getElementById('modal-score').textContent = p.fri;
@@ -1129,14 +1184,19 @@ function openModal(p) {
   if (p.char <= 60) {
     warn.style.display = 'block';
     document.getElementById('char-warning-text').textContent = lang === 'ru'
-      ? `Индекс характера ${p.char}/100 — один из самых низких в рейтинге. Красные карточки, конфликты с арбитрами и симуляции существенно снижают общий FRI несмотря на высокие игровые показатели.`
-      : `Character Index ${p.char}/100 — one of the lowest in the rankings. Red cards, referee confrontations and simulations significantly reduce the overall FRI despite elite on-field performance.`;
+      ? `Индекс характера ${p.char}/100 — заметно ниже базового уровня 80 из-за зафиксированных негативных событий. Подробности — в полной статистике.`
+      : `Character Index ${p.char}/100 — well below the 80 baseline because of negative events on record. The events are listed in the full statistics.`;
   } else if (p.char >= 90) {
     good.style.display = 'block';
     document.getElementById('char-badge-text').textContent = lang === 'ru'
-      ? `Индекс характера ${p.char}/100 — образцовый. Ноль красных карточек за 18+ месяцев, безупречное отношение к арбитрам и партнёрам, активная социальная деятельность.`
-      : `Character Index ${p.char}/100 — exemplary. Zero red cards in 18+ months, consistent respect for referees and teammates, active social and charitable engagement.`;
+      ? `Индекс характера ${p.char}/100 — выше базового уровня 80: за игроком зафиксированы положительные события и нет весомых нарушений.`
+      : `Character Index ${p.char}/100 — above the 80 baseline: positive events on record and no significant incidents against this player.`;
   }
+  window.currentModalPlayer = p;
+  const fsPanel = document.getElementById('fs-panel');
+  if (fsPanel) { fsPanel.hidden = true; fsPanel.innerHTML = ''; }
+  const fsLock = document.getElementById('fs-lock');
+  if (fsLock) fsLock.hidden = !!window.friUser;
   document.getElementById('modal').classList.add('open');
 
   // Async-load history + news for the chart and news list. Show skeletons
@@ -1290,7 +1350,8 @@ function showRoute(path, opts) {
     page.hidden = page.getAttribute('data-route') !== route;
   });
   document.querySelectorAll('[data-route-link]').forEach(link => {
-    link.classList.toggle('active', link.getAttribute('href') === route && route !== '/');
+    // The logo also points at '/', but it is a logo, not a tab.
+    link.classList.toggle('active', link.getAttribute('href') === route && !link.classList.contains('nav-logo'));
   });
   // A route change is a page change: start at the top rather than keeping the
   // scroll position of the page we just left.
@@ -1354,6 +1415,7 @@ renderTable();
 
 renderNews();
 </script>
+<script src="/assets/card.js"></script>
 <script src="/assets/live.js"></script>
 </body>
 </html>

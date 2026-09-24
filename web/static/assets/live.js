@@ -13,9 +13,6 @@
     const trendValue = Math.abs(Number(item.trend_value || 0));
     return {
       id: item.id,
-      // Server-side flag: this article is about a player whose leaderboard
-      // place is withheld, and arrives with its text and links stripped.
-      locked: item.locked === true,
       rank: index + 1,
       emoji: item.emoji || "⚽",
       name: item.name,
@@ -63,6 +60,15 @@
     const sign = delta > 0 ? "+" : "";
     return {
       id: item.id,
+      // Server-side flag: this article is about a player whose leaderboard
+      // place is withheld, and arrives with its text and links stripped.
+      //
+      // This line used to sit in toLegacyPlayer by mistake, so every news
+      // item came through with locked undefined. renderNews never took its
+      // locked branch, and a withheld article was drawn as an ordinary card
+      // with nothing in it — an impact badge, a football, a blank headline
+      // and "-1.5 pts". The partner photographed exactly that.
+      locked: item.locked === true,
       // Carry the id, not a resolved photo. Players and news load
       // concurrently, so a lookup here races the roster and loses: every
       // card rendered the fallback ball instead of a face. The photo is
@@ -1037,6 +1043,125 @@
     if (link) link.hidden = !window.friIsAdmin;
   }
   window.renderAdminNav = renderAdminNav;
+
+  // ── PLAYER CARD + FULL STATISTICS ─────────────────────────
+  window.openPlayerCard = function openPlayerCard() {
+    if (window.currentModalPlayer && typeof window.openCardPreview === "function") {
+      window.openCardPreview(window.currentModalPlayer);
+    }
+  };
+
+  const FS_TEXT = {
+    en: {
+      season: "This season", career: "Last five seasons", social: "Social", media: "Media", character: "Character",
+      apps: "Matches", minutes: "Minutes", goals: "Goals", assists: "Assists", rating: "Avg rating",
+      ga90: "Goals + assists / 90", rank: "League rank score", share: "Minutes share", form: "Form (last 5)",
+      seasons: "Seasons", trophies: "Trophies", baseline: "Career score",
+      followers: "Followers", engagement: "Engagement", mentions: "Buzz", score: "Score",
+      articles: "Articles", positive: "Positive", negative: "Negative", sentiment: "Avg tone", tier: "Source quality",
+      base: "Baseline", events: "Events on record", none: "No events recorded.",
+      comp: "Competition", w: "Weight",
+      noCounts: "Match counts are recorded from the next statistics sync onward.",
+      formula: (w, c) => `FRI = Performance ×${w.performance} + Social ×${w.social} + Media ×${w.media} + Character ×${w.character}. Performance blends this season with the last five seasons, ${Math.round((1 - c) * 100)}/${Math.round(c * 100)}.`,
+      failed: "Could not load the statistics.",
+    },
+    ru: {
+      season: "Этот сезон", career: "Последние пять сезонов", social: "Соцсети", media: "Медиа", character: "Характер",
+      apps: "Матчи", minutes: "Минуты", goals: "Голы", assists: "Передачи", rating: "Средняя оценка",
+      ga90: "Голы + передачи / 90", rank: "Место в лиге (балл)", share: "Доля минут", form: "Форма (5 матчей)",
+      seasons: "Сезонов", trophies: "Трофеи", baseline: "Карьерный балл",
+      followers: "Подписчики", engagement: "Вовлечённость", mentions: "Шум", score: "Балл",
+      articles: "Статей", positive: "Позитивных", negative: "Негативных", sentiment: "Средний тон", tier: "Качество источников",
+      base: "База", events: "Зафиксированные события", none: "Событий нет.",
+      comp: "Турнир", w: "Вес",
+      noCounts: "Число матчей начнёт записываться со следующей синхронизации статистики.",
+      formula: (w, c) => `FRI = Игра ×${w.performance} + Соцсети ×${w.social} + Медиа ×${w.media} + Характер ×${w.character}. Игра смешивает этот сезон и пять последних, ${Math.round((1 - c) * 100)}/${Math.round(c * 100)}.`,
+      failed: "Не удалось загрузить статистику.",
+    },
+  };
+
+  function fsRow(label, value) {
+    return `<div class="fs-row"><span>${escapeHtml(label)}</span><span>${escapeHtml(String(value))}</span></div>`;
+  }
+  function fmt(n, digits) {
+    const v = Number(n || 0);
+    return digits === undefined ? v.toLocaleString() : v.toFixed(digits);
+  }
+
+  function renderFullStats(d, L) {
+    const blocks = [];
+    const perf = d.performance;
+    if (perf) {
+      let html = `<div class="fs-block"><h4>${L.season} · ${fmt(d.score.performance, 1)}</h4>`;
+      if (perf.appearances > 0) {
+        html += fsRow(L.apps, perf.appearances) + fsRow(L.minutes, fmt(perf.minutes)) +
+          fsRow(L.goals, perf.goals) + fsRow(L.assists, perf.assists);
+      }
+      html += fsRow(L.rating, fmt(perf.average_rating, 1)) + fsRow(L.ga90, fmt(perf.goals_assists_per90, 2)) +
+        fsRow(L.rank, fmt(perf.position_rank_score, 0)) + fsRow(L.share, fmt(perf.minutes_share, 0) + "%") +
+        fsRow(L.form, fmt(perf.form_score, 0));
+      if (!(perf.appearances > 0)) html += `<div class="fs-note">${L.noCounts}</div>`;
+      html += "</div>";
+      blocks.push(html);
+    }
+    const c = d.career;
+    if (c) {
+      blocks.push(`<div class="fs-block"><h4>${L.career} · ${fmt(c.baseline_score, 1)}</h4>` +
+        fsRow(L.seasons, c.seasons_played) + fsRow(L.apps, c.career_appearances) + fsRow(L.minutes, fmt(c.career_minutes)) +
+        fsRow(L.goals, c.career_goals) + fsRow(L.assists, c.career_assists) + fsRow(L.rating, fmt(c.career_avg_rating, 1)) +
+        fsRow(L.trophies, c.career_trophies_count) + "</div>");
+    }
+    const so = d.social;
+    blocks.push(`<div class="fs-block"><h4>${L.social} · ${fmt(d.score.social, 1)}</h4>` +
+      (so ? fsRow(L.followers, fmt(so.followers)) + fsRow(L.engagement, fmt(so.engagement_rate, 1) + "%") +
+        fsRow(L.mentions, fmt(so.mentions_growth_7d, 0)) : "") + "</div>");
+    const m = d.media || {};
+    blocks.push(`<div class="fs-block"><h4>${L.media} · ${fmt(d.score.media, 1)}</h4>` +
+      fsRow(L.articles, m.articles || 0) + fsRow(L.positive, m.positive || 0) + fsRow(L.negative, m.negative || 0) +
+      fsRow(L.sentiment, fmt(m.avg_sentiment, 2)) + fsRow(L.tier, fmt(m.avg_source_tier, 0)) + "</div>");
+    const ch = d.character || { events: [] };
+    let chHtml = `<div class="fs-block"><h4>${L.character} · ${fmt(d.score.character, 1)}</h4>` + fsRow(L.base, fmt(ch.baseline, 0));
+    const evs = ch.events || [];
+    chHtml += evs.length
+      ? evs.slice(0, 8).map((e) => fsRow(String(e.trigger).replace(/_/g, " "), (e.delta > 0 ? "+" : "") + fmt(e.delta, 1))).join("")
+      : `<div class="fs-note">${L.none}</div>`;
+    chHtml += "</div>";
+    blocks.push(chHtml);
+
+    let comps = "";
+    if (perf && perf.competitions && perf.competitions.length) {
+      comps = `<table class="fs-table"><thead><tr><th>${L.comp}</th><th>${L.apps}</th><th>${L.minutes}</th><th>${L.goals}</th><th>${L.assists}</th><th>${L.rating}</th><th>${L.w}</th></tr></thead><tbody>` +
+        perf.competitions.map((x) => `<tr><td>${escapeHtml(x.name)}</td><td>${x.appearances}</td><td>${fmt(x.minutes)}</td><td>${x.goals}</td><td>${x.assists}</td><td>${fmt(x.rating, 2)}</td><td>×${fmt(x.weight, 2)}</td></tr>`).join("") +
+        "</tbody></table>";
+    }
+    return `<div class="fs-grid">${blocks.join("")}</div>${comps}<div class="fs-note">${L.formula(d.weights || {}, d.career_share || 0.4)}</div>`;
+  }
+
+  window.openFullStats = async function openFullStats() {
+    const p = window.currentModalPlayer;
+    const panel = document.getElementById("fs-panel");
+    if (!p || !panel) return;
+    // Behind an account, the same as the top five.
+    if (!window.friUser) {
+      if (typeof window.openAuth === "function") window.openAuth("register");
+      return;
+    }
+    if (!panel.hidden) {
+      panel.hidden = true;
+      return;
+    }
+    const L = FS_TEXT[window.lang === "ru" ? "ru" : "en"];
+    panel.hidden = false;
+    panel.innerHTML = `<div class="modal-empty">…</div>`;
+    try {
+      const payload = await fetchJSON(`/api/players/${encodeURIComponent(p.id)}/breakdown`);
+      if (window.currentModalPlayer !== p) return; // the visitor opened someone else meanwhile
+      panel.innerHTML = renderFullStats(payload.data || {}, L);
+    } catch (err) {
+      panel.innerHTML = `<div class="modal-empty">${L.failed}</div>`;
+      console.error("full stats failed", err);
+    }
+  };
 
   async function hydrate() {
     try {
