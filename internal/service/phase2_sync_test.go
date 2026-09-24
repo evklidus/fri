@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"strings"
 	"testing"
 
 	"fri.local/football-reputation-index/internal/domain"
@@ -169,5 +171,34 @@ func TestRodriIsNotGivenSomeoneElsesAccount(t *testing.T) {
 	}
 	if snapshot.Followers != 0 || snapshot.NormalizedScore != neutralComponentScore {
 		t.Errorf("Rodri scored %+v, want no followers and the neutral score", snapshot)
+	}
+}
+
+type unavailablePerformance struct{}
+
+func (unavailablePerformance) Name() string { return apiFootballProviderName }
+func (unavailablePerformance) FetchPerformanceSnapshot(_ context.Context, p domain.PlayerSyncTarget) (domain.PerformanceSnapshot, error) {
+	return domain.PerformanceSnapshot{}, fmt.Errorf("%w for %s", ErrNoRealPerformance, p.Name)
+}
+
+func TestLapsedProviderLeavesScoresAloneAndSaysSo(t *testing.T) {
+	// 2026-09-17: the API-Football plan lapsed to Free, which refuses the
+	// current season. The sync used to fill every player with demo numbers
+	// and report "completed". It must now write nothing and report failure.
+	repo := &mockRepo{
+		listSyncTargetsFn: func(context.Context) ([]domain.PlayerSyncTarget, error) {
+			return []domain.PlayerSyncTarget{{ID: 8, Name: "L. Yamal"}, {ID: 17, Name: "Pedri"}}, nil
+		},
+	}
+	svc := New(repo, nil, nil, unavailablePerformance{})
+	result, err := svc.SyncPerformance(context.Background())
+	if err != nil {
+		t.Fatalf("sync: %v", err)
+	}
+	if result.Status != "failed" {
+		t.Errorf("status = %q, want failed — a provider that measured nobody is an outage, not a sync", result.Status)
+	}
+	if !strings.Contains(result.Message, "subscription") {
+		t.Errorf("message %q should point at the likely cause", result.Message)
 	}
 }

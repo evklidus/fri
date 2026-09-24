@@ -432,9 +432,12 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 
 	snapshots := make([]domain.PerformanceSnapshot, 0, len(targets))
 	var statsEvents []domain.CharacterEventCandidate
+	var skipped []string
 	for _, player := range targets {
 		snapshot, fetchErr := s.performanceProvider.FetchPerformanceSnapshot(ctx, player)
 		if fetchErr != nil {
+			// The player keeps the last score that came from real data.
+			skipped = append(skipped, player.Name)
 			continue
 		}
 		// Anchor with career baseline (Phase 4.2). If no baseline exists yet
@@ -453,10 +456,20 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 	}
 
 	if len(snapshots) == 0 {
-		return finish("completed", "no performance snapshots produced", 0, nil, nil)
+		// Nothing real came back for anyone: almost always the provider
+		// itself — a lapsed plan, an expired key, an outage. Say so in red.
+		msg := "no performance data from the provider — scores left as they were"
+		if len(skipped) > 0 {
+			msg = fmt.Sprintf("provider returned no real data for all %d players — scores left as they were; check the API-Football subscription", len(skipped))
+		}
+		return finish("failed", msg, 0, nil, nil)
 	}
 
 	deltas, err := s.repo.ApplyPerformanceSync(ctx, snapshots, providerName)
+	skippedNote := ""
+	if len(skipped) > 0 {
+		skippedNote = fmt.Sprintf("; %d skipped, kept their last real score: %s", len(skipped), strings.Join(firstN(skipped, 6), ", "))
+	}
 	if err == nil && len(statsEvents) > 0 {
 		// Stats events ride through the same event-routing path as
 		// keyword-detected ones — ApplyCharacterSync routes by
@@ -472,7 +485,7 @@ func (s *Service) SyncPerformance(ctx context.Context) (*domain.ComponentSyncRes
 		return finish("failed", err.Error(), len(snapshots), nil, err)
 	}
 
-	return finish("completed", fmt.Sprintf("performance sync completed for %d players", len(snapshots)), len(snapshots), deltas, nil)
+	return finish("completed", fmt.Sprintf("performance sync completed for %d players", len(snapshots))+skippedNote, len(snapshots), deltas, nil)
 }
 
 func (s *Service) SyncAll(ctx context.Context) ([]domain.ComponentSyncResult, error) {
@@ -584,4 +597,11 @@ func deterministicPercent(seed string) float64 {
 
 func round2(value float64) float64 {
 	return math.Round(value*100) / 100
+}
+
+func firstN(values []string, n int) []string {
+	if len(values) <= n {
+		return values
+	}
+	return append(append([]string(nil), values[:n]...), fmt.Sprintf("+%d more", len(values)-n))
 }

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -587,13 +588,25 @@ func buildRanksByGroup(entries []apiFootballPlayerEntry, group string) map[int]i
 	return ranks
 }
 
-func (p *apiFootballPerformanceProvider) fallbackSnapshot(ctx context.Context, player domain.PlayerSyncTarget) (domain.PerformanceSnapshot, error) {
-	snapshot, err := p.fallback.FetchPerformanceSnapshot(ctx, player)
-	if err != nil {
-		return domain.PerformanceSnapshot{}, err
-	}
-	snapshot.Provider = apiFootballFallbackProviderName
-	return snapshot, nil
+// ErrNoRealPerformance means the provider could not produce real statistics
+// for a player. The sync skips the player, who keeps their last real score.
+var ErrNoRealPerformance = errors.New("no real performance data")
+
+// fallbackSnapshot used to hand back the demo provider's numbers when
+// API-Football could not answer. That was harmless in the demo and harmful
+// in production: when the Pro subscription lapsed to the Free plan on
+// 2026-09-17, Free refused every current-season request, and for a week 44
+// of 45 players were scored on invented statistics — a rating, goal rate and
+// league rank that were all the same function of a hash, a form score of
+// zero for everyone. Lamine Yamal read 47.6 and Pedri 38.9, and nothing
+// anywhere said the numbers were made up.
+//
+// It now refuses. A player the provider cannot measure keeps the last score
+// that came from real data, and the sync reports how many were skipped and
+// why, so a lapsed subscription is a red line on the dashboard rather than
+// a quietly rewritten table.
+func (p *apiFootballPerformanceProvider) fallbackSnapshot(_ context.Context, player domain.PlayerSyncTarget) (domain.PerformanceSnapshot, error) {
+	return domain.PerformanceSnapshot{}, fmt.Errorf("%w for %s", ErrNoRealPerformance, player.Name)
 }
 
 func (p *apiFootballPerformanceProvider) findTeam(ctx context.Context, club string) (apiFootballTeam, error) {

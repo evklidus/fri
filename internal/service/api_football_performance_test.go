@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -298,12 +299,8 @@ func TestAPIFootballMappingPathFallsBackOnEmptyResponse(t *testing.T) {
 	provider := newTestProvider(server, store)
 	target := domain.PlayerSyncTarget{ID: 7, Name: "Lionel Messi", Club: "Inter Miami", Position: "RW", Age: 38}
 
-	snapshot, err := provider.FetchPerformanceSnapshot(context.Background(), target)
-	if err != nil {
-		t.Fatalf("fetch snapshot: %v", err)
-	}
-	if snapshot.Provider != apiFootballFallbackProviderName {
-		t.Errorf("provider = %q, want fallback %q", snapshot.Provider, apiFootballFallbackProviderName)
+	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); !errors.Is(err, ErrNoRealPerformance) {
+		t.Errorf("err = %v, want ErrNoRealPerformance — an unmeasurable player must not be given invented numbers", err)
 	}
 
 	stored, ok := store.get(7, apiFootballProviderName)
@@ -361,9 +358,8 @@ func TestAPIFootballMappingPathDeletesOnSanityFailure(t *testing.T) {
 	provider := newTestProvider(server, store)
 	target := domain.PlayerSyncTarget{ID: 7, Name: "Lionel Messi", Club: "Inter Miami", Position: "RW", Age: 38}
 
-	snapshot, _ := provider.FetchPerformanceSnapshot(context.Background(), target)
-	if snapshot.Provider != apiFootballFallbackProviderName {
-		t.Errorf("provider = %q, want fallback after sanity-check failure", snapshot.Provider)
+	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); !errors.Is(err, ErrNoRealPerformance) {
+		t.Errorf("err = %v, want ErrNoRealPerformance after sanity-check failure", err)
 	}
 	if _, ok := store.get(7, apiFootballProviderName); ok {
 		t.Errorf("mapping must be deleted when mapping-path sanity-check fails")
@@ -480,9 +476,8 @@ func TestAPIFootballSanityCheckRejectsWhenNoIdentitySignals(t *testing.T) {
 	provider := newTestProvider(server, store)
 	target := domain.PlayerSyncTarget{ID: 11, Name: "Erling Haaland", Club: "Manchester City", Position: "ST", Age: 25}
 
-	snapshot, _ := provider.FetchPerformanceSnapshot(context.Background(), target)
-	if snapshot.Provider != apiFootballFallbackProviderName {
-		t.Errorf("provider = %q, want fallback when no identity signal", snapshot.Provider)
+	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); !errors.Is(err, ErrNoRealPerformance) {
+		t.Errorf("err = %v, want ErrNoRealPerformance when no identity signal", err)
 	}
 	if _, ok := store.get(11, apiFootballProviderName); ok {
 		t.Errorf("mapping must NOT be saved when there's no identity signal")
@@ -647,12 +642,8 @@ func TestAPIFootballSanityCheckBlocksFalsePositive(t *testing.T) {
 	provider := newTestProvider(server, store)
 	target := domain.PlayerSyncTarget{ID: 11, Name: "Erling Haaland", Club: "Manchester City", Position: "ST", Age: 25}
 
-	snapshot, err := provider.FetchPerformanceSnapshot(context.Background(), target)
-	if err != nil {
-		t.Fatalf("fetch snapshot: %v", err)
-	}
-	if snapshot.Provider != apiFootballFallbackProviderName {
-		t.Errorf("provider = %q, want fallback when sanity-check fails", snapshot.Provider)
+	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); !errors.Is(err, ErrNoRealPerformance) {
+		t.Errorf("err = %v, want ErrNoRealPerformance when sanity-check fails", err)
 	}
 	if _, ok := store.get(11, apiFootballProviderName); ok {
 		t.Errorf("mapping must NOT be saved when sanity-check fails")
@@ -697,9 +688,8 @@ func TestAPIFootballSanityCheckBlocksLargeAgeGap(t *testing.T) {
 	provider := newTestProvider(server, store)
 	target := domain.PlayerSyncTarget{ID: 11, Name: "Erling Haaland", Club: "Manchester City", Position: "ST", Age: 25}
 
-	snapshot, _ := provider.FetchPerformanceSnapshot(context.Background(), target)
-	if snapshot.Provider != apiFootballFallbackProviderName {
-		t.Errorf("provider = %q, want fallback for age gap > 3", snapshot.Provider)
+	if _, err := provider.FetchPerformanceSnapshot(context.Background(), target); !errors.Is(err, ErrNoRealPerformance) {
+		t.Errorf("err = %v, want ErrNoRealPerformance for age gap > 3", err)
 	}
 	if _, ok := store.get(11, apiFootballProviderName); ok {
 		t.Errorf("mapping must NOT be saved when age gap is too big")
