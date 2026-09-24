@@ -708,21 +708,38 @@ var knownClubTeamIDs = map[string]int{
 	"galatasaray": 645,
 	"besiktas":    549,
 	"trabzonspor": 998, // Salah, from 2026-08-03
+	"ajax":        194,
+
+	// La Liga (Basque)
+	"athletic club":   531,
+	"athletic bilbao": 531,
+
+	// Brazil
+	"santos": 128,
 
 	// MLS
 	//
 	// 9568, not 1614. The wrong id sat here unnoticed because nobody from
 	// Miami had been added: the first attempt, Messi, was rejected with
 	// "not at Inter Miami" while his rows plainly said Inter Miami.
-	"inter miami": 9568,
+	"inter miami":         9568,
+	"orlando city":        1598,
+	"chicago fire":        1607,
+	"vancouver whitecaps": 1603,
+	"los angeles fc":      1616,
+	"lafc":                1616,
 
 	// Saudi Pro League
-	"al nassr":        2939,
-	"al ittihad":      2932,
+	"al nassr": 2939,
+	// Both of these were wrong until 2026-09-24: Al-Ittihad was mapped to
+	// 2932, which is Al-Hilal, and Al-Hilal to 2925, which is Al Bidda of
+	// Qatar. Verified against /teams?search.
+	"al ittihad":      2938,
 	"al-qadisiyah":    2933, // Julián Quiñones, Ballon d'Or 2026 nominee
 	"al qadisiyah":    2933,
 	"al-qadisiyah fc": 2933,
-	"al hilal":        2925,
+	"al hilal":        2932,
+	"al-hilal":        2932,
 }
 
 func (p *apiFootballPerformanceProvider) searchTeam(ctx context.Context, query, originalClub string) (apiFootballTeam, error) {

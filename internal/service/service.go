@@ -409,9 +409,12 @@ var clubLeagueIndex = map[string]string{
 	"besiktas":    "Süper Lig",
 
 	// MLS
-	"inter miami": "MLS",
-	"la galaxy":   "MLS",
-	"lafc":        "MLS",
+	"inter miami":  "MLS",
+	"orlando city": "MLS", "chicago fire": "MLS", "vancouver whitecaps": "MLS", "los angeles fc": "MLS",
+	"ajax": "Eredivisie", "santos": "Brasileirão", "athletic club": "La Liga", "athletic bilbao": "La Liga",
+	"al-hilal":  "Saudi Pro League",
+	"la galaxy": "MLS",
+	"lafc":      "MLS",
 }
 
 func slugify(value string) string {
