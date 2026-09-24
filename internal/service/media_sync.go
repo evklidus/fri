@@ -27,11 +27,11 @@ const (
 	// above them were refreshed twice a day, and the ordering is by FRI, so
 	// a low score kept them there.
 	//
-	// 80 is the ceiling the MediaStack Standard plan supports on a 12-hour
-	// schedule: 80 players × 60 runs a month is 4,800 of the 10,000 request
-	// allowance, leaving room for retries and a second sync a day if we ever
-	// want one. Raise the plan before raising this.
-	mediaSyncBatchSize = 80
+	// Raised to 110 when the roster reached 100 (2026-09-24): at 80, the
+	// twenty lowest-rated players never got coverage. 110 players × 60 runs a
+	// month is 6,600 of the MediaStack Standard plan's 10,000 requests. Raise
+	// the plan before raising this much further.
+	mediaSyncBatchSize = 110
 )
 
 type mediaProvider interface {

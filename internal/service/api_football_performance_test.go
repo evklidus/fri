@@ -1607,3 +1607,27 @@ func TestResolvePlayerFindsAnInjuredRegular(t *testing.T) {
 		t.Fatalf("an injured regular was refused: %v", err)
 	}
 }
+
+func TestSanityCheckAcceptsAThinStartToTheSeason(t *testing.T) {
+	player := domain.PlayerSyncTarget{Name: "Gavi", Position: "MID", Age: 22}
+	entry := apiFootballPlayerEntry{Player: apiFootballPlayerProfile{Age: 21}}
+	stat := apiFootballStatistic{Games: apiFootballGames{Minutes: 73, Position: "Midfielder"}}
+	if !passesSanityCheck(player, entry, stat) {
+		t.Error("73 minutes in September is a thin season, not a different person")
+	}
+	// No position to go on and an age three years off: too little to trust
+	// on so little football.
+	loose := apiFootballStatistic{Games: apiFootballGames{Minutes: 20}}
+	if passesSanityCheck(domain.PlayerSyncTarget{Name: "X", Age: 25}, apiFootballPlayerEntry{Player: apiFootballPlayerProfile{Age: 28}}, loose) {
+		t.Error("a loose age match on twenty minutes was accepted")
+	}
+}
+
+func TestNordicAndTurkishLettersNormalise(t *testing.T) {
+	if got := playerSearchTerm("M. Ødegaard"); got != "odegaard" {
+		t.Errorf("term = %q, want odegaard", got)
+	}
+	if got := playerSearchTerm("A. Güler"); got != "guler" {
+		t.Errorf("term = %q, want guler", got)
+	}
+}

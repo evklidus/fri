@@ -1546,12 +1546,13 @@ func passesSanityCheck(player domain.PlayerSyncTarget, apiPlayer apiFootballPlay
 
 	hasAgeSignal := apiPlayer.Player.Age > 0 && player.Age > 0
 	hasAgeMatch := false
+	ageDiff := 99
 	if hasAgeSignal {
-		diff := apiPlayer.Player.Age - player.Age
-		if diff < 0 {
-			diff = -diff
+		ageDiff = apiPlayer.Player.Age - player.Age
+		if ageDiff < 0 {
+			ageDiff = -ageDiff
 		}
-		if diff > 3 {
+		if ageDiff > 3 {
 			return false
 		}
 		hasAgeMatch = true
@@ -1564,7 +1565,14 @@ func passesSanityCheck(player domain.PlayerSyncTarget, apiPlayer apiFootballPlay
 		return false
 	}
 
-	if stat.Games.Minutes < 90 {
+	// Little or no football this season is not a reason to doubt who someone
+	// is. This used to reject anyone under 90 minutes outright, and a few
+	// weeks into 2026/27 that meant Álvarez (83), Gavi (73), Caicedo (14) and
+	// the injured — and a failed check deletes the stored mapping, so each
+	// sync threw away the very ids that identified them. With few minutes
+	// the identity has to rest on something firmer than a loose age match:
+	// the position, or an age within a year.
+	if stat.Games.Minutes < 90 && !hasPositionMatch && ageDiff > 1 {
 		return false
 	}
 
@@ -1776,6 +1784,7 @@ func normalizeFootballName(value string) string {
 		"ó", "o", "ò", "o", "ô", "o", "ö", "o", "õ", "o",
 		"ú", "u", "ù", "u", "û", "u", "ü", "u",
 		"ñ", "n", "ç", "c", "š", "s", "ć", "c", "č", "c", "ž", "z",
+		"ø", "o", "æ", "ae", "ß", "ss", "ł", "l", "ğ", "g", "ı", "i", "ş", "s", "ő", "o", "ű", "u",
 		".", " ", "-", " ",
 	)
 	return strings.Join(strings.Fields(replacer.Replace(value)), " ")
