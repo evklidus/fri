@@ -204,3 +204,30 @@ func TestAvailabilityIsJudgedAgainstFixturesActuallyPlayed(t *testing.T) {
 		t.Errorf("average rating = %v, want 7.2 pooled across both competitions", snapshot.AverageRating)
 	}
 }
+
+func TestEarlySeasonLeansOnLastSeason(t *testing.T) {
+	last := pooledStats{RawMinutes: 3000, Rating: 7.8, GoalsAssistsPer90: 1.0}
+	// Four matches in, one bad week: the rate and rating collapse.
+	thin := pooledStats{RawMinutes: 360, Rating: 6.2, GoalsAssistsPer90: 0.0}
+	got := shrinkTowardPrevious(thin, last)
+	if got.Rating < 7.3 || got.GoalsAssistsPer90 < 0.7 {
+		t.Errorf("four matches dragged a proven player down: %+v", got)
+	}
+	if got.RawMinutes != 360 {
+		t.Error("availability must stay the current season's")
+	}
+	// Fifteen matches in, the season speaks for itself.
+	full := pooledStats{RawMinutes: 1400, Rating: 6.2, GoalsAssistsPer90: 0.0}
+	if got := shrinkTowardPrevious(full, last); got.Rating != 6.2 {
+		t.Errorf("an established season was still blended: %v", got.Rating)
+	}
+	// Halfway the two weigh the same, and the pull fades steadily.
+	half := pooledStats{RawMinutes: 675, Rating: 7.0, GoalsAssistsPer90: 0.4}
+	if got := shrinkTowardPrevious(half, last); math.Abs(got.Rating-7.4) > 1e-9 {
+		t.Errorf("rating = %v, want 7.4 at the midpoint", got.Rating)
+	}
+	// No previous season (a debutant): nothing to lean on.
+	if got := shrinkTowardPrevious(thin, pooledStats{}); got.Rating != 6.2 {
+		t.Error("a player with no previous season was blended with nothing")
+	}
+}

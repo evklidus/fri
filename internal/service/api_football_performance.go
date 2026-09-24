@@ -221,6 +221,10 @@ func (p *apiFootballPerformanceProvider) fetchByExternalID(ctx context.Context, 
 	pooled := poolClubStatistics(apiPlayer.Statistics)
 	fixtureMinutes := p.fixtureMinutesFor(ctx, pooled, info.Season)
 	logPooledCompetitions(player, pooled, fixtureMinutes)
+	if len(pooled.Competitions) == 0 {
+		pooled = poolFromAnchor(stat) // as buildAPIFootballSnapshot would, before judging how thin it is
+	}
+	pooled = p.withPreviousSeason(ctx, apiPlayer.Player.ID, info.Season, pooled)
 
 	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)
@@ -282,6 +286,10 @@ func (p *apiFootballPerformanceProvider) fetchByTextSearch(ctx context.Context, 
 	pooled := poolClubStatistics(apiPlayer.Statistics)
 	fixtureMinutes := p.fixtureMinutesFor(ctx, pooled, info.Season)
 	logPooledCompetitions(player, pooled, fixtureMinutes)
+	if len(pooled.Competitions) == 0 {
+		pooled = poolFromAnchor(stat) // as buildAPIFootballSnapshot would, before judging how thin it is
+	}
+	pooled = p.withPreviousSeason(ctx, apiPlayer.Player.ID, info.Season, pooled)
 
 	snapshot := buildAPIFootballSnapshot(player, stat, pooled, rankPos, rankTotal, fixtureMinutes, form)
 	attachProfile(&snapshot, apiPlayer.Player)

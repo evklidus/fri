@@ -1171,7 +1171,13 @@ function openModal(p) {
   }
   const modalScoreMain = document.getElementById('modal-score-main');
   if (modalScoreMain) modalScoreMain.title = friScaleHint(lang);
-  document.getElementById('modal-summary').textContent = lang==='ru' ? p.sum_ru : p.sum_en;
+  // The summaries are prose from the original static demo and quote
+  // numbers that stopped being true long ago — one said "a FRI of 83" under
+  // a live 80.4. Better no paragraph than one contradicting the score
+  // right above it.
+  const summaryEl = document.getElementById('modal-summary');
+  summaryEl.textContent = '';
+  summaryEl.hidden = true;
   [['m-perf',p.perf],['m-social',p.social],['m-media',p.media],['m-char',p.char]].forEach(([id,v]) => {
     document.getElementById(id).textContent = v;
     document.getElementById(id+'-bar').style.width = v+'%';

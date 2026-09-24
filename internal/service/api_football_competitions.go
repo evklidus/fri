@@ -337,3 +337,58 @@ func logPooledCompetitions(player domain.PlayerSyncTarget, pooled pooledStats, f
 	log.Printf("api-football: %s pooled: %s → rating %.2f, availability %d/%.0f",
 		player.Name, strings.Join(parts, " · "), pooled.Rating, pooled.RawMinutes, fixtureMinutes)
 }
+
+// earlySeasonMinutes is how much current-season football a score needs
+// before it stands on its own: fifteen full matches.
+//
+// After the rollover guard switches to the new season (five league
+// fixtures played), a player's rate and rating rest on four or five games,
+// and one bad evening — or one hat-trick — swings Performance by twenty
+// points. That is noise, not reputation. Until a player has played this
+// much, last season makes up the difference: with 400 minutes this season
+// the score is 400 parts this season to 950 parts last, and by fifteen
+// matches last season has faded out entirely. It is the standard
+// regression-to-the-mean treatment for small samples, with the previous
+// season as the prior instead of a league average, because it is the best
+// available estimate of this particular player.
+const earlySeasonMinutes = 1350.0
+
+// shrinkTowardPrevious blends a thin current season with the previous one.
+// Only the per-90 rates and the rating are blended: availability, form and
+// league rank describe the present and stay current.
+func shrinkTowardPrevious(cur, prev pooledStats) pooledStats {
+	m := float64(cur.RawMinutes)
+	if m >= earlySeasonMinutes || prev.RawMinutes <= 0 {
+		return cur
+	}
+	prior := earlySeasonMinutes - m
+	if pm := float64(prev.RawMinutes); prior > pm {
+		prior = pm
+	}
+	blend := func(c, p float64) float64 { return (c*m + p*prior) / (m + prior) }
+	out := cur
+	out.GoalsAssistsPer90 = blend(cur.GoalsAssistsPer90, prev.GoalsAssistsPer90)
+	out.KeyPassesPer90 = blend(cur.KeyPassesPer90, prev.KeyPassesPer90)
+	out.ShotsOnPer90 = blend(cur.ShotsOnPer90, prev.ShotsOnPer90)
+	switch {
+	case cur.Rating > 0 && prev.Rating > 0:
+		out.Rating = blend(cur.Rating, prev.Rating)
+	case cur.Rating <= 0:
+		out.Rating = prev.Rating
+	}
+	return out
+}
+
+// withPreviousSeason applies shrinkTowardPrevious, fetching the previous
+// season only while the current one is thin — a handful of extra requests
+// for a few weeks after each rollover.
+func (p *apiFootballPerformanceProvider) withPreviousSeason(ctx context.Context, playerID, season int, cur pooledStats) pooledStats {
+	if float64(cur.RawMinutes) >= earlySeasonMinutes || playerID <= 0 {
+		return cur
+	}
+	prev, err := p.fetchPlayerByID(ctx, playerID, season-1)
+	if err != nil {
+		return cur
+	}
+	return shrinkTowardPrevious(cur, poolClubStatistics(prev.Statistics))
+}
