@@ -41,7 +41,13 @@ func main() {
 	careerBaselineProvider := service.NewCareerBaselineProvider(performanceProvider)
 	svc := service.New(repo, mediaProvider, socialProvider, performanceProvider).
 		WithCareerBaselineProvider(careerBaselineProvider).
-		WithNewsClassifier(service.NewNewsClassifier(cfg.AnthropicAPIKey, cfg.NewsClassifierModel))
+		WithNewsClassifier(service.NewNewsClassifier(service.NewsClassifierConfig{
+			DeepSeekAPIKey:  cfg.DeepSeekAPIKey,
+			DeepSeekModel:   cfg.DeepSeekModel,
+			DeepSeekBaseURL: cfg.DeepSeekBaseURL,
+			AnthropicAPIKey: cfg.AnthropicAPIKey,
+			AnthropicModel:  cfg.NewsClassifierModel,
+		}))
 
 	if err := svc.SeedIfEmpty(ctx, cfg.SourceHTMLPath); err != nil {
 		log.Fatalf("seed database: %v", err)

@@ -962,7 +962,23 @@ let lang = 'en';
 window.T = T;
 window.lang = lang;
 
-function setLang(l) {
+// First visit: Russian if the browser's preferred language is Russian,
+// English for everything else. A language picked with the switcher is
+// remembered and wins from then on.
+const LANG_KEY = 'fri_lang';
+function initialLang() {
+  try {
+    const saved = localStorage.getItem(LANG_KEY);
+    if (saved === 'en' || saved === 'ru') return saved;
+  } catch (e) {}
+  const preferred = (navigator.languages && navigator.languages[0]) || navigator.language || '';
+  return preferred.toLowerCase().startsWith('ru') ? 'ru' : 'en';
+}
+
+function setLang(l, remember = true) {
+  if (remember) {
+    try { localStorage.setItem(LANG_KEY, l); } catch (e) {}
+  }
   lang = l;
   window.lang = l;
   document.getElementById('btn-en').classList.toggle('active', l === 'en');
@@ -1420,6 +1436,7 @@ renderTable();
   function updateHeroCard() {}
 
 renderNews();
+if (initialLang() !== 'en') setLang(initialLang(), false);
 </script>
 <script src="/assets/card.js"></script>
 <script src="/assets/live.js"></script>

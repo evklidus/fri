@@ -59,16 +59,30 @@ type articleClassifier interface {
 	Classify(ctx context.Context, player domain.PlayerSyncTarget, articles []domain.MediaArticleCandidate) ([]ArticleVerdict, error)
 }
 
-// NewNewsClassifier returns a Claude-backed classifier, or nil when no key
-// is configured — the media sync then falls back to the keyword filters.
-func NewNewsClassifier(apiKey, model string) articleClassifier {
-	if strings.TrimSpace(apiKey) == "" {
-		return nil
+// NewNewsClassifier returns the article classifier for whichever key is
+// configured — DeepSeek first, then Claude — or nil when neither is, and the
+// media sync falls back to the keyword filters. See docs/news-classifier.md.
+func NewNewsClassifier(cfg NewsClassifierConfig) articleClassifier {
+	if strings.TrimSpace(cfg.DeepSeekAPIKey) != "" {
+		return newDeepSeekNewsClassifier(cfg.DeepSeekAPIKey, cfg.DeepSeekModel, cfg.DeepSeekBaseURL)
 	}
-	if strings.TrimSpace(model) == "" {
-		model = "claude-opus-5"
+	if strings.TrimSpace(cfg.AnthropicAPIKey) != "" {
+		model := cfg.AnthropicModel
+		if strings.TrimSpace(model) == "" {
+			model = "claude-opus-5"
+		}
+		return newClaudeNewsClassifier(cfg.AnthropicAPIKey, model)
 	}
-	return newClaudeNewsClassifier(apiKey, model)
+	return nil
+}
+
+// NewsClassifierConfig carries the keys and models for the classifier backends.
+type NewsClassifierConfig struct {
+	DeepSeekAPIKey  string
+	DeepSeekModel   string
+	DeepSeekBaseURL string
+	AnthropicAPIKey string
+	AnthropicModel  string
 }
 
 func newClaudeNewsClassifier(apiKey, model string, opts ...option.RequestOption) *claudeNewsClassifier {
@@ -141,16 +155,6 @@ func (c *claudeNewsClassifier) Classify(ctx context.Context, player domain.Playe
 	if len(articles) == 0 {
 		return nil, nil
 	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Player: %s — %s, %s.\n\n", player.Name, player.Club, player.Position)
-	for i, a := range articles {
-		summary := a.Summary
-		if len(summary) > 500 {
-			summary = summary[:500]
-		}
-		fmt.Fprintf(&b, "[%d] %s\n%s\n(source: %s)\n\n", i, a.Title, summary, a.Source)
-	}
-
 	resp, err := c.client.Beta.Messages.New(ctx, anthropic.BetaMessageNewParams{
 		Model:     c.model,
 		MaxTokens: 8000,
@@ -167,7 +171,7 @@ func (c *claudeNewsClassifier) Classify(ctx context.Context, player domain.Playe
 		// chosen by refusal category, inside the same call.
 		Fallbacks: anthropic.BetaFallbacksParamUnion{OfDefault: constant.ValueOf[constant.Default]()},
 		Betas:     []anthropic.AnthropicBeta{anthropic.AnthropicBetaServerSideFallback2026_07_01},
-		Messages:  []anthropic.BetaMessageParam{anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(b.String()))},
+		Messages:  []anthropic.BetaMessageParam{anthropic.NewBetaUserMessage(anthropic.NewBetaTextBlock(classifierUserPrompt(player, articles)))},
 	})
 	if err != nil {
 		return nil, err
@@ -213,4 +217,18 @@ func (c *claudeNewsClassifier) Classify(ctx context.Context, player domain.Playe
 		return out, nil
 	}
 	return nil, errors.New("classifier returned no verdicts")
+}
+
+// classifierUserPrompt lists the player and the numbered articles to judge.
+func classifierUserPrompt(player domain.PlayerSyncTarget, articles []domain.MediaArticleCandidate) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "Player: %s — %s, %s.\n\n", player.Name, player.Club, player.Position)
+	for i, a := range articles {
+		summary := a.Summary
+		if len(summary) > 500 {
+			summary = summary[:500]
+		}
+		fmt.Fprintf(&b, "[%d] %s\n%s\n(source: %s)\n\n", i, a.Title, summary, a.Source)
+	}
+	return b.String()
 }

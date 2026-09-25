@@ -88,9 +88,12 @@ services:
       # Generate with `openssl rand -hex 32`; leaving it empty disables the
       # header path and leaves sessions as the only way in.
       ADMIN_API_TOKEN: ${ADMIN_API_TOKEN:-}
-      # Claude reads each new article for the media sync: is it about this
+      # A model reads each new article for the media sync: is it about this
       # player, what does it do to their reputation, what event does it
-      # report. Empty falls back to keyword filters.
+      # report. DeepSeek is used when its key is set, Claude otherwise;
+      # both empty falls back to keyword filters. See docs/news-classifier.md.
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-flash}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       NEWS_CLASSIFIER_MODEL: ${NEWS_CLASSIFIER_MODEL:-claude-opus-5}
     # NOTE: there used to be an `extra_hosts` pin mapping api.mediastack.com

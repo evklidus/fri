@@ -33,10 +33,15 @@ type Config struct {
 	// sessions as the only way in.
 	AdminAPIToken string
 
-	// AnthropicAPIKey enables the news classifier: Claude reads each new
+	// DeepSeekAPIKey enables the news classifier: a model reads each new
 	// article and decides whether it is really about the player, what it
 	// does to their reputation, and what event it reports. Empty keeps the
-	// keyword filters. NewsClassifierModel defaults to claude-opus-5.
+	// keyword filters. See docs/news-classifier.md.
+	DeepSeekAPIKey  string
+	DeepSeekModel   string
+	DeepSeekBaseURL string
+	// AnthropicAPIKey is the alternative backend, used only when no
+	// DeepSeek key is set. NewsClassifierModel is its model.
 	AnthropicAPIKey     string
 	NewsClassifierModel string
 }
@@ -65,6 +70,9 @@ func MustLoad() Config {
 		MediaStackAPIKey:       getEnv("MEDIASTACK_API_KEY", ""),
 		MediaStackBaseURL:      getEnv("MEDIASTACK_BASE_URL", "https://api.mediastack.com/v1"),
 		AdminAPIToken:          getEnv("ADMIN_API_TOKEN", ""),
+		DeepSeekAPIKey:         getEnv("DEEPSEEK_API_KEY", ""),
+		DeepSeekModel:          getEnv("DEEPSEEK_MODEL", "deepseek-flash"),
+		DeepSeekBaseURL:        getEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com"),
 		AnthropicAPIKey:        getEnv("ANTHROPIC_API_KEY", ""),
 		NewsClassifierModel:    getEnv("NEWS_CLASSIFIER_MODEL", "claude-opus-5"),
 	}
